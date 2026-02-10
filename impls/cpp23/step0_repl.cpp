@@ -3,28 +3,22 @@
 
 static ReadLine rl("~/.mal_history");
 
-std::string READ(const std::string &str)
-{
-  return str;
-}
+std::string READ(std::string str) { return str; }
 
-std::string EVAL(const std::string &str)
-{
-  return str;
-}
 
-std::string PRINT(const std::string &str)
-{
-  return str;
-}
+std::string EVAL(std::string str) { return str; }
 
-std::string rep(const std::string &str)
+
+std::string PRINT(std::string str) { return str; }
+
+
+std::string rep(std::string str)
 {
-  return PRINT(EVAL(READ(str)));
+  return PRINT(EVAL(READ(std::move(str))));
 }
 
 int main() {
   std::string line;
   while (rl.get("user> ", line))
-    std::cout <<  rep(line) << "\n";
+    std::cout <<  rep(std::move(line)) << "\n";
 }

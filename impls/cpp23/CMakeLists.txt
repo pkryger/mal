@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 4.2)
-project(mal)
+project(mal LANGUAGES CXX)
 
-set(CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if(APPLE)
@@ -25,14 +24,21 @@ if(NOT READLINE_FOUND)
     macOS: brew install readline")
 endif()
 
-add_library(mal ReadLine.cpp)
+add_library(mal
+  ReadLine.cpp
+  Reader.cpp
+  Types.cpp
+)
 target_include_directories(mal PUBLIC ${READLINE_INCLUDE_DIRS})
 target_link_libraries(mal INTERFACE ${READLINE_LIBRARIES})
 target_link_directories(mal INTERFACE ${READLINE_LIBRARY_DIRS})
-file(GLOB mains step*.cpp)
+set_property(TARGET mal PROPERTY CXX_STANDARD 23)
+target_compile_options(mal PUBLIC -Wmove)
 
+file(GLOB mains step*.cpp)
 foreach(main ${mains})
   get_filename_component(target ${main} NAME_WLE)
   add_executable(${target} ${main})
   target_link_libraries(${target} PRIVATE mal)
+  set_property(TARGET ${target} PROPERTY CXX_STANDARD 23)
 endforeach()

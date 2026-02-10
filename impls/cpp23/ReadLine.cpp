@@ -15,7 +15,7 @@ static auto guardedString(char *str)
 
 ReadLine::ReadLine(const std::string &file)
   : historyFile{[&]() {
-    const auto&& expanded = guardedString(tilde_expand(file.c_str()));
+    auto &&expanded = guardedString(tilde_expand(file.c_str()));
     return std::string{expanded.get()};
   }()}
 {
@@ -24,7 +24,7 @@ ReadLine::ReadLine(const std::string &file)
 
 bool ReadLine::get(const std::string &prompt, std::string &out)
 {
-  const auto&& line = guardedString(readline(prompt.c_str()));
+  auto &&line = guardedString(readline(prompt.c_str()));
   if (!line)
     return false;
 
