@@ -42,6 +42,8 @@ public:
   virtual std::string print(bool) const = 0;
   virtual MalValuePtr eval(MalEnvPtr) { return shared_from_this(); }
 
+  bool isTrue() const noexcept;
+
   virtual ~MalValue() = default;
 
   MalValue(const MalValue &) = delete;

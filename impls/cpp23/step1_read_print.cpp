@@ -8,7 +8,7 @@ static ReadLine rl("~/.mal_history");
 
 MalValuePtr READ(std::string str) { return readStr(std::move(str)); }
 
-MalValuePtr EVAL(MalValuePtr val) {
+MalValuePtr EVAL(MalValuePtr val, MalEnvPtr) {
   assert(val);
   return val;
 }
@@ -18,7 +18,9 @@ std::string PRINT(MalValuePtr val) {
   return val->print(true);
 }
 
-std::string rep(std::string str) { return PRINT(EVAL(READ(std::move(str)))); }
+std::string rep(std::string str) {
+  return PRINT(EVAL(READ(std::move(str)), nullptr));
+}
 
 int main() {
   std::string line;

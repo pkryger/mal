@@ -3,6 +3,8 @@
 #include <utility>
 #include <ranges>
 
+extern MalValuePtr EVAL(MalValuePtr, MalEnvPtr);
+
 MalValuePtr MalEnv::find(const std::string &key) const {
   for (auto env = this; env; env = [&]() noexcept -> const MalEnv * {
          if (env->outer)
@@ -14,6 +16,11 @@ MalValuePtr MalEnv::find(const std::string &key) const {
     }
   }
   return nullptr;
+}
+
+bool MalValue::isTrue() const noexcept {
+  return !(this == MalConstant::nilValue().get() ||
+           this == MalConstant::falseValue().get());
 }
 
 MalValuePtr MalSymbol::eval(MalEnvPtr env) {
@@ -110,7 +117,7 @@ std::string MalSequence::doPrint(bool readably, char open, char close) const {
 MalValuePtr MalVector::eval(MalEnvPtr env) {
   assert(env);
   auto evaled = data |
-                std::views::transform([&](auto &&v) { return v->eval(env); }) |
+                std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
                 std::ranges::to<MalValueVec>();
   return std::make_shared<MalVector>(std::move(evaled));
 }
@@ -120,7 +127,7 @@ MalValuePtr MalList::eval(MalEnvPtr env) {
   if (data.empty())
     return shared_from_this();
   auto evaled = data |
-                std::views::transform([&](auto &&v) { return v->eval(env); }) |
+                std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
                 std::ranges::to<MalValueVec>();
   auto op = evaled.at(0);
   if (auto func = dynamic_cast<MalFunction *>(op.get())) {
@@ -138,7 +145,7 @@ std::string MalHash::print(bool readably) const {
 MalValuePtr MalHash::eval(MalEnvPtr env) {
   assert(env);
   auto evaled = data | std::views::transform([&](auto &&v) {
-                  return std::pair{v.first, v.second->eval(env)};
+                  return std::pair{v.first, EVAL(v.second, env)};
                 }) |
                 std::ranges::to<std::unordered_map>();
   auto res = std::make_shared<MalHash>(MalValueVec{});
