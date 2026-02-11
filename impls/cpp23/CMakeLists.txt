@@ -25,6 +25,7 @@ if(NOT READLINE_FOUND)
 endif()
 
 add_library(mal
+  Core.cpp
   ReadLine.cpp
   Reader.cpp
   Types.cpp
