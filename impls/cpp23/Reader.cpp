@@ -71,7 +71,7 @@ void Tokeniser::nextToken() {
   std::string mismatch{pos, str.end()};
   if (mismatch[0] == '"')
     throw ReaderException{"unbalanced \""};
-  throw ReaderException{"mismatch from: " + std::move(mismatch)};
+  throw ReaderException{std::format("mismatch from: {}", std::move(mismatch))};
 }
 
 MalValuePtr readForm(Tokeniser&);
@@ -169,7 +169,7 @@ MalValuePtr readForm(Tokeniser &tokeniser) {
       if (!(dynamic_cast<MalString *>(i->get()) ||
             dynamic_cast<MalSymbol *>(i->get()) ||
             dynamic_cast<MalKeyword *>(i->get()))) {
-        throw ReaderException{"unexpected key " + (*i)->print(true)};
+        throw ReaderException{std::format("unexpected key '{:r}'", *i)};
     }}
     return std::make_shared<MalHash>(std::move(items));
   }

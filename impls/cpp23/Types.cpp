@@ -1,5 +1,8 @@
 #include "Types.h"
+#include "Core.h"
+#include <algorithm>
 #include <cassert>
+#include <format>
 #include <utility>
 #include <ranges>
 
@@ -23,11 +26,46 @@ bool MalValue::isTrue() const noexcept {
            this == MalConstant::falseValue().get());
 }
 
+MalValuePtr MalInteger::isEqualTo(MalValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return MalConstant::trueValue();
+  }
+  if (auto other = dynamic_cast<MalInteger *>(rhs.get());
+      other && data == other->data) {
+    return MalConstant::trueValue();
+  }
+  return MalConstant::falseValue();
+}
+
+MalValuePtr MalStringBase::isEqualTo(MalValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return MalConstant::trueValue();
+  }
+  if (auto other = [&]() noexcept -> MalStringBase * {
+        auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
+        if (typeid(*this) == typeid(o)) {
+          return dynamic_cast<MalStringBase *>(rhs.get());
+        }
+        return nullptr;
+      }();
+      other && data == other->data) {
+    return MalConstant::trueValue();
+  }
+  return MalConstant::falseValue();
+}
+
 MalValuePtr MalSymbol::eval(MalEnvPtr env) {
   assert(env);
   if (auto &&i = env->find(data))
     return i;
-  throw EvalException{"'" + data + "' not found"};
+  throw EvalException{std::format("'{}' not found", data)};
+}
+
+MalValuePtr MalConstant::isEqualTo(MalValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return MalConstant::trueValue();
+  }
+  return MalConstant::falseValue();
 }
 
 std::string MalString::unescape(std::string in) {
@@ -58,7 +96,7 @@ std::string MalString::unescape(std::string in) {
 
 std::string MalString::escape(std::string in) {
   std::string out{'"'};
-  out.reserve(in.size());
+  out.reserve(in.size() + 2);
   for (auto i = in.begin(); i != in.end(); ++i) {
     char c = *i;
     switch (c) {
@@ -80,39 +118,25 @@ std::string MalString::escape(std::string in) {
 }
 
 std::string MalString::print(bool readably) const {
-  std::string out{MalStringBase::print(readably)};
-  return readably ? escape(out) : out;
+  return readably ? escape(data) : data;
 }
 
-namespace {
-  // No support for std::views::join_with on Apple Clang 17.0, but for a
-  // MalValueVec it should be something like:
-  //
-  // return std::format("({})", data | std::views::transform(&MalValue::print)
-  //   | std::views::join_with(' ') | std::ranges::to<std::string>());
-
-
-template <typename DATA, typename FORMAT_DATUM>
-std::string collectionPrint(char open, char close, DATA&& data,
-                            FORMAT_DATUM &&format_datum) {
-  std::string res{open};
-  if (data.empty())
-    return res + close;
-  auto i = data.begin();
-  res += format_datum(*i);
-  for (++i; i != data.end(); ++i)
-    res += " " + format_datum(*i);
-  res += close;
-  return res;
+MalValuePtr MalSequence::isEqualTo(MalValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return MalConstant::trueValue();
+  }
+  if (auto other = dynamic_cast<MalSequence *>(rhs.get());
+      other && data.size() == other->data.size()) {
+    auto res =
+        std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
+          return lhs->isEqualTo(rhs)->isTrue();
+        });
+    return res.in1 == data.end() && res.in2 == other->data.end()
+               ? MalConstant::trueValue()
+               : MalConstant::falseValue();
+  }
+  return MalConstant::falseValue();
 }
-
-} // namespace
-
-std::string MalSequence::doPrint(bool readably, char open, char close) const {
-  return collectionPrint(open, close, data,
-                         [&](auto &&v) { return v->print(readably); });
-}
-
 
 MalValuePtr MalVector::eval(MalEnvPtr env) {
   assert(env);
@@ -129,17 +153,15 @@ MalValuePtr MalList::eval(MalEnvPtr env) {
   auto evaled = data |
                 std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
                 std::ranges::to<MalValueVec>();
-  auto op = evaled.at(0);
-  if (auto func = dynamic_cast<MalFunction *>(op.get())) {
-    return func->apply(evaled.begin() + 1, evaled.end());
+  auto op = evaled[0];
+  if (auto function = dynamic_cast<MalFunction *>(op.get())) {
+    return function->apply({evaled.begin() + 1, evaled.end()});
   }
-  throw EvalException{"invalid function " + op->print(true)};
+  throw EvalException{std::format("invalid function '{:r}'", op)};
 }
 
 std::string MalHash::print(bool readably) const {
-  return collectionPrint('{', '}', data, [&](auto &&v) {
-    return v.first->print(readably) + " " + v.second->print(readably);
-  });
+  return readably ? std::format("{{{:r}}}", data) : std::format("{{{}}}", data);
 }
 
 MalValuePtr MalHash::eval(MalEnvPtr env) {
@@ -147,19 +169,106 @@ MalValuePtr MalHash::eval(MalEnvPtr env) {
   auto evaled = data | std::views::transform([&](auto &&v) {
                   return std::pair{v.first, EVAL(v.second, env)};
                 }) |
-                std::ranges::to<std::unordered_map>();
+                std::ranges::to<MalValueMap>();
   auto res = std::make_shared<MalHash>(MalValueVec{});
   res->data = std::move(evaled);
   return res;
 }
 
-std::unordered_map<MalValuePtr, MalValuePtr>
-MalHash::createMap(MalValueVec v) {
-  std::unordered_map<MalValuePtr, MalValuePtr> res;
+MalValuePtr MalHash::isEqualTo(MalValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return MalConstant::trueValue();
+  }
+  if (auto other = [&]() noexcept -> MalHash * {
+        auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
+        if (typeid(*this) == typeid(o)) {
+          return dynamic_cast<MalHash *>(rhs.get());
+        }
+        return nullptr;
+      }();
+      other && data.size() == other->data.size()) {
+    auto res =
+        std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
+          return lhs.first->isEqualTo(rhs.first)->isTrue() &&
+                 lhs.second->isEqualTo(rhs.second)->isTrue();
+        });
+    return res.in1 == data.end() && res.in2 == other->data.end()
+               ? MalConstant::trueValue()
+               : MalConstant::falseValue();
+  }
+  return MalConstant::falseValue();
+}
+
+MalValueMap MalHash::createMap(MalValueVec v) {
+  MalValueMap res;
   res.reserve(v.size() / 2);
   for (auto &&i = v.begin(); i != v.end(); i += 2) {
     assert(dynamic_cast<MalStringBase *>(i->get()));
     res.emplace(std::move(*i), std::move(*(i + 1)));
   }
   return res;
+}
+
+MalValuePtr MalBuiltIn::isEqualTo(MalValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return MalConstant::trueValue();
+  }
+  if (auto other = dynamic_cast<MalBuiltIn *>(rhs.get());
+      other && handler == other->handler) {
+    return MalConstant::trueValue();
+  }
+  return MalConstant::falseValue();
+}
+
+std::string MalLambda::print(bool readable) const {
+  if (readable) {
+    return std::format("#(λ-{:p} ({}) {:r}", reinterpret_cast<const void *>(this),
+                       params, body);
+
+  }
+  return std::format("(λ-{:p})", reinterpret_cast<const void *>(this));
+}
+
+MalValuePtr MalLambda::isEqualTo(MalValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return MalConstant::trueValue();
+  }
+  if (auto other = dynamic_cast<MalLambda *>(rhs.get());
+      other && params.size() == other->params.size() &&
+      env.get() == other->env.get()) {
+    auto res =
+        std::ranges::mismatch(params, other->params, [](auto &&lhs, auto &&rhs) noexcept {
+          return lhs == rhs;
+        });
+    if (res.in1 != params.end() || res.in2 != other->params.end()) {
+      return MalConstant::falseValue();
+    }
+    return body->isEqualTo(other->body);
+  }
+  return MalConstant::falseValue();
+}
+
+MalValuePtr MalLambda::apply(MalValues values) const {
+  auto applyEnv = std::make_shared<MalEnv>(env);
+  auto bindSize = params.size();
+  if (auto i = std::find_if(params.begin(), params.end(),
+                            [](auto &&elt) { return elt[0] == '&'; });
+      i != params.end()) {
+    if ((params.end() - i) != 2) {
+      throw EvalException{"there must be exactly one parameter after the &"};
+    }
+    bindSize = i - params.begin();
+    checkArgsAtLeast(print(false), values, bindSize);
+    applyEnv->insert_or_assign(params.back(),
+                               std::make_shared<MalList>(MalValueVec(
+                                   values.begin() + bindSize, values.end())));
+  } else {
+    checkArgsIs(print(false), values, params.size());
+  }
+  for (auto &&[key, value] :
+       std::views::zip(params | std::views::take(bindSize),
+                       values)) {
+    applyEnv->insert_or_assign(key, value);
+  }
+  return EVAL(body, applyEnv);
 }

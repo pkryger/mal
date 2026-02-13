@@ -5,6 +5,17 @@
 #include <stdexcept>
 #include <string>
 
+void checkArgsIs(std::string name, MalValues values, std::size_t expected);
+
+void checkArgsAtLeast(std::string name, MalValues values, std::size_t expected);
+
+void checkArgsBetween(std::string name, MalValues values,
+                      std::size_t expectedMin, std::size_t expectedMax);
+
+
+[[noreturn]]
+void throwWrongArgument(std::string name, MalValuePtr val);
+
 void installBuiltIns(MalEnv& env);
 
 class CoreException : public std::runtime_error {

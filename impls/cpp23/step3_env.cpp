@@ -34,34 +34,36 @@ MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
       }
       if (auto symbol = dynamic_cast<MalSymbol *>(lvalues[1].get())) {
         auto val = EVAL(lvalues[2], env);
-        env->insert_or_assign(symbol->print(false), val);
+        env->insert_or_assign(symbol->asKey(), val);
         return val;
       }
-      throw EvalException{"invalid def! argument " + lvalues[1]->print(true)};
+      throw EvalException{
+          std::format("invalid def! argument '{:r}'", lvalues[1])};
     }
     if (frontValueIs("let*")) {
       if (lvalues.size() != 3) {
-        throw EvalException{"wrong number of let* arguments " +
-                            std::to_string(lvalues.size())};
+        throw EvalException{
+            std::format("wrong number of let* arguments: {:r}", lvalues)};
       }
       if (auto bindings = dynamic_cast<MalSequence *>(lvalues[1].get())) {
         auto bvalues = bindings->values();
         if (bvalues.size() % 2 != 0) {
-          throw EvalException{"odd number of let* bindings " +
-                              std::to_string(bvalues.size())};
+          throw EvalException{
+              std::format("odd number of let* bindings: {:r}", bvalues)};
         }
         auto letEnv = std::make_shared<MalEnv>(env);
         for (auto i = bvalues.begin(); i != bvalues.end(); i += 2) {
           if (auto symbol = dynamic_cast<MalSymbol *>(i->get())) {
-            letEnv->insert_or_assign(symbol->print(false),
+            letEnv->insert_or_assign(symbol->asKey(),
                                      EVAL(*(i + 1), letEnv));
           } else {
-            throw EvalException{"invalid let* binding " + (*i)->print(true)};
+            throw EvalException{std::format("invalid let* binding '{:r}'", *i)};
           }
         }
         return EVAL(lvalues[2], letEnv);
       }
-      throw EvalException{"invalid let* bindings " + lvalues[1]->print(true)};
+      throw EvalException{
+          std::format("invalid let* bindings '{:r}'", lvalues[1])};
     }
   }
   return ast->eval(env);
@@ -69,7 +71,7 @@ MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
 
 std::string PRINT(MalValuePtr ast) {
   assert(ast);
-  return ast->print(true);
+  return std::format("{:r}", ast);
 }
 
 std::string rep(std::string str) {

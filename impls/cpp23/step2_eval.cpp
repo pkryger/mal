@@ -17,7 +17,7 @@ MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
 
 std::string PRINT(MalValuePtr ast) {
   assert(ast);
-  return ast->print(true);
+  return std::format("{:r}", ast);
 }
 
 std::string rep(std::string str) {
