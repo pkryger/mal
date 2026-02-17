@@ -5,25 +5,27 @@
 #include <iostream>
 #include <memory>
 
+namespace mal {
+
 static ReadLine rl("~/.mal_history");
 
-MalValuePtr READ(std::string str) { return readStr(std::move(str)); }
+ValuePtr READ(std::string str) { return readStr(std::move(str)); }
 
-MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
+ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
   if (auto dbg = env->find("DEBUG-EVAL");
       dbg && dbg->isTrue()) {
     std::cout << "EVAL: " << ast->print(true) << "\n";
   }
-  if (auto list = dynamic_cast<MalList *>(ast.get())) {
+  if (auto list = dynamic_cast<List *>(ast.get())) {
     auto&& lvalues = list->values();
     if (lvalues.empty()) {
       return ast->eval(env);
     }
     auto frontValueIs = [&](std::string name) noexcept {
-      if (auto symbol = dynamic_cast<MalSymbol *>(lvalues[0].get())) {
-        return *symbol == MalSymbol{std::move(name)};
+      if (auto symbol = dynamic_cast<Symbol *>(lvalues[0].get())) {
+        return *symbol == Symbol{std::move(name)};
       }
       return false;
     };
@@ -32,7 +34,7 @@ MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
         throw EvalException{"wrong number of def! arguments " +
           std::to_string(lvalues.size())};
       }
-      if (auto symbol = dynamic_cast<MalSymbol *>(lvalues[1].get())) {
+      if (auto symbol = dynamic_cast<Symbol *>(lvalues[1].get())) {
         auto val = EVAL(lvalues[2], env);
         env->insert_or_assign(symbol->asKey(), val);
         return val;
@@ -45,15 +47,15 @@ MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
         throw EvalException{
             std::format("wrong number of let* arguments: {:r}", lvalues)};
       }
-      if (auto bindings = dynamic_cast<MalSequence *>(lvalues[1].get())) {
+      if (auto bindings = dynamic_cast<Sequence *>(lvalues[1].get())) {
         auto bvalues = bindings->values();
         if (bvalues.size() % 2 != 0) {
           throw EvalException{
               std::format("odd number of let* bindings: {:r}", bvalues)};
         }
-        auto letEnv = std::make_shared<MalEnv>(env);
+        auto letEnv = std::make_shared<Env>(env);
         for (auto i = bvalues.begin(); i != bvalues.end(); i += 2) {
-          if (auto symbol = dynamic_cast<MalSymbol *>(i->get())) {
+          if (auto symbol = dynamic_cast<Symbol *>(i->get())) {
             letEnv->insert_or_assign(symbol->asKey(),
                                      EVAL(*(i + 1), letEnv));
           } else {
@@ -69,34 +71,35 @@ MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
   return ast->eval(env);
 }
 
-std::string PRINT(MalValuePtr ast) {
+std::string PRINT(ValuePtr ast) {
   assert(ast);
   return std::format("{:r}", ast);
 }
 
 std::string rep(std::string str) {
-  static MalEnv env = []() {
-    MalEnv env{nullptr};
+  static Env env = []() {
+    Env env{nullptr};
     installBuiltIns(env);
     return env;
   }();
-  static MalEnvPtr envPtr =
-    std::shared_ptr<MalEnv>(std::addressof(env), [](auto &&) noexcept {});
+  static EnvPtr envPtr =
+    std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
   return PRINT(EVAL(READ(std::move(str)), envPtr));
 }
 
+} // namespace mal
 
 int main() {
   std::string line;
-  while (rl.get("user> ", line)) {
+  while (mal::rl.get("user> ", line)) {
     std::string out;
     try {
-      out = rep(std::move(line));
-    } catch (ReaderException ex) {
+      out = mal::rep(std::move(line));
+    } catch (mal::ReaderException ex) {
       out = std::string{"[reader] "} + ex.what();
-    } catch (CoreException ex) {
+    } catch (mal::CoreException ex) {
       out = std::string{"[core] "} + ex.what();
-    } catch (EvalException ex) {
+    } catch (mal::EvalException ex) {
       out = std::string{"[eval] "} + ex.what();
     }
     std::cout << out << "\n";

@@ -5,23 +5,26 @@
 #include <stdexcept>
 #include <string>
 
-void checkArgsIs(std::string name, MalValues values, std::size_t expected);
+namespace mal {
+void checkArgsIs(std::string name, ValuesSpan values, std::size_t expected);
 
-void checkArgsAtLeast(std::string name, MalValues values, std::size_t expected);
+void checkArgsAtLeast(std::string name, ValuesSpan values, std::size_t expected);
 
-void checkArgsBetween(std::string name, MalValues values,
+void checkArgsBetween(std::string name, ValuesSpan values,
                       std::size_t expectedMin, std::size_t expectedMax);
 
 
 [[noreturn]]
-void throwWrongArgument(std::string name, MalValuePtr val);
+void throwWrongArgument(std::string name, ValuePtr val);
 
-void installBuiltIns(MalEnv& env);
+void installBuiltIns(Env& env);
 
 class CoreException : public std::runtime_error {
 public:
   explicit CoreException(const std::string &str) : std::runtime_error{str} {}
 };
 
+
+} // namespace mal
 
 #endif // INCLUDE_CORE_H

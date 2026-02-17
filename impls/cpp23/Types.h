@@ -15,58 +15,58 @@
 #include <unordered_map>
 #include <span>
 
-class MalEnv;
-using MalEnvPtr = std::shared_ptr<MalEnv>;
+namespace mal {
 
-class MalValue;
-using MalValuePtr = std::shared_ptr<MalValue>;
-using MalValueVec = std::vector<MalValuePtr>;
-using MalValues = std::span<const MalValuePtr>;
-using MalValueIter =  MalValueVec::iterator;
-using MalValueCIter = MalValueVec::const_iterator;
-using MalValueMap = std::unordered_map<MalValuePtr, MalValuePtr>;
+class Env;
+using EnvPtr = std::shared_ptr<Env>;
 
-class MalEnv {
+class Value;
+using ValuePtr = std::shared_ptr<Value>;
+using ValuesContainer = std::vector<ValuePtr>;
+using ValuesSpan = std::span<const ValuePtr>;
+using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
+
+class Env {
 public:
-  explicit MalEnv(MalEnvPtr o) noexcept : outer{std::move(o)} {}
+  explicit Env(EnvPtr o) noexcept : outer{std::move(o)} {}
 
-  void insert_or_assign(std::string key, MalValuePtr value) {
+  void insert_or_assign(std::string key, ValuePtr value) {
     assert(value);
     map.insert_or_assign(std::move(key), std::move(value));
   }
 
-  MalValuePtr find(const std::string& key) const;
+  ValuePtr find(const std::string& key) const;
 
 private:
-  MalEnvPtr outer;
-  std::unordered_map<std::string, MalValuePtr> map;
+  EnvPtr outer;
+  std::unordered_map<std::string, ValuePtr> map;
 };
 
 
-class MalValue : public std::enable_shared_from_this<MalValue> {
+class Value : public std::enable_shared_from_this<Value> {
 public:
   virtual std::string print(bool) const = 0;
-  virtual MalValuePtr eval(MalEnvPtr) { return shared_from_this(); }
+  virtual  ValuePtr eval(EnvPtr) { return shared_from_this(); }
 
   bool isTrue() const noexcept;
-  virtual MalValuePtr isEqualTo(MalValuePtr rhs) const = 0;
+  virtual ValuePtr isEqualTo(ValuePtr rhs) const = 0;
 
-  virtual ~MalValue() = default;
+  virtual ~Value() = default;
 
-  MalValue(const MalValue &) = delete;
-  MalValue(MalValue &&) = delete;
-  MalValue &operator=(const MalValue &) = delete;
-  MalValue &operator=(MalValue &&) = delete;
+  Value(const Value &) = delete;
+  Value(Value &&) = delete;
+  Value &operator=(const Value &) = delete;
+  Value &operator=(Value &&) = delete;
 
 protected:
-  MalValue() = default;
+  Value() = default;
 };
 
-class MalInteger : public MalValue {
+class Integer : public Value {
 public:
-  explicit MalInteger(std::int64_t v) noexcept : data{v} {}
+  explicit Integer(std::int64_t v) noexcept : data{v} {}
   std::string print(bool) const override { return std::to_string(data); }
-  MalValuePtr isEqualTo(MalValuePtr rhs) const override;
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   std::int64_t value() const noexcept { return data; }
 
@@ -74,37 +74,43 @@ private:
   std::int64_t data;
 };
 
-class MalStringBase : public MalValue {
+class StringBase : public Value {
 public:
   std::string print(bool) const override { return data; }
-  MalValuePtr isEqualTo(MalValuePtr rhs) const override;
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  friend bool operator==(const MalStringBase &lhs,
-                         const MalStringBase &rhs) noexcept {
+  friend bool operator==(const StringBase &lhs,
+                         const StringBase &rhs) noexcept {
     return lhs.data == rhs.data;
   }
 
-  friend std::hash<MalValuePtr>;
+  friend std::hash<ValuePtr>;
 
 protected:
-  explicit MalStringBase(std::string v) noexcept : data{std::move(v)} {}
+  explicit StringBase(std::string v) noexcept : data{std::move(v)} {}
   std::string data;
 };
 
-// This block need to appear when the MalStringBase is already defined, but
-// before the first instantiation of MalValueMap, such that hash<MalValuePtr>
+} // namespace mal
+
+// This block need to appear when the StringBase is already defined, but
+// before the first instantiation of ValuesMap, such that hash<ValuePtr>
 // can be defined
 namespace std {
 
-template <> struct hash<MalValuePtr> {
-  size_t operator()(const MalValuePtr &o) const noexcept {
-    assert(dynamic_cast<MalStringBase *>(o.get()));
-    return std::hash<std::string>{}(static_cast<MalStringBase &>(*o).data);
+template <> struct hash<mal::ValuePtr> {
+  size_t operator()(const mal::ValuePtr &o) const noexcept {
+    assert(dynamic_cast<mal::StringBase *>(o.get()));
+    return std::hash<std::string>{}(static_cast<mal::StringBase &>(*o).data);
   }
 };
 
-struct mal_parse_value_mixin {
-  constexpr auto parse(format_parse_context &ctx) {
+} // namespace std
+
+namespace mal {
+
+struct ParseValueMixin {
+  constexpr auto parse(std::format_parse_context &ctx) {
     auto it = ctx.begin();
     if (it != ctx.end() && *it == 'r') {
       readably = true;
@@ -115,27 +121,10 @@ struct mal_parse_value_mixin {
   bool readably{false};
 };
 
-template <> struct formatter<MalValuePtr> : mal_parse_value_mixin {
-  template<typename FormatContext>
-  auto format(const MalValuePtr &val, FormatContext &ctx) const {
-    return format_to(ctx.out(), "{}", val->print(readably));
-  }
-};
-
-template <>
-struct formatter<MalValueMap::value_type> : mal_parse_value_mixin {
-  template <typename FormatContext>
-  auto format(const MalValueMap::value_type &val, FormatContext &ctx) const {
-    if (readably) {
-      return format_to(ctx.out(), "{:r} {:r}", val.first, val.second);
-    }
-    return format_to(ctx.out(), "{} {}", val.first, val.second);
-  }
-};
-
 template <typename RANGE_FORMATTER>
-constexpr auto mal_range_formatter_parse(RANGE_FORMATTER &rf,
-                                         format_parse_context &ctx) {
+constexpr auto RangeFormatterParse(RANGE_FORMATTER &rf,
+                                   std::format_parse_context &ctx) {
+
   rf.set_brackets("", "");
   rf.set_separator(" ");
   auto it = ctx.begin();
@@ -146,156 +135,178 @@ constexpr auto mal_range_formatter_parse(RANGE_FORMATTER &rf,
   return it;
 }
 
-template <typename R>
-  requires ranges::range<R> &&
-           same_as<ranges::range_value_t<R>, MalValuePtr>
-struct formatter<R> : range_formatter<MalValuePtr> {
-  constexpr auto parse(format_parse_context &ctx) {
-    return mal_range_formatter_parse(*this, ctx);
+} // namespace mal
+
+namespace std {
+
+template <> struct formatter<mal::ValuePtr> : mal::ParseValueMixin {
+  template<typename FormatContext>
+  auto format(const mal::ValuePtr &val, FormatContext &ctx) const {
+    return format_to(ctx.out(), "{}", val->print(readably));
   }
 };
 
 template <>
-struct formatter<MalValueMap> : range_formatter<MalValueMap::value_type> {
+struct formatter<mal::ValuesMap::value_type> : mal::ParseValueMixin {
+  template <typename FormatContext>
+  auto format(const mal::ValuesMap::value_type &val, FormatContext &ctx) const {
+    if (readably) {
+      return format_to(ctx.out(), "{:r} {:r}", val.first, val.second);
+    }
+    return format_to(ctx.out(), "{} {}", val.first, val.second);
+  }
+};
+
+template <typename R>
+  requires ranges::range<R> && same_as<ranges::range_value_t<R>, mal::ValuePtr>
+struct formatter<R> : range_formatter<mal::ValuePtr> {
   constexpr auto parse(format_parse_context &ctx) {
-    return mal_range_formatter_parse (*this, ctx);
+    return mal::RangeFormatterParse(*this, ctx);
+  }
+};
+
+template <>
+struct formatter<mal::ValuesMap> : range_formatter<mal::ValuesMap::value_type> {
+  constexpr auto parse(format_parse_context &ctx) {
+    return mal::RangeFormatterParse (*this, ctx);
   }
 };
 
 } // namespace std
 
+namespace mal {
 
-class MalSymbol : public MalStringBase {
+class Symbol : public StringBase {
 public:
-  explicit MalSymbol(std::string v) noexcept : MalStringBase{std::move(v)} {}
-  MalValuePtr eval(MalEnvPtr env) override;
+  explicit Symbol(std::string v) noexcept : StringBase{std::move(v)} {}
+  ValuePtr eval(EnvPtr env) override;
 
   const std::string &asKey() const {
     return data;
   }
 
-  friend bool operator==(const MalSymbol &lhs, const std::string &rhs) {
+  friend bool operator==(const Symbol &lhs, const std::string &rhs) {
     return lhs.data == rhs;
   }
 
-  friend bool operator==(const std::string &lhs, const MalSymbol &rhs) {
+  friend bool operator==(const std::string &lhs, const Symbol &rhs) {
     return lhs == rhs.data;
   }
 
 };
 
-class MalKeyword : public MalStringBase {
+class Keyword : public StringBase {
 public:
-  explicit MalKeyword(std::string v) noexcept : MalStringBase{std::move(v)} {}
+  explicit Keyword(std::string v) noexcept : StringBase{std::move(v)} {}
 };
 
-class MalConstant : public MalStringBase {
+class Constant : public StringBase {
 public:
-  static MalValuePtr nilValue() {
-    static MalConstant val{"nil"};
-    static MalValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
+  static ValuePtr nilValue() {
+    static Constant val{"nil"};
+    static ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
 
     return ptr;
   }
 
-  static MalValuePtr trueValue() {
-    static MalConstant val{"true"};
-    static MalValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
+  static ValuePtr trueValue() {
+    static Constant val{"true"};
+    static ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
 
     return ptr;
   }
 
-  static MalValuePtr falseValue() {
-    static MalConstant val{"false"};
-    static MalValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
+  static ValuePtr falseValue() {
+    static Constant val{"false"};
+    static ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
     return ptr;
   }
 
-  MalValuePtr isEqualTo(MalValuePtr rhs) const override;
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
 
 private:
-  explicit MalConstant(std::string v) noexcept : MalStringBase{std::move(v)} {}
+  explicit Constant(std::string v) noexcept : StringBase{std::move(v)} {}
 
 };
 
-class MalString : public MalStringBase {
+class String : public StringBase {
 public:
   std::string print(bool readably) const override;
   static std::string unescape(std::string in);
   static std::string escape(std::string in);
 
-  explicit MalString(std::string v) noexcept : MalStringBase{std::move(v)} {}
+  explicit String(std::string v) noexcept : StringBase{std::move(v)} {}
 };
 
-class MalSequence : public MalValue {
+class Sequence : public Value {
 public:
-  MalValuePtr isEqualTo(MalValuePtr rhs) const override;
-  MalValues values() const noexcept { return {data.begin(), data.end()}; };
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
+  ValuesSpan values() const noexcept { return {data.begin(), data.end()}; };
 
 protected:
-  explicit MalSequence(MalValueVec v) noexcept
+  explicit Sequence(ValuesContainer v) noexcept
       : data{std::move(v)} {}
 
-  MalValueVec data;
+  ValuesContainer data;
 };
 
-class MalList : public MalSequence {
+class List : public Sequence {
 public:
-  explicit MalList(MalValueVec v) noexcept
-      : MalSequence{std::move(v)} {}
+  explicit List(ValuesContainer v) noexcept
+      : Sequence{std::move(v)} {}
   std::string print(bool readably) const override {
     return readably ? std::format("({:r})", data) : std::format("({})", data);
   }
 
-  MalValuePtr eval(MalEnvPtr env) override;
+   ValuePtr eval(EnvPtr env) override;
 };
 
-class MalVector : public MalSequence {
+class Vector : public Sequence {
 public:
-  explicit MalVector(MalValueVec v) noexcept
-      : MalSequence{std::move(v)} {}
+  explicit Vector(ValuesContainer v) noexcept
+      : Sequence{std::move(v)} {}
   std::string print(bool readably) const override {
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
   }
 
-  MalValuePtr eval(MalEnvPtr env) override;
+   ValuePtr eval(EnvPtr env) override;
 };
 
-class MalHash : public MalValue {
+class Hash : public Value {
 public:
-  explicit MalHash(MalValueVec v)
+  explicit Hash(ValuesContainer v)
       : data{createMap(std::move(v))} {}
 
   std::string print(bool) const override;
 
-  MalValuePtr eval(MalEnvPtr env) override;
+  ValuePtr eval(EnvPtr env) override;
 
-  MalValuePtr isEqualTo(MalValuePtr rhs) const override;
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   auto& values() const noexcept { return data; }
 
 private:
-  static MalValueMap createMap(MalValueVec);
-  MalValueMap data;
+  static ValuesMap createMap(ValuesContainer);
+  ValuesMap data;
 };
 
-class MalFunction : public MalValue {
+class Invocable : public Value {
 public:
-  virtual MalValuePtr apply(MalValues) const = 0;
+  virtual ValuePtr apply(ValuesSpan) const = 0;
 };
 
-class MalBuiltIn : public MalFunction {
+class BuiltIn : public Invocable {
 public:
-  using Handler = MalValuePtr (*)(std::string name, MalValues values);
+  using Handler = ValuePtr (*)(std::string name, ValuesSpan values);
 
-  MalBuiltIn(std::string n, Handler h) noexcept
+  BuiltIn(std::string n, Handler h) noexcept
       : name{std::move(n)}, handler{h} {}
 
-  MalValuePtr apply(MalValues values) const override {
+  ValuePtr apply(ValuesSpan values) const override {
     return handler(name, values);
   }
 
-  MalValuePtr isEqualTo(MalValuePtr rhs) const override;
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   std::string print(bool readable) const override {
     return readable ? "#'" + name : name;
@@ -308,19 +319,19 @@ private:
   Handler handler;
 };
 
-class MalLambda : public MalFunction {
+class Lambda : public Invocable {
 public:
-  explicit MalLambda(std::vector<std::string> p, MalValuePtr b, MalEnvPtr e)
+  explicit Lambda(std::vector<std::string> p,  ValuePtr b, EnvPtr e)
   : params{std::move(p)}, body{b}, env{e} {}
 
   std::string print(bool readable) const override;
-  MalValuePtr isEqualTo(MalValuePtr rhs) const override;
-  MalValuePtr apply(MalValues values) const override;
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
+  ValuePtr apply(ValuesSpan values) const override;
 
 private:
   std::vector<std::string> params;
-  MalValuePtr body;
-  MalEnvPtr env;
+  ValuePtr body;
+  EnvPtr env;
 };
 
 class EvalException : public std::runtime_error {
@@ -328,4 +339,5 @@ public:
   explicit EvalException(const std::string &str) : std::runtime_error{str} {}
 };
 
+} // namespace mal
 #endif // INCLUDE_TYPES_H

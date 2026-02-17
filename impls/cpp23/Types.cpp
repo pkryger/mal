@@ -6,10 +6,13 @@
 #include <utility>
 #include <ranges>
 
-extern MalValuePtr EVAL(MalValuePtr, MalEnvPtr);
 
-MalValuePtr MalEnv::find(const std::string &key) const {
-  for (auto env = this; env; env = [&]() noexcept -> const MalEnv * {
+namespace mal {
+
+extern ValuePtr EVAL(ValuePtr, EnvPtr);
+
+ValuePtr Env::find(const std::string &key) const {
+  for (auto env = this; env; env = [&]() noexcept -> const Env * {
          if (env->outer)
            return env->outer.get();
          return nullptr;
@@ -21,54 +24,54 @@ MalValuePtr MalEnv::find(const std::string &key) const {
   return nullptr;
 }
 
-bool MalValue::isTrue() const noexcept {
-  return !(this == MalConstant::nilValue().get() ||
-           this == MalConstant::falseValue().get());
+bool Value::isTrue() const noexcept {
+  return !(this == Constant::nilValue().get() ||
+           this == Constant::falseValue().get());
 }
 
-MalValuePtr MalInteger::isEqualTo(MalValuePtr rhs) const {
+ValuePtr Integer::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<MalInteger *>(rhs.get());
+  if (auto other = dynamic_cast<Integer *>(rhs.get());
       other && data == other->data) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-MalValuePtr MalStringBase::isEqualTo(MalValuePtr rhs) const {
+ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  if (auto other = [&]() noexcept -> MalStringBase * {
+  if (auto other = [&]() noexcept -> StringBase * {
         auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
         if (typeid(*this) == typeid(o)) {
-          return dynamic_cast<MalStringBase *>(rhs.get());
+          return dynamic_cast<StringBase *>(rhs.get());
         }
         return nullptr;
       }();
       other && data == other->data) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-MalValuePtr MalSymbol::eval(MalEnvPtr env) {
+ValuePtr Symbol::eval(EnvPtr env) {
   assert(env);
   if (auto &&i = env->find(data))
     return i;
   throw EvalException{std::format("'{}' not found", data)};
 }
 
-MalValuePtr MalConstant::isEqualTo(MalValuePtr rhs) const {
+ValuePtr Constant::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-std::string MalString::unescape(std::string in) {
+std::string String::unescape(std::string in) {
   std::string out;
   out.reserve(in.size());
   for (auto i = in.begin() + 1, end = in.end() - 1; i != end; ++i) {
@@ -94,7 +97,7 @@ std::string MalString::unescape(std::string in) {
   return out;
 }
 
-std::string MalString::escape(std::string in) {
+std::string String::escape(std::string in) {
   std::string out{'"'};
   out.reserve(in.size() + 2);
   for (auto i = in.begin(); i != in.end(); ++i) {
@@ -117,72 +120,72 @@ std::string MalString::escape(std::string in) {
   return out;
 }
 
-std::string MalString::print(bool readably) const {
+std::string String::print(bool readably) const {
   return readably ? escape(data) : data;
 }
 
-MalValuePtr MalSequence::isEqualTo(MalValuePtr rhs) const {
+ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<MalSequence *>(rhs.get());
+  if (auto other = dynamic_cast<Sequence *>(rhs.get());
       other && data.size() == other->data.size()) {
     auto res =
         std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
           return lhs->isEqualTo(rhs)->isTrue();
         });
     return res.in1 == data.end() && res.in2 == other->data.end()
-               ? MalConstant::trueValue()
-               : MalConstant::falseValue();
+               ? Constant::trueValue()
+               : Constant::falseValue();
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-MalValuePtr MalVector::eval(MalEnvPtr env) {
+ValuePtr Vector::eval(EnvPtr env) {
   assert(env);
   auto evaled = data |
                 std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
-                std::ranges::to<MalValueVec>();
-  return std::make_shared<MalVector>(std::move(evaled));
+                std::ranges::to<ValuesContainer>();
+  return std::make_shared<Vector>(std::move(evaled));
 }
 
-MalValuePtr MalList::eval(MalEnvPtr env) {
+ValuePtr List::eval(EnvPtr env) {
   assert(env);
   if (data.empty())
     return shared_from_this();
   auto evaled = data |
                 std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
-                std::ranges::to<MalValueVec>();
+                std::ranges::to<ValuesContainer>();
   auto op = evaled[0];
-  if (auto function = dynamic_cast<MalFunction *>(op.get())) {
+  if (auto function = dynamic_cast<Invocable *>(op.get())) {
     return function->apply({evaled.begin() + 1, evaled.end()});
   }
   throw EvalException{std::format("invalid function '{:r}'", op)};
 }
 
-std::string MalHash::print(bool readably) const {
+std::string Hash::print(bool readably) const {
   return readably ? std::format("{{{:r}}}", data) : std::format("{{{}}}", data);
 }
 
-MalValuePtr MalHash::eval(MalEnvPtr env) {
+ValuePtr Hash::eval(EnvPtr env) {
   assert(env);
   auto evaled = data | std::views::transform([&](auto &&v) {
                   return std::pair{v.first, EVAL(v.second, env)};
                 }) |
-                std::ranges::to<MalValueMap>();
-  auto res = std::make_shared<MalHash>(MalValueVec{});
+                std::ranges::to<ValuesMap>();
+  auto res = std::make_shared<Hash>(ValuesContainer{});
   res->data = std::move(evaled);
   return res;
 }
 
-MalValuePtr MalHash::isEqualTo(MalValuePtr rhs) const {
+ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  if (auto other = [&]() noexcept -> MalHash * {
+  if (auto other = [&]() noexcept -> Hash * {
         auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
         if (typeid(*this) == typeid(o)) {
-          return dynamic_cast<MalHash *>(rhs.get());
+          return dynamic_cast<Hash *>(rhs.get());
         }
         return nullptr;
       }();
@@ -193,34 +196,34 @@ MalValuePtr MalHash::isEqualTo(MalValuePtr rhs) const {
                  lhs.second->isEqualTo(rhs.second)->isTrue();
         });
     return res.in1 == data.end() && res.in2 == other->data.end()
-               ? MalConstant::trueValue()
-               : MalConstant::falseValue();
+               ? Constant::trueValue()
+               : Constant::falseValue();
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-MalValueMap MalHash::createMap(MalValueVec v) {
-  MalValueMap res;
+ValuesMap Hash::createMap(ValuesContainer v) {
+  ValuesMap res;
   res.reserve(v.size() / 2);
   for (auto &&i = v.begin(); i != v.end(); i += 2) {
-    assert(dynamic_cast<MalStringBase *>(i->get()));
+    assert(dynamic_cast<StringBase *>(i->get()));
     res.emplace(std::move(*i), std::move(*(i + 1)));
   }
   return res;
 }
 
-MalValuePtr MalBuiltIn::isEqualTo(MalValuePtr rhs) const {
+ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<MalBuiltIn *>(rhs.get());
+  if (auto other = dynamic_cast<BuiltIn *>(rhs.get());
       other && handler == other->handler) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-std::string MalLambda::print(bool readable) const {
+std::string Lambda::print(bool readable) const {
   if (readable) {
     return std::format("#(λ-{:p} ({}) {:r}", reinterpret_cast<const void *>(this),
                        params, body);
@@ -229,11 +232,11 @@ std::string MalLambda::print(bool readable) const {
   return std::format("(λ-{:p})", reinterpret_cast<const void *>(this));
 }
 
-MalValuePtr MalLambda::isEqualTo(MalValuePtr rhs) const {
+ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
-    return MalConstant::trueValue();
+    return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<MalLambda *>(rhs.get());
+  if (auto other = dynamic_cast<Lambda *>(rhs.get());
       other && params.size() == other->params.size() &&
       env.get() == other->env.get()) {
     auto res =
@@ -241,15 +244,15 @@ MalValuePtr MalLambda::isEqualTo(MalValuePtr rhs) const {
           return lhs == rhs;
         });
     if (res.in1 != params.end() || res.in2 != other->params.end()) {
-      return MalConstant::falseValue();
+      return Constant::falseValue();
     }
     return body->isEqualTo(other->body);
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-MalValuePtr MalLambda::apply(MalValues values) const {
-  auto applyEnv = std::make_shared<MalEnv>(env);
+ValuePtr Lambda::apply(ValuesSpan values) const {
+  auto applyEnv = std::make_shared<Env>(env);
   auto bindSize = params.size();
   if (auto i = std::find_if(params.begin(), params.end(),
                             [](auto &&elt) { return elt[0] == '&'; });
@@ -260,7 +263,7 @@ MalValuePtr MalLambda::apply(MalValues values) const {
     bindSize = i - params.begin();
     checkArgsAtLeast(print(false), values, bindSize);
     applyEnv->insert_or_assign(params.back(),
-                               std::make_shared<MalList>(MalValueVec(
+                               std::make_shared<List>(ValuesContainer(
                                    values.begin() + bindSize, values.end())));
   } else {
     checkArgsIs(print(false), values, params.size());
@@ -272,3 +275,5 @@ MalValuePtr MalLambda::apply(MalValues values) const {
   }
   return EVAL(body, applyEnv);
 }
+
+} // namespace mal

@@ -5,14 +5,14 @@
 #include <iostream>
 #include <format>
 #include <ranges>
-#include <span>
 #include <string>
 #include <utility>
 #include <memory>
 #include <algorithm>
 #include <print>
 
-void checkArgsIs(std::string name, MalValues values, std::size_t expected) {
+namespace mal {
+void checkArgsIs(std::string name, ValuesSpan values, std::size_t expected) {
 
   if (auto actual = values.size(); actual != expected) {
     throw CoreException{
@@ -22,7 +22,7 @@ void checkArgsIs(std::string name, MalValues values, std::size_t expected) {
   }
 }
 
-void checkArgsAtLeast(std::string name, MalValues values,
+void checkArgsAtLeast(std::string name, ValuesSpan values,
                       std::size_t expected) {
   if (auto actual = values.size(); actual < expected) {
     throw CoreException{
@@ -31,7 +31,7 @@ void checkArgsAtLeast(std::string name, MalValues values,
   }
 }
 
-void checkArgsBetween(std::string name, MalValues values,
+void checkArgsBetween(std::string name, ValuesSpan values,
                       std::size_t expectedMin, std::size_t expectedMax) {
   if (auto actual = values.size();
        expectedMax < actual || actual < expectedMin) {
@@ -42,28 +42,40 @@ void checkArgsBetween(std::string name, MalValues values,
 }
 
 [[noreturn]]
-void throwWrongArgument(std::string name, MalValuePtr val) {
+void throwWrongArgument(std::string name, ValuePtr val) {
   throw CoreException{
       std::format("wrong argument for '{}' call '{:r}'", std::move(name), val)};
 }
 
+} // namespace mal
+
 namespace {
 
+using mal::Constant;
+using mal::CoreException;
+using mal::Integer;
+using mal::List;
+using mal::Sequence;
+using mal::String;
+using mal::ValuePtr;
+using mal::ValuesSpan;
+using mal::ValuesContainer;
+
 template <typename BINARY_OP, typename UNARY_OP>
-MalValuePtr accumulateIntegers(std::string name, MalValues values,
-                               BINARY_OP &&binary_op, UNARY_OP &&unary_op,
-                               int minArgs = 1) {
+ValuePtr accumulateIntegers(std::string name, ValuesSpan values,
+                            BINARY_OP &&binary_op, UNARY_OP &&unary_op,
+                            int minArgs = 1) {
 
   assert(minArgs > 0);
   checkArgsAtLeast(std::move(name), values, minArgs);
-  if (auto init = dynamic_cast<MalInteger *>(values.front().get())) {
+  if (auto init = dynamic_cast<Integer *>(values.front().get())) {
     if (values.size() == 1) {
-      return std::make_shared<MalInteger>(
+      return std::make_shared<Integer>(
           std::forward<UNARY_OP>(unary_op)(init->value()));
     }
-    return std::make_shared<MalInteger>(std::ranges::fold_left(
+    return std::make_shared<Integer>(std::ranges::fold_left(
         values.subspan(1) | std::views::transform([&](auto elt) {
-          if (auto integer = dynamic_cast<MalInteger *>(elt.get())) {
+          if (auto integer = dynamic_cast<Integer *>(elt.get())) {
             return integer->value();
           }
           throwWrongArgument(std::move(name), elt);
@@ -73,29 +85,28 @@ MalValuePtr accumulateIntegers(std::string name, MalValues values,
   throwWrongArgument(std::move(name), values.front());
 }
 
-
-MalValuePtr addition(std::string name, MalValues values) {
+ValuePtr addition(std::string name, ValuesSpan values) {
   return accumulateIntegers(
       std::move(name), values,
       [](auto &&acc, auto &&v) noexcept { return acc + v; },
       [](auto &&v) noexcept { return v; });
 }
 
-MalValuePtr subtraction(std::string name, MalValues values) {
+ValuePtr subtraction(std::string name, ValuesSpan values) {
   return accumulateIntegers(
       std::move(name), values,
       [](auto &&acc, auto &&v) { return acc - v; },
       [](auto &&v) noexcept { return -v; });
 }
 
-MalValuePtr multiplication(std::string name, MalValues values) {
+ValuePtr multiplication(std::string name, ValuesSpan values) {
   return accumulateIntegers(
       std::move(name), values,
       [](auto &&acc, auto &&v) { return acc * v; },
       [](auto &&v) noexcept { return v; });
 }
 
-MalValuePtr division(std::string name, MalValues values) {
+ValuePtr division(std::string name, ValuesSpan values) {
   return accumulateIntegers(
       name, values,
       [&](auto &&acc, auto &&v) {
@@ -111,41 +122,41 @@ MalValuePtr division(std::string name, MalValues values) {
       2);
 }
 
-MalValuePtr list(std::string, MalValues values) {
-  return std::make_shared<MalList>(MalValueVec{values.begin(), values.end()});
+ValuePtr list(std::string, ValuesSpan values) {
+  return std::make_shared<List>(ValuesContainer{values.begin(), values.end()});
 }
 
-MalValuePtr listQuestion(std::string name, MalValues values) {
+ValuePtr listQuestion(std::string name, ValuesSpan values) {
   checkArgsIs(      std::move(name), values, 1);
-  if (dynamic_cast<MalList *>(values.front().get())) {
-    return MalConstant::trueValue();
+  if (dynamic_cast<List *>(values.front().get())) {
+    return Constant::trueValue();
   }
-  return MalConstant::falseValue();
+  return Constant::falseValue();
 }
 
-MalValuePtr emptyQuestion(std::string name, MalValues values) {
+ValuePtr emptyQuestion(std::string name, ValuesSpan values) {
   checkArgsIs(name, values, 1);
-  if (auto sequence = dynamic_cast<MalSequence *>(values.front().get())) {
-    return sequence->values().empty() ? MalConstant::trueValue()
-                                      : MalConstant::falseValue();
+  if (auto sequence = dynamic_cast<Sequence *>(values.front().get())) {
+    return sequence->values().empty() ? Constant::trueValue()
+                                      : Constant::falseValue();
   }
   throwWrongArgument(std::move(name), values.front());
 
 }
 
-MalValuePtr count(std::string name, MalValues values) {
+ValuePtr count(std::string name, ValuesSpan values) {
   checkArgsAtLeast(name, values, 1);
-  if (values.front().get() == MalConstant::nilValue().get()) {
-    return std::make_shared<MalInteger>(0);
+  if (values.front().get() == Constant::nilValue().get()) {
+    return std::make_shared<Integer>(0);
   }
-  if (auto sequence = dynamic_cast<MalSequence *>(values.front().get())) {
-    return std::make_shared<MalInteger>(sequence->values().size());
+  if (auto sequence = dynamic_cast<Sequence *>(values.front().get())) {
+    return std::make_shared<Integer>(sequence->values().size());
   }
   throwWrongArgument(std::move(name), values.front());
 }
 
 template <typename BINARY_OP>
-MalValuePtr compareIntegers(std::string name, MalValues values,
+ValuePtr compareIntegers(std::string name, ValuesSpan values,
                             BINARY_OP &&binary_op) {
   checkArgsAtLeast(name, values, 2);
   auto notMatching = std::ranges::adjacent_find(
@@ -154,73 +165,73 @@ MalValuePtr compareIntegers(std::string name, MalValues values,
         return !binary_op(lhs, rhs);
       },
       [name = std::move(name)](auto &&elt) {
-        if (auto integer = dynamic_cast<MalInteger *>(elt.get())) {
+        if (auto integer = dynamic_cast<Integer *>(elt.get())) {
           return integer->value();
         }
         throwWrongArgument(std::move(name), elt);
       });
-  return notMatching == values.end() ? MalConstant::trueValue()
-                                     : MalConstant::falseValue();
+  return notMatching == values.end() ? Constant::trueValue()
+                                     : Constant::falseValue();
 
 }
 
-MalValuePtr lt(std::string name, MalValues values) {
+ValuePtr lt(std::string name, ValuesSpan values) {
   return compareIntegers(
       std::move(name), values,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs < rhs; });
 }
 
-MalValuePtr lte(std::string name, MalValues values) {
+ValuePtr lte(std::string name, ValuesSpan values) {
   return compareIntegers(
             std::move(name), values,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs <= rhs; });
 }
 
-MalValuePtr gt(std::string name, MalValues values) {
+ValuePtr gt(std::string name, ValuesSpan values) {
   return compareIntegers(
             std::move(name), values,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs > rhs; });
 }
 
-MalValuePtr gte(std::string name, MalValues values) {
+ValuePtr gte(std::string name, ValuesSpan values) {
   return compareIntegers(
             std::move(name), values,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs >= rhs; });
 }
 
-MalValuePtr equal(std::string name, MalValues values) {
+ValuePtr equal(std::string name, ValuesSpan values) {
   checkArgsAtLeast(std::move(name), values, 2);
   auto notEqual =
       std::ranges::adjacent_find(values, [](auto &&lhs, auto &&rhs) {
         return !lhs->isEqualTo(rhs)->isTrue();
       });
-  return notEqual == values.end() ? MalConstant::trueValue()
-                                  : MalConstant::falseValue();
+  return notEqual == values.end() ? Constant::trueValue()
+                                  : Constant::falseValue();
 }
 
-MalValuePtr not_(std::string name, MalValues values) {
+ValuePtr not_(std::string name, ValuesSpan values) {
   checkArgsIs(      std::move(name), values, 1);
-  return values.front()->isTrue() ? MalConstant::falseValue()
-                                  : MalConstant::trueValue();
+  return values.front()->isTrue() ? Constant::falseValue()
+                                  : Constant::trueValue();
 }
 
-MalValuePtr prn(std::string name, MalValues values) {
+ValuePtr prn(std::string name, ValuesSpan values) {
   std::cout << std::format("{:r}\n", values);
-  return MalConstant::nilValue();
+  return Constant::nilValue();
 }
 
-MalValuePtr println(std::string name, MalValues values) {
+ValuePtr println(std::string name, ValuesSpan values) {
   std::print("{}\n", values);
-  return MalConstant::nilValue();
+  return Constant::nilValue();
 }
 
-MalValuePtr pr_str(std::string name, MalValues values) {
-  return std::make_shared<MalString>(
+ValuePtr pr_str(std::string name, ValuesSpan values) {
+  return std::make_shared<String>(
       std::format("{:r}", values));
 }
 
-MalValuePtr str(std::string name, MalValues values) {
-  return std::make_shared<MalString>(
+ValuePtr str(std::string name, ValuesSpan values) {
+  return std::make_shared<String>(
       values |
       std::views::transform([](auto &&elt) { return std::format("{}", elt); }) |
       std::views::join | std::ranges::to<std::string>());
@@ -228,33 +239,33 @@ MalValuePtr str(std::string name, MalValues values) {
 
 } // namespace
 
-
-void installBuiltIns(MalEnv &env) {
-  static MalValueVec builtIns{
-      std::make_shared<MalBuiltIn>("+", &addition),
-      std::make_shared<MalBuiltIn>("-", &subtraction),
-      std::make_shared<MalBuiltIn>("*", &multiplication),
-      std::make_shared<MalBuiltIn>("/", &division),
-      std::make_shared<MalBuiltIn>("list", &list),
-      std::make_shared<MalBuiltIn>("list?", &listQuestion),
-      std::make_shared<MalBuiltIn>("empty?", &emptyQuestion),
-      std::make_shared<MalBuiltIn>("count", &count),
-      std::make_shared<MalBuiltIn>("<", &lt),
-      std::make_shared<MalBuiltIn>("<=", &lte),
-      std::make_shared<MalBuiltIn>(">", &gt),
-      std::make_shared<MalBuiltIn>(">=", &gte),
-      std::make_shared<MalBuiltIn>("=", &equal),
-      std::make_shared<MalBuiltIn>("not", &not_),
-      std::make_shared<MalBuiltIn>("prn", &prn),
-      std::make_shared<MalBuiltIn>("println", &println),
-      std::make_shared<MalBuiltIn>("pr-str", &pr_str),
-      std::make_shared<MalBuiltIn>("str", &str),
+namespace mal {
+void installBuiltIns(Env &env) {
+  static ValuesContainer builtIns{
+      std::make_shared<BuiltIn>("+", &addition),
+      std::make_shared<BuiltIn>("-", &subtraction),
+      std::make_shared<BuiltIn>("*", &multiplication),
+      std::make_shared<BuiltIn>("/", &division),
+      std::make_shared<BuiltIn>("list", &list),
+      std::make_shared<BuiltIn>("list?", &listQuestion),
+      std::make_shared<BuiltIn>("empty?", &emptyQuestion),
+      std::make_shared<BuiltIn>("count", &count),
+      std::make_shared<BuiltIn>("<", &lt),
+      std::make_shared<BuiltIn>("<=", &lte),
+      std::make_shared<BuiltIn>(">", &gt),
+      std::make_shared<BuiltIn>(">=", &gte),
+      std::make_shared<BuiltIn>("=", &equal),
+      std::make_shared<BuiltIn>("not", &not_),
+      std::make_shared<BuiltIn>("prn", &prn),
+      std::make_shared<BuiltIn>("println", &println),
+      std::make_shared<BuiltIn>("pr-str", &pr_str),
+      std::make_shared<BuiltIn>("str", &str),
   };
 
   for (auto &builtIn : builtIns) {
-    env.insert_or_assign(dynamic_cast<MalBuiltIn *>(builtIn.get())->asKey(),
+    env.insert_or_assign(dynamic_cast<BuiltIn *>(builtIn.get())->asKey(),
                          builtIn);
-
   }
-
 }
+
+} // namespace mal

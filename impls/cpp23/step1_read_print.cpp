@@ -4,16 +4,17 @@
 
 #include <iostream>
 
+namespace mal {
 static ReadLine rl("~/.mal_history");
 
-MalValuePtr READ(std::string str) { return readStr(std::move(str)); }
+ValuePtr READ(std::string str) { return readStr(std::move(str)); }
 
-MalValuePtr EVAL(MalValuePtr val, MalEnvPtr) {
+ValuePtr EVAL(ValuePtr val, EnvPtr) {
   assert(val);
   return val;
 }
 
-std::string PRINT(MalValuePtr val) {
+std::string PRINT(ValuePtr val) {
   assert(val);
   return val->print(true);
 }
@@ -22,13 +23,15 @@ std::string rep(std::string str) {
   return PRINT(EVAL(READ(std::move(str)), nullptr));
 }
 
+} // namespace mal
+
 int main() {
   std::string line;
-  while (rl.get("user> ", line)) {
+  while (mal::rl.get("user> ", line)) {
     std::string out;
     try {
-      out = rep(std::move(line));
-    } catch (ReaderException ex) {
+      out = mal::rep(std::move(line));
+    } catch (mal::ReaderException ex) {
       out = std::string{"ReaderException: "} + ex.what();
     }
     std::cout << out << "\n";

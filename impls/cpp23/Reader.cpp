@@ -8,6 +8,17 @@
 #include <utility>
 
 namespace {
+using mal::Constant;
+using mal::Integer;
+using mal::Keyword;
+using mal::List;
+using mal::ReaderException;
+using mal::String;
+using mal::Symbol;
+using mal::ValuePtr;
+using mal::ValuesContainer;
+using mal::Vector;
+using mal::Hash;
 
 static const std::regex tokenRegexes[] = {
   std::regex("~@"),
@@ -74,11 +85,11 @@ void Tokeniser::nextToken() {
   throw ReaderException{std::format("mismatch from: {}", std::move(mismatch))};
 }
 
-MalValuePtr readForm(Tokeniser&);
+ValuePtr readForm(Tokeniser&);
 
-MalValueVec readSequence(Tokeniser &tokeniser, const std::string &end) {
+ValuesContainer readSequence(Tokeniser &tokeniser, const std::string &end) {
   assert(!tokeniser.eoi());
-  MalValueVec items;
+  ValuesContainer items;
   while ([&]() {
     if (tokeniser.eoi())
       throw ReaderException{"unbalanced " + end};
@@ -90,37 +101,37 @@ MalValueVec readSequence(Tokeniser &tokeniser, const std::string &end) {
   return items;
 }
 
-MalValuePtr readAtom(Tokeniser &tokeniser) {
+ValuePtr readAtom(Tokeniser &tokeniser) {
   assert(!tokeniser.eoi());
   auto token = tokeniser.peek();
   tokeniser.nextToken();
 
   if (token[0] == '"') {
-    return std::make_shared<MalString>(MalString::unescape(std::move(token)));
+    return std::make_shared<String>(String::unescape(std::move(token)));
   }
 
   if (token[0] == ':') {
-    return std::make_shared<MalKeyword>(token);
+    return std::make_shared<Keyword>(token);
   }
 
   if (token == "^") {
     auto meta{readForm(tokeniser)};
-    return std::make_shared<MalList>(MalValueVec{
-      std::make_shared<MalSymbol>("with-meta"),
+    return std::make_shared<List>(ValuesContainer{
+      std::make_shared<Symbol>("with-meta"),
       readForm(tokeniser),
       std::move(meta),
     });
   }
 
   if (std::regex_match(token, std::regex{"^[-+]?\\d+$"})) {
-    return std::make_shared<MalInteger>(std::stol(std::move(token)));
+    return std::make_shared<Integer>(std::stol(std::move(token)));
   }
 
   auto firstIsToken = [&](auto &&elt) noexcept { return elt.first == token; };
-  static const std::pair<std::string, MalValuePtr> constants[] = {
-    {"nil", MalConstant::nilValue()},
-    {"true", MalConstant::trueValue()},
-    {"false", MalConstant::falseValue()},
+  static const std::pair<std::string, ValuePtr> constants[] = {
+    {"nil", Constant::nilValue()},
+    {"true", Constant::trueValue()},
+    {"false", Constant::falseValue()},
   };
   if (auto constant = std::find_if(std::begin(constants), std::end(constants),
                                    firstIsToken);
@@ -138,40 +149,40 @@ MalValuePtr readAtom(Tokeniser &tokeniser) {
   if (auto macro = std::find_if(std::begin(macros), std::end(macros),
                                 firstIsToken);
       macro != std::end(macros)) {
-    return std::make_shared<MalList>(MalValueVec{
-        std::make_shared<MalSymbol>(macro->second),
+    return std::make_shared<List>(ValuesContainer{
+        std::make_shared<Symbol>(macro->second),
         readForm(tokeniser),
     });
   }
 
-  return std::make_shared<MalSymbol>(std::move(token));
+  return std::make_shared<Symbol>(std::move(token));
 }
 
-MalValuePtr readForm(Tokeniser &tokeniser) {
+ValuePtr readForm(Tokeniser &tokeniser) {
   assert(!tokeniser.eoi());
   auto &&token = tokeniser.peek();
   if (token == "(") {
     tokeniser.nextToken();
-    return std::make_shared<MalList>(readSequence(tokeniser, ")"));
+    return std::make_shared<List>(readSequence(tokeniser, ")"));
   }
   if (token == "[") {
     tokeniser.nextToken();
-    return std::make_shared<MalVector>(readSequence(tokeniser, "]"));
+    return std::make_shared<Vector>(readSequence(tokeniser, "]"));
   }
   if (token == "{") {
     tokeniser.nextToken();
     auto items = readSequence(tokeniser, "}");
     if (items.size() % 2 != 0) {
       throw ReaderException{"odd number of items: " +
-                            std::to_string(items.size())};
+                                 std::to_string(items.size())};
     }
     for (auto i = items.begin(); i != items.end(); i+=2) {
-      if (!(dynamic_cast<MalString *>(i->get()) ||
-            dynamic_cast<MalSymbol *>(i->get()) ||
-            dynamic_cast<MalKeyword *>(i->get()))) {
+      if (!(dynamic_cast<String *>(i->get()) ||
+            dynamic_cast<Symbol *>(i->get()) ||
+            dynamic_cast<Keyword *>(i->get()))) {
         throw ReaderException{std::format("unexpected key '{:r}'", *i)};
     }}
-    return std::make_shared<MalHash>(std::move(items));
+    return std::make_shared<Hash>(std::move(items));
   }
 
   return readAtom(tokeniser);
@@ -179,10 +190,14 @@ MalValuePtr readForm(Tokeniser &tokeniser) {
 
 } // namespace
 
-MalValuePtr readStr(std::string str) {
+namespace mal {
+
+ValuePtr readStr(std::string str) {
   Tokeniser tokeniser(str);
   if (tokeniser.eoi()) {
     throw ReaderException{"EOI"};
   }
   return readForm(tokeniser);
 }
+
+} // namespace mal

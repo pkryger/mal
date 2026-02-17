@@ -5,43 +5,46 @@
 #include <iostream>
 #include <memory>
 
+namespace mal {
 static ReadLine rl("~/.mal_history");
 
-MalValuePtr READ(std::string str) { return readStr(std::move(str)); }
+ValuePtr READ(std::string str) { return readStr(std::move(str)); }
 
-MalValuePtr EVAL(MalValuePtr ast, MalEnvPtr env) {
+ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
   return ast->eval(env);
 }
 
-std::string PRINT(MalValuePtr ast) {
+std::string PRINT(ValuePtr ast) {
   assert(ast);
   return std::format("{:r}", ast);
 }
 
 std::string rep(std::string str) {
-  static MalEnv env = []() {
-    MalEnv env{nullptr};
+  static Env env = []() {
+    Env env{nullptr};
     installBuiltIns(env);
     return env;
   }();
-  static MalEnvPtr envPtr =
-    std::shared_ptr<MalEnv>(std::addressof(env), [](auto &&) noexcept {});
+  static EnvPtr envPtr =
+    std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
   return PRINT(EVAL(READ(std::move(str)), envPtr));
 }
 
+} // namespace mal
+
 int main() {
   std::string line;
-  while (rl.get("user> ", line)) {
+  while (mal::rl.get("user> ", line)) {
     std::string out;
     try {
-      out = rep(std::move(line));
-    } catch (ReaderException ex) {
+      out = mal::rep(std::move(line));
+    } catch (mal::ReaderException ex) {
       out = std::string{"[reader] "} + ex.what();
-    } catch (CoreException ex) {
+    } catch (mal::CoreException ex) {
       out = std::string{"[core] "} + ex.what();
-    } catch (EvalException ex) {
+    } catch (mal::EvalException ex) {
       out = std::string{"[eval] "} + ex.what();
     }
     std::cout << out << "\n";
