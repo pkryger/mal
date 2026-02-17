@@ -9,16 +9,17 @@
 
 namespace {
 using mal::Constant;
+using mal::Hash;
 using mal::Integer;
 using mal::Keyword;
 using mal::List;
+using mal::make;
 using mal::ReaderException;
 using mal::String;
 using mal::Symbol;
 using mal::ValuePtr;
 using mal::ValuesContainer;
 using mal::Vector;
-using mal::Hash;
 
 static const std::regex tokenRegexes[] = {
   std::regex("~@"),
@@ -107,24 +108,24 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   tokeniser.nextToken();
 
   if (token[0] == '"') {
-    return std::make_shared<String>(String::unescape(std::move(token)));
+    return make<String>(String::unescape(std::move(token)));
   }
 
   if (token[0] == ':') {
-    return std::make_shared<Keyword>(token);
+    return make<Keyword>(token);
   }
 
   if (token == "^") {
     auto meta{readForm(tokeniser)};
-    return std::make_shared<List>(ValuesContainer{
-      std::make_shared<Symbol>("with-meta"),
+    return make<List>(ValuesContainer{
+      make<Symbol>("with-meta"),
       readForm(tokeniser),
       std::move(meta),
     });
   }
 
   if (std::regex_match(token, std::regex{"^[-+]?\\d+$"})) {
-    return std::make_shared<Integer>(std::stol(std::move(token)));
+    return make<Integer>(std::stol(std::move(token)));
   }
 
   auto firstIsToken = [&](auto &&elt) noexcept { return elt.first == token; };
@@ -149,13 +150,13 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   if (auto macro = std::find_if(std::begin(macros), std::end(macros),
                                 firstIsToken);
       macro != std::end(macros)) {
-    return std::make_shared<List>(ValuesContainer{
-        std::make_shared<Symbol>(macro->second),
+    return make<List>(ValuesContainer{
+        make<Symbol>(macro->second),
         readForm(tokeniser),
     });
   }
 
-  return std::make_shared<Symbol>(std::move(token));
+  return make<Symbol>(std::move(token));
 }
 
 ValuePtr readForm(Tokeniser &tokeniser) {
@@ -163,11 +164,11 @@ ValuePtr readForm(Tokeniser &tokeniser) {
   auto &&token = tokeniser.peek();
   if (token == "(") {
     tokeniser.nextToken();
-    return std::make_shared<List>(readSequence(tokeniser, ")"));
+    return make<List>(readSequence(tokeniser, ")"));
   }
   if (token == "[") {
     tokeniser.nextToken();
-    return std::make_shared<Vector>(readSequence(tokeniser, "]"));
+    return make<Vector>(readSequence(tokeniser, "]"));
   }
   if (token == "{") {
     tokeniser.nextToken();
@@ -177,12 +178,12 @@ ValuePtr readForm(Tokeniser &tokeniser) {
                                  std::to_string(items.size())};
     }
     for (auto i = items.begin(); i != items.end(); i+=2) {
-      if (!(dynamic_cast<String *>(i->get()) ||
-            dynamic_cast<Symbol *>(i->get()) ||
-            dynamic_cast<Keyword *>(i->get()))) {
+      if (!(to<String>(*i) ||
+            to<Symbol>(*i) ||
+            to<Keyword>(*i))) {
         throw ReaderException{std::format("unexpected key '{:r}'", *i)};
     }}
-    return std::make_shared<Hash>(std::move(items));
+    return make<Hash>(std::move(items));
   }
 
   return readAtom(tokeniser);

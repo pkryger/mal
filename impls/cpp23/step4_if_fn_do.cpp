@@ -23,7 +23,7 @@ ValuePtr EVAL(ValuePtr, EnvPtr);
 
 ValuePtr specialDefBang(std::string name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(std::move(name), values, 2);
-  if (auto symbol = dynamic_cast<Symbol *>(values[0].get())) {
+  if (auto symbol = to<Symbol>(values[0])) {
     auto val = EVAL(values[1], env);
     env->insert_or_assign(symbol->asKey(), val);
     return val;
@@ -33,17 +33,17 @@ ValuePtr specialDefBang(std::string name, ValuesSpan values, EnvPtr env) {
 
 ValuePtr specialLetStar(std::string name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(std::move(name), values, 2);
-  if (auto sequence = dynamic_cast<Sequence *>(values[0].get())) {
+  if (auto sequence = to<Sequence>(values[0])) {
     auto bindings = sequence->values();
     if (bindings.size() % 2 != 0) {
       throw EvalException{
           std::format("odd number of let* bindings: {:r}", values[0])};
     }
-    auto letEnv = std::make_shared<Env>(env);
+    auto letEnv = make<Env>(env);
     for (auto &&[key, value] :
          bindings | std::views::chunk(2) |
              std::views::transform([&](auto &&chunk) {
-               if (auto symbol = dynamic_cast<Symbol *>(chunk[0].get())) {
+               if (auto symbol = to<Symbol>(chunk[0])) {
                  return std::pair{symbol->asKey(), EVAL(chunk[1], letEnv)};
                }
                throw EvalException{
@@ -70,10 +70,10 @@ ValuePtr specialIf(std::string name, ValuesSpan values, EnvPtr env) {
 
 ValuePtr specialFnStar(std::string name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(name, values, 2);
-  if (auto sequence = dynamic_cast<Sequence *>(values[0].get())) {
-    return std::make_shared<Lambda>(
+  if (auto sequence = to<Sequence>(values[0])) {
+    return make<Lambda>(
         sequence->values() | std::views::transform([&](auto &&elt) {
-          if (auto symbol = dynamic_cast<Symbol *>(elt.get())) {
+          if (auto symbol = to<Symbol>(elt)) {
             return symbol->asKey();
           }
           throwWrongArgument(std::move(name), elt);
@@ -99,7 +99,7 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   if (auto dbg = env->find("DEBUG-EVAL"); dbg && dbg->isTrue()) {
     std::print("EVAL: {:r}\n", ast);
   }
-  if (auto list = dynamic_cast<List *>(ast.get())) {
+  if (auto list = to<List>(ast)) {
     auto&& values = list->values();
     if (values.empty()) {
       return ast->eval(env);
@@ -113,7 +113,7 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
         {"do", &specialDo},
     };
     if (auto special = [&]() -> Specials * {
-          if (auto symbol = dynamic_cast<Symbol *>(values[0].get())) {
+          if (auto symbol = to<Symbol>(values[0])) {
             auto res = std::find_if(
                 std::begin(specials), std::end(specials),
                 [&](auto &&elt) noexcept { return *symbol == elt.first; });

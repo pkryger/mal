@@ -18,13 +18,13 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
       dbg && dbg->isTrue()) {
     std::cout << "EVAL: " << ast->print(true) << "\n";
   }
-  if (auto list = dynamic_cast<List *>(ast.get())) {
+  if (auto list = to<List>(ast)) {
     auto&& lvalues = list->values();
     if (lvalues.empty()) {
       return ast->eval(env);
     }
     auto frontValueIs = [&](std::string name) noexcept {
-      if (auto symbol = dynamic_cast<Symbol *>(lvalues[0].get())) {
+      if (auto symbol = to<Symbol>(lvalues[0])) {
         return *symbol == Symbol{std::move(name)};
       }
       return false;
@@ -34,7 +34,7 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
         throw EvalException{"wrong number of def! arguments " +
           std::to_string(lvalues.size())};
       }
-      if (auto symbol = dynamic_cast<Symbol *>(lvalues[1].get())) {
+      if (auto symbol = to<Symbol>(lvalues[1])) {
         auto val = EVAL(lvalues[2], env);
         env->insert_or_assign(symbol->asKey(), val);
         return val;
@@ -47,15 +47,15 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
         throw EvalException{
             std::format("wrong number of let* arguments: {:r}", lvalues)};
       }
-      if (auto bindings = dynamic_cast<Sequence *>(lvalues[1].get())) {
+      if (auto bindings = to<Sequence>(lvalues[1])) {
         auto bvalues = bindings->values();
         if (bvalues.size() % 2 != 0) {
           throw EvalException{
               std::format("odd number of let* bindings: {:r}", bvalues)};
         }
-        auto letEnv = std::make_shared<Env>(env);
+        auto letEnv = make<Env>(env);
         for (auto i = bvalues.begin(); i != bvalues.end(); i += 2) {
-          if (auto symbol = dynamic_cast<Symbol *>(i->get())) {
+          if (auto symbol = to<Symbol>(*i)) {
             letEnv->insert_or_assign(symbol->asKey(),
                                      EVAL(*(i + 1), letEnv));
           } else {

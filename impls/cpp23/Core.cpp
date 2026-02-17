@@ -50,16 +50,17 @@ void throwWrongArgument(std::string name, ValuePtr val) {
 } // namespace mal
 
 namespace {
-
 using mal::Constant;
 using mal::CoreException;
 using mal::Integer;
 using mal::List;
+using mal::make;
 using mal::Sequence;
 using mal::String;
+using mal::to;
 using mal::ValuePtr;
-using mal::ValuesSpan;
 using mal::ValuesContainer;
+using mal::ValuesSpan;
 
 template <typename BINARY_OP, typename UNARY_OP>
 ValuePtr accumulateIntegers(std::string name, ValuesSpan values,
@@ -68,14 +69,14 @@ ValuePtr accumulateIntegers(std::string name, ValuesSpan values,
 
   assert(minArgs > 0);
   checkArgsAtLeast(std::move(name), values, minArgs);
-  if (auto init = dynamic_cast<Integer *>(values.front().get())) {
+  if (auto init = to<Integer>(values.front())) {
     if (values.size() == 1) {
-      return std::make_shared<Integer>(
+      return make<Integer>(
           std::forward<UNARY_OP>(unary_op)(init->value()));
     }
-    return std::make_shared<Integer>(std::ranges::fold_left(
+    return make<Integer>(std::ranges::fold_left(
         values.subspan(1) | std::views::transform([&](auto elt) {
-          if (auto integer = dynamic_cast<Integer *>(elt.get())) {
+          if (auto integer = to<Integer>(elt)) {
             return integer->value();
           }
           throwWrongArgument(std::move(name), elt);
@@ -123,12 +124,12 @@ ValuePtr division(std::string name, ValuesSpan values) {
 }
 
 ValuePtr list(std::string, ValuesSpan values) {
-  return std::make_shared<List>(ValuesContainer{values.begin(), values.end()});
+  return make<List>(ValuesContainer{values.begin(), values.end()});
 }
 
 ValuePtr listQuestion(std::string name, ValuesSpan values) {
   checkArgsIs(      std::move(name), values, 1);
-  if (dynamic_cast<List *>(values.front().get())) {
+  if (to<List>(values.front())) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -136,7 +137,7 @@ ValuePtr listQuestion(std::string name, ValuesSpan values) {
 
 ValuePtr emptyQuestion(std::string name, ValuesSpan values) {
   checkArgsIs(name, values, 1);
-  if (auto sequence = dynamic_cast<Sequence *>(values.front().get())) {
+  if (auto sequence = to<Sequence>(values.front())) {
     return sequence->values().empty() ? Constant::trueValue()
                                       : Constant::falseValue();
   }
@@ -147,10 +148,10 @@ ValuePtr emptyQuestion(std::string name, ValuesSpan values) {
 ValuePtr count(std::string name, ValuesSpan values) {
   checkArgsAtLeast(name, values, 1);
   if (values.front().get() == Constant::nilValue().get()) {
-    return std::make_shared<Integer>(0);
+    return make<Integer>(0);
   }
-  if (auto sequence = dynamic_cast<Sequence *>(values.front().get())) {
-    return std::make_shared<Integer>(sequence->values().size());
+  if (auto sequence = to<Sequence>(values.front())) {
+    return make<Integer>(sequence->values().size());
   }
   throwWrongArgument(std::move(name), values.front());
 }
@@ -165,7 +166,7 @@ ValuePtr compareIntegers(std::string name, ValuesSpan values,
         return !binary_op(lhs, rhs);
       },
       [name = std::move(name)](auto &&elt) {
-        if (auto integer = dynamic_cast<Integer *>(elt.get())) {
+        if (auto integer = to<Integer>(elt)) {
           return integer->value();
         }
         throwWrongArgument(std::move(name), elt);
@@ -226,12 +227,12 @@ ValuePtr println(std::string name, ValuesSpan values) {
 }
 
 ValuePtr pr_str(std::string name, ValuesSpan values) {
-  return std::make_shared<String>(
+  return make<String>(
       std::format("{:r}", values));
 }
 
 ValuePtr str(std::string name, ValuesSpan values) {
-  return std::make_shared<String>(
+  return make<String>(
       values |
       std::views::transform([](auto &&elt) { return std::format("{}", elt); }) |
       std::views::join | std::ranges::to<std::string>());
@@ -242,28 +243,28 @@ ValuePtr str(std::string name, ValuesSpan values) {
 namespace mal {
 void installBuiltIns(Env &env) {
   static ValuesContainer builtIns{
-      std::make_shared<BuiltIn>("+", &addition),
-      std::make_shared<BuiltIn>("-", &subtraction),
-      std::make_shared<BuiltIn>("*", &multiplication),
-      std::make_shared<BuiltIn>("/", &division),
-      std::make_shared<BuiltIn>("list", &list),
-      std::make_shared<BuiltIn>("list?", &listQuestion),
-      std::make_shared<BuiltIn>("empty?", &emptyQuestion),
-      std::make_shared<BuiltIn>("count", &count),
-      std::make_shared<BuiltIn>("<", &lt),
-      std::make_shared<BuiltIn>("<=", &lte),
-      std::make_shared<BuiltIn>(">", &gt),
-      std::make_shared<BuiltIn>(">=", &gte),
-      std::make_shared<BuiltIn>("=", &equal),
-      std::make_shared<BuiltIn>("not", &not_),
-      std::make_shared<BuiltIn>("prn", &prn),
-      std::make_shared<BuiltIn>("println", &println),
-      std::make_shared<BuiltIn>("pr-str", &pr_str),
-      std::make_shared<BuiltIn>("str", &str),
+      make<BuiltIn>("+", &addition),
+      make<BuiltIn>("-", &subtraction),
+      make<BuiltIn>("*", &multiplication),
+      make<BuiltIn>("/", &division),
+      make<BuiltIn>("list", &list),
+      make<BuiltIn>("list?", &listQuestion),
+      make<BuiltIn>("empty?", &emptyQuestion),
+      make<BuiltIn>("count", &count),
+      make<BuiltIn>("<", &lt),
+      make<BuiltIn>("<=", &lte),
+      make<BuiltIn>(">", &gt),
+      make<BuiltIn>(">=", &gte),
+      make<BuiltIn>("=", &equal),
+      make<BuiltIn>("not", &not_),
+      make<BuiltIn>("prn", &prn),
+      make<BuiltIn>("println", &println),
+      make<BuiltIn>("pr-str", &pr_str),
+      make<BuiltIn>("str", &str),
   };
 
   for (auto &builtIn : builtIns) {
-    env.insert_or_assign(dynamic_cast<BuiltIn *>(builtIn.get())->asKey(),
+    env.insert_or_assign(to<BuiltIn>(builtIn)->asKey(),
                          builtIn);
   }
 }

@@ -33,7 +33,7 @@ ValuePtr Integer::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<Integer *>(rhs.get());
+  if (auto other = to<Integer>(rhs);
       other && data == other->data) {
     return Constant::trueValue();
   }
@@ -47,7 +47,7 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   if (auto other = [&]() noexcept -> StringBase * {
         auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
         if (typeid(*this) == typeid(o)) {
-          return dynamic_cast<StringBase *>(rhs.get());
+          return to<StringBase>(rhs);
         }
         return nullptr;
       }();
@@ -128,7 +128,7 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<Sequence *>(rhs.get());
+  if (auto other = to<Sequence>(rhs);
       other && data.size() == other->data.size()) {
     auto res =
         std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
@@ -146,7 +146,7 @@ ValuePtr Vector::eval(EnvPtr env) {
   auto evaled = data |
                 std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
                 std::ranges::to<ValuesContainer>();
-  return std::make_shared<Vector>(std::move(evaled));
+  return make<Vector>(std::move(evaled));
 }
 
 ValuePtr List::eval(EnvPtr env) {
@@ -157,7 +157,7 @@ ValuePtr List::eval(EnvPtr env) {
                 std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
                 std::ranges::to<ValuesContainer>();
   auto op = evaled[0];
-  if (auto function = dynamic_cast<Invocable *>(op.get())) {
+  if (auto function = to<Invocable>(op)) {
     return function->apply({evaled.begin() + 1, evaled.end()});
   }
   throw EvalException{std::format("invalid function '{:r}'", op)};
@@ -173,7 +173,7 @@ ValuePtr Hash::eval(EnvPtr env) {
                   return std::pair{v.first, EVAL(v.second, env)};
                 }) |
                 std::ranges::to<ValuesMap>();
-  auto res = std::make_shared<Hash>(ValuesContainer{});
+  auto res = make<Hash>(ValuesContainer{});
   res->data = std::move(evaled);
   return res;
 }
@@ -185,7 +185,7 @@ ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
   if (auto other = [&]() noexcept -> Hash * {
         auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
         if (typeid(*this) == typeid(o)) {
-          return dynamic_cast<Hash *>(rhs.get());
+          return to<Hash>(rhs);
         }
         return nullptr;
       }();
@@ -206,7 +206,7 @@ ValuesMap Hash::createMap(ValuesContainer v) {
   ValuesMap res;
   res.reserve(v.size() / 2);
   for (auto &&i = v.begin(); i != v.end(); i += 2) {
-    assert(dynamic_cast<StringBase *>(i->get()));
+    assert(to<StringBase>(*i));
     res.emplace(std::move(*i), std::move(*(i + 1)));
   }
   return res;
@@ -216,7 +216,7 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<BuiltIn *>(rhs.get());
+  if (auto other = to<BuiltIn>(rhs);
       other && handler == other->handler) {
     return Constant::trueValue();
   }
@@ -236,7 +236,7 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = dynamic_cast<Lambda *>(rhs.get());
+  if (auto other = to<Lambda>(rhs);
       other && params.size() == other->params.size() &&
       env.get() == other->env.get()) {
     auto res =
@@ -252,7 +252,7 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
 }
 
 ValuePtr Lambda::apply(ValuesSpan values) const {
-  auto applyEnv = std::make_shared<Env>(env);
+  auto applyEnv = make<Env>(env);
   auto bindSize = params.size();
   if (auto i = std::find_if(params.begin(), params.end(),
                             [](auto &&elt) { return elt[0] == '&'; });
@@ -263,7 +263,7 @@ ValuePtr Lambda::apply(ValuesSpan values) const {
     bindSize = i - params.begin();
     checkArgsAtLeast(print(false), values, bindSize);
     applyEnv->insert_or_assign(params.back(),
-                               std::make_shared<List>(ValuesContainer(
+                               make<List>(ValuesContainer(
                                    values.begin() + bindSize, values.end())));
   } else {
     checkArgsIs(print(false), values, params.size());

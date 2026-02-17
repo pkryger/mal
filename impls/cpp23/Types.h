@@ -14,6 +14,7 @@
 #include <ranges>
 #include <unordered_map>
 #include <span>
+#include <type_traits>
 
 namespace mal {
 
@@ -25,6 +26,15 @@ using ValuePtr = std::shared_ptr<Value>;
 using ValuesContainer = std::vector<ValuePtr>;
 using ValuesSpan = std::span<const ValuePtr>;
 using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
+
+template <typename TYPE, typename... ARGS>
+std::shared_ptr<std::decay_t<TYPE>> make(ARGS &&...args) {
+  return std::make_shared<std::decay_t<TYPE>>(std::forward<ARGS>(args)...);
+}
+
+template <typename TYPE> std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
+  return dynamic_cast<std::decay_t<TYPE> *>(ptr.get());
+}
 
 class Env {
 public:
@@ -100,7 +110,7 @@ namespace std {
 
 template <> struct hash<mal::ValuePtr> {
   size_t operator()(const mal::ValuePtr &o) const noexcept {
-    assert(dynamic_cast<mal::StringBase *>(o.get()));
+    assert(mal::to<mal::StringBase>(o));
     return std::hash<std::string>{}(static_cast<mal::StringBase &>(*o).data);
   }
 };
