@@ -5,7 +5,8 @@
 
 class ReadLine {
 public:
-  explicit ReadLine(const std::string &file);
+  explicit ReadLine(const std::string &file) noexcept;
+  ~ReadLine();
 
   bool get(const std::string& prompt, std::string& out);
 
