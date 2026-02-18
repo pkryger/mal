@@ -2,6 +2,8 @@
 #define INCLUDE_CORE_H
 
 #include "Types.h"
+
+#include <cstddef>
 #include <stdexcept>
 #include <string>
 

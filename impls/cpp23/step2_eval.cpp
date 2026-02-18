@@ -2,8 +2,14 @@
 #include "ReadLine.h"
 #include "Reader.h"
 #include "Types.h"
-#include <iostream>
+
+#include <cassert>
+#include <format>
 #include <memory>
+#include <optional>
+#include <print>
+#include <string>
+#include <utility>
 
 namespace mal {
 static ReadLine rl("~/.mal_history");
@@ -46,6 +52,6 @@ int main() {
     } catch (mal::EvalException ex) {
       out = std::string{"[eval] "} + ex.what();
     }
-    std::cout << out << "\n";
+    std::print("{}\n", out);
   }
 }

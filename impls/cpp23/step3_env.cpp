@@ -2,8 +2,14 @@
 #include "ReadLine.h"
 #include "Reader.h"
 #include "Types.h"
-#include <iostream>
+
+#include <cassert>
+#include <format>
 #include <memory>
+#include <optional>
+#include <print>
+#include <string>
+#include <utility>
 
 namespace mal {
 
@@ -16,7 +22,7 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(env);
   if (auto dbg = env->find("DEBUG-EVAL");
       dbg && dbg->isTrue()) {
-    std::cout << "EVAL: " << ast->print(true) << "\n";
+    std::print("EVAL: {}\n", ast->print(true));
   }
   if (auto list = to<List>(ast)) {
     auto&& lvalues = list->values();
@@ -101,6 +107,6 @@ int main() {
     } catch (mal::EvalException ex) {
       out = std::string{"[eval] "} + ex.what();
     }
-    std::cout << out << "\n";
+    std::print("{}\n", out);
   }
 }

@@ -1,15 +1,17 @@
-#include "Core.h"
+#include "Core.h" // IWYU pragma: associated
 #include "Types.h"
 
+#include <algorithm>
+#include <cassert>
 #include <cstddef>
-#include <iostream>
+#include <cstdint>
 #include <format>
+#include <memory>
+#include <print>
 #include <ranges>
 #include <string>
+#include <type_traits>
 #include <utility>
-#include <memory>
-#include <algorithm>
-#include <print>
 
 namespace mal {
 void checkArgsIs(std::string name, ValuesSpan values, std::size_t expected) {
@@ -128,7 +130,7 @@ ValuePtr list(std::string, ValuesSpan values) {
 }
 
 ValuePtr listQuestion(std::string name, ValuesSpan values) {
-  checkArgsIs(      std::move(name), values, 1);
+  checkArgsIs(std::move(name), values, 1);
   if (to<List>(values.front())) {
     return Constant::trueValue();
   }
@@ -211,13 +213,13 @@ ValuePtr equal(std::string name, ValuesSpan values) {
 }
 
 ValuePtr not_(std::string name, ValuesSpan values) {
-  checkArgsIs(      std::move(name), values, 1);
+  checkArgsIs(std::move(name), values, 1);
   return values.front()->isTrue() ? Constant::falseValue()
                                   : Constant::trueValue();
 }
 
 ValuePtr prn(std::string name, ValuesSpan values) {
-  std::cout << std::format("{:r}\n", values);
+  std::print("{:r}\n", values);
   return Constant::nilValue();
 }
 

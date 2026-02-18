@@ -1,12 +1,19 @@
-#include "Reader.h"
+#include "Reader.h" // IWYU pragma: associated
 #include "Ranges.h"
 #include "Types.h"
+
 #include <algorithm>
 #include <cassert>
+#include <format>
+#include <iterator>
+// IWYU pragma: no_include <ranges>
+#ifdef __cpp_lib_ranges_stride
 #include <ranges>
+#endif
 #include <regex>
 #include <string>
 #include <utility>
+// IWYU pragma: no_include <memory>
 
 namespace {
 using mal::Constant;

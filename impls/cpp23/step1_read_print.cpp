@@ -2,7 +2,11 @@
 #include "Reader.h"
 #include "Types.h"
 
-#include <iostream>
+#include <cassert>
+#include <optional>
+#include <print>
+#include <string>
+#include <utility>
 
 namespace mal {
 static ReadLine rl("~/.mal_history");
@@ -33,6 +37,6 @@ int main() {
     } catch (mal::ReaderException ex) {
       out = std::string{"ReaderException: "} + ex.what();
     }
-    std::cout << out << "\n";
+    std::print("{}\n", out);
   }
 }

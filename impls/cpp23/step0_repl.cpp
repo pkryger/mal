@@ -1,5 +1,9 @@
 #include "ReadLine.h"
-#include <iostream>
+
+#include <optional>
+#include <print>
+#include <string>
+#include <utility>
 
 namespace mal {
 static ReadLine rl("~/.mal_history");
@@ -20,5 +24,5 @@ std::string rep(std::string str) { return PRINT(EVAL(READ(std::move(str)))); }
 int main() {
   std::string line;
   while (auto line = mal::rl.get("user> "))
-    std::cout << mal::rep(std::move(line.value())) << "\n";
+    std::print("{}\n", mal::rep(std::move(line.value())));
 }

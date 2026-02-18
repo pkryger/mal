@@ -2,19 +2,21 @@
 #define INCLUDE_TYPES_H
 
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
+#include <format>
+#include <functional> // IWYU pragma: keep
 #include <memory>
+#include <ranges>
+#include <span>
 #include <stdexcept>
 #include <string>
-#include <utility>
-#include <vector>
-#include <format>
-#include <ranges>
-#include <unordered_map>
-#include <span>
 #include <type_traits>
+#include <unordered_map>
+#include <utility>
+#include <vector> // IWYU pragma: keep
+// IWYU pragma: no_include <__vector/vector.h>
 
 namespace mal {
 

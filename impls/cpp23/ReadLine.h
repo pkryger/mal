@@ -1,8 +1,8 @@
 #ifndef INCLUDE_READLINE_H
 #define INCLUDE_READLINE_H
 
-#include <string>
 #include <optional>
+#include <string>
 
 class ReadLine {
 public:

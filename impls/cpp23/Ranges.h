@@ -1,11 +1,15 @@
 #ifndef INCLUDE_RANGES_H
 #define INCLUDE_RANGES_H
 
-#include <ranges>
-#include <version>
+#include <cassert>
 #include <concepts>
+#include <cstddef>
 #include <iterator>
+#include <ranges>
 #include <tuple>
+#include <type_traits>
+#include <utility>
+#include <version> // IWYU pragma: keep
 
 /*
   Apple Clang 17 lacks implementation of

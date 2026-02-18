@@ -3,13 +3,21 @@
 #include "Reader.h"
 #include "Ranges.h"
 #include "Types.h"
+
 #include <algorithm>
-#include <cstddef>
-#include <memory>
-#include <utility>
-#include <ranges>
-#include <print>
+#include <array>
+#include <cassert>
 #include <format>
+#include <memory>
+#include <optional>
+#include <print>
+#include <ranges>
+#include <span>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector> // IWYU pragma: keep
+// IWYU pragma: no_include <__vector/vector.h>
 
 namespace mal {
 
@@ -105,19 +113,19 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
       return ast->eval(env);
     }
     using Specials = const std::pair<std::string, SpecialForm>;
-    static const Specials specials[]{
-        {"def!", &specialDefBang},
-        {"let*", &specialLetStar},
-        {"if", &specialIf},
-        {"fn*", &specialFnStar},
-        {"do", &specialDo},
+    static const std::array specials{
+        Specials{"def!", &specialDefBang},
+        Specials{"let*", &specialLetStar},
+        Specials{"if", &specialIf},
+        Specials{"fn*", &specialFnStar},
+        Specials{"do", &specialDo},
     };
     if (auto special = [&]() -> Specials * {
           if (auto symbol = to<Symbol>(values[0])) {
             auto res = std::find_if(
-                std::begin(specials), std::end(specials),
+                specials.begin(), specials.end(),
                 [&](auto &&elt) noexcept { return *symbol == elt.first; });
-            return res != std::end(specials) ? res : nullptr;
+            return res != specials.end() ? res : nullptr;
           }
           return nullptr;
         }()) {

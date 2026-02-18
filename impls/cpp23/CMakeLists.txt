@@ -26,6 +26,7 @@ endif()
 
 add_library(mal
   Core.cpp
+  Ranges.cpp
   ReadLine.cpp
   Reader.cpp
   Types.cpp
