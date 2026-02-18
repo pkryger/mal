@@ -151,18 +151,27 @@ ValuePtr Vector::eval(EnvPtr env) {
   return make<Vector>(std::move(evaled));
 }
 
-ValuePtr List::eval(EnvPtr env) {
+InvocableResult List::invoke(EnvPtr env) const {
   assert(env);
-  if (data.empty())
-    return shared_from_this();
-  auto evaled = data |
-                std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
-                std::ranges::to<ValuesContainer>();
+  assert(!data.empty());
+  auto evaled =
+      data | std::views::transform([&](auto &&v) { return EVAL(v, env); });
   auto op = evaled[0];
   if (auto function = to<Invocable>(op)) {
-    return function->apply({evaled.begin() + 1, evaled.end()});
+    auto args =
+        evaled | std::views::drop(1) | std::ranges::to<ValuesContainer>();
+    return function->apply({args.begin(), args.end()}, env);
   }
   throw EvalException{std::format("invalid function '{:r}'", op)};
+}
+
+ValuePtr List::eval(EnvPtr env) {
+  assert(env);
+  if (data.empty()) {
+    return shared_from_this();
+  }
+  auto [ast, evalEnv, needsEval] = invoke(env);
+  return needsEval ? EVAL(ast, evalEnv) : ast;
 }
 
 std::string Hash::print(bool readably) const {
@@ -242,8 +251,7 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
     return Constant::trueValue();
   }
   if (auto other = to<Lambda>(rhs);
-      other && params.size() == other->params.size() &&
-      env.get() == other->env.get()) {
+      other && params.size() == other->params.size()) {
     auto res =
         std::ranges::mismatch(params, other->params, [](auto &&lhs, auto &&rhs) noexcept {
           return lhs == rhs;
@@ -256,7 +264,7 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-ValuePtr Lambda::apply(ValuesSpan values) const {
+InvocableResult Lambda::apply(ValuesSpan values, EnvPtr /* evalEnv */) const {
   auto applyEnv = make<Env>(env);
   auto bindSize = params.size();
   if (auto i = std::find_if(params.begin(), params.end(),
@@ -278,7 +286,7 @@ ValuePtr Lambda::apply(ValuesSpan values) const {
                        values)) {
     applyEnv->insert_or_assign(key, value);
   }
-  return EVAL(body, applyEnv);
+  return {body, applyEnv, true};
 }
 
 } // namespace mal

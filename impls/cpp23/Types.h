@@ -12,6 +12,7 @@
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -28,6 +29,8 @@ using ValuePtr = std::shared_ptr<Value>;
 using ValuesContainer = std::vector<ValuePtr>;
 using ValuesSpan = std::span<const ValuePtr>;
 using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
+
+using InvocableResult = std::tuple<ValuePtr, EnvPtr, bool>;
 
 template <typename TYPE, typename... ARGS>
 std::shared_ptr<std::decay_t<TYPE>> make(ARGS &&...args) {
@@ -271,7 +274,8 @@ public:
     return readably ? std::format("({:r})", data) : std::format("({})", data);
   }
 
-   ValuePtr eval(EnvPtr env) override;
+  InvocableResult invoke(EnvPtr) const;
+  ValuePtr eval(EnvPtr env) override;
 };
 
 class Vector : public Sequence {
@@ -305,7 +309,7 @@ private:
 
 class Invocable : public Value {
 public:
-  virtual ValuePtr apply(ValuesSpan) const = 0;
+  virtual InvocableResult apply(ValuesSpan, EnvPtr) const = 0;
 };
 
 class BuiltIn : public Invocable {
@@ -315,8 +319,8 @@ public:
   BuiltIn(std::string n, Handler h) noexcept
       : name{std::move(n)}, handler{h} {}
 
-  ValuePtr apply(ValuesSpan values) const override {
-    return handler(name, values);
+  InvocableResult apply(ValuesSpan values, EnvPtr evalEnv) const override {
+    return {handler(name, values), evalEnv, false};
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
@@ -335,11 +339,11 @@ private:
 class Lambda : public Invocable {
 public:
   explicit Lambda(std::vector<std::string> p,  ValuePtr b, EnvPtr e)
-  : params{std::move(p)}, body{b}, env{e} {}
+  : params{std::move(p)}, body{std::move(b)}, env{std::move(e)} {}
 
   std::string print(bool readable) const override;
   ValuePtr isEqualTo(ValuePtr rhs) const override;
-  ValuePtr apply(ValuesSpan values) const override;
+  InvocableResult apply(ValuesSpan values, EnvPtr evalEnv) const override;
 
 private:
   std::vector<std::string> params;
