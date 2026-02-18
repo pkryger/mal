@@ -43,7 +43,7 @@ template <typename TYPE> std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
 
 class Env {
 public:
-  explicit Env(EnvPtr o) noexcept : outer{std::move(o)} {}
+  explicit Env(EnvPtr outer) noexcept : outer{std::move(outer)} {}
 
   void insert_or_assign(std::string key, ValuePtr value) {
     assert(value);
@@ -60,7 +60,7 @@ private:
 
 class Value : public std::enable_shared_from_this<Value> {
 public:
-  virtual std::string print(bool) const = 0;
+  virtual std::string print(bool readably) const = 0;
   virtual  ValuePtr eval(EnvPtr) { return shared_from_this(); }
 
   bool isTrue() const noexcept;
@@ -79,19 +79,22 @@ protected:
 
 class Integer : public Value {
 public:
-  explicit Integer(std::int64_t v) noexcept : data{v} {}
-  std::string print(bool) const override { return std::to_string(data); }
+  explicit Integer(std::int64_t value) noexcept : data{value} {}
+
+  std::string print(bool /* readably */) const override {
+    return std::to_string(data);
+  }
+
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   std::int64_t value() const noexcept { return data; }
-
 private:
   std::int64_t data;
 };
 
 class StringBase : public Value {
 public:
-  std::string print(bool) const override { return data; }
+  std::string print(bool /* readably */) const override { return data; }
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   friend bool operator==(const StringBase &lhs,
@@ -241,7 +244,8 @@ public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
 private:
-  explicit Constant(std::string v) noexcept : StringBase{std::move(v)} {}
+  explicit Constant(std::string value) noexcept
+      : StringBase{std::move(value)} {}
 
 };
 
@@ -260,28 +264,30 @@ public:
   ValuesSpan values() const noexcept { return {data.begin(), data.end()}; };
 
 protected:
-  explicit Sequence(ValuesContainer v) noexcept
-      : data{std::move(v)} {}
+  explicit Sequence(ValuesContainer data) noexcept
+      : data{std::move(data)} {}
 
   ValuesContainer data;
 };
 
 class List : public Sequence {
 public:
-  explicit List(ValuesContainer v) noexcept
-      : Sequence{std::move(v)} {}
+  explicit List(ValuesContainer values) noexcept
+      : Sequence{std::move(values)} {}
+
   std::string print(bool readably) const override {
     return readably ? std::format("({:r})", data) : std::format("({})", data);
   }
 
-  InvocableResult invoke(EnvPtr) const;
+  InvocableResult invoke(EnvPtr env) const;
   ValuePtr eval(EnvPtr env) override;
 };
 
 class Vector : public Sequence {
 public:
-  explicit Vector(ValuesContainer v) noexcept
-      : Sequence{std::move(v)} {}
+  explicit Vector(ValuesContainer value) noexcept
+      : Sequence{std::move(value)} {}
+
   std::string print(bool readably) const override {
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
   }
@@ -291,19 +297,18 @@ public:
 
 class Hash : public Value {
 public:
-  explicit Hash(ValuesContainer v)
-      : data{createMap(std::move(v))} {}
+  explicit Hash(ValuesContainer value) : data{createMap(std::move(value))} {}
 
-  std::string print(bool) const override;
+  std::string print(bool readably) const override;
 
   ValuePtr eval(EnvPtr env) override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  auto& values() const noexcept { return data; }
+  auto& value() const noexcept { return data; }
 
 private:
-  static ValuesMap createMap(ValuesContainer);
+  static ValuesMap createMap(ValuesContainer value);
   ValuesMap data;
 };
 
@@ -314,19 +319,19 @@ public:
 
 class BuiltIn : public Invocable {
 public:
-  using Handler = ValuePtr (*)(std::string name, ValuesSpan values);
+  using Handler = ValuePtr (*)(std::string name, ValuesSpan value);
 
-  BuiltIn(std::string n, Handler h) noexcept
-      : name{std::move(n)}, handler{h} {}
+  explicit BuiltIn(std::string name, Handler handler) noexcept
+      : name{std::move(name)}, handler{handler} {}
 
-  InvocableResult apply(ValuesSpan values, EnvPtr evalEnv) const override {
-    return {handler(name, values), evalEnv, false};
+  InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override {
+    return {handler(name, value), evalEnv, false};
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  std::string print(bool readable) const override {
-    return readable ? "#'" + name : name;
+  std::string print(bool readably) const override {
+    return readably ? "#'" + name : name;
   }
 
   const std::string &asKey() const { return name; }
@@ -338,12 +343,12 @@ private:
 
 class Lambda : public Invocable {
 public:
-  explicit Lambda(std::vector<std::string> p,  ValuePtr b, EnvPtr e)
-  : params{std::move(p)}, body{std::move(b)}, env{std::move(e)} {}
+  explicit Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env)
+      : params{std::move(params)}, body{std::move(body)}, env{std::move(env)} {}
 
-  std::string print(bool readable) const override;
+  std::string print(bool readably) const override;
   ValuePtr isEqualTo(ValuePtr rhs) const override;
-  InvocableResult apply(ValuesSpan values, EnvPtr evalEnv) const override;
+  InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override;
 
 private:
   std::vector<std::string> params;
