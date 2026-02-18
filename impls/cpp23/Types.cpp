@@ -1,5 +1,6 @@
 #include "Types.h"
 #include "Core.h"
+#include "Ranges.h"
 #include <algorithm>
 #include <cassert>
 #include <format>
@@ -205,9 +206,12 @@ ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
 ValuesMap Hash::createMap(ValuesContainer v) {
   ValuesMap res;
   res.reserve(v.size() / 2);
-  for (auto &&i = v.begin(); i != v.end(); i += 2) {
-    assert(to<StringBase>(*i));
-    res.emplace(std::move(*i), std::move(*(i + 1)));
+  for (auto &&[key, value] :
+       v | std::views::chunk(2) | std::views::transform([](auto &&elt) {
+         return std::tie(elt[0], elt[1]);
+       })) {
+    assert(to<StringBase>(key));
+    res.emplace(std::move(key), std::move(value));
   }
   return res;
 }
