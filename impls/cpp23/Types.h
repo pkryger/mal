@@ -243,8 +243,8 @@ private:
 class String : public StringBase {
 public:
   std::string print(bool readably) const override;
-  static std::string unescape(std::string in);
-  static std::string escape(std::string in);
+  static std::string unescape(const std::string& in);
+  static std::string escape(const std::string& in);
 
   explicit String(std::string v) noexcept : StringBase{std::move(v)} {}
 };

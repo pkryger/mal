@@ -72,7 +72,7 @@ ValuePtr Constant::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-std::string String::unescape(std::string in) {
+std::string String::unescape(const std::string& in) {
   std::string out;
   out.reserve(in.size() - 2);
   for (auto i = in.begin() + 1, end = in.end() - 1; i != end; ++i) {
@@ -98,7 +98,7 @@ std::string String::unescape(std::string in) {
   return out;
 }
 
-std::string String::escape(std::string in) {
+std::string String::escape(const std::string& in) {
   std::string out{'"'};
   out.reserve(in.size() + 2);
   for (auto i = in.begin(); i != in.end(); ++i) {
