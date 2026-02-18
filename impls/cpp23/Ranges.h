@@ -5,6 +5,7 @@
 #include <version>
 #include <concepts>
 #include <iterator>
+#include <tuple>
 
 /*
   Apple Clang 17 lacks implementation of
@@ -36,18 +37,19 @@ struct ChunkPipeable
 template <std::ranges::forward_range VIEW>
   requires std::ranges::view<VIEW>
 class ChunkView : public std::ranges::view_interface<ChunkView<VIEW>> {
-  VIEW base_ = VIEW();
+  VIEW base_ = VIEW{};
   std::ranges::range_difference_t<VIEW> count_{1};
 
-  class Iterator;
+  class iterator;
 
-  std::ranges::iterator_t<VIEW> find_next(std::ranges::iterator_t<VIEW> it) {
-    std::ranges::advance(it, count_, std::ranges::end(base_));
-    return it;
+  auto find_next(std::ranges::iterator_t<VIEW> it) {
+    return std::pair{it,
+                     std::ranges::advance(it, count_, std::ranges::end(base_))};
   }
 
-  std::ranges::iterator_t<VIEW> find_prev(std::ranges::iterator_t<VIEW> it) {
-    std::ranges::advance(it, -count_, std::ranges::begin(base_));
+  auto find_prev(std::ranges::iterator_t<VIEW> it,
+                 std::ranges::range_difference_t<VIEW> reminder) {
+    std::ranges::advance(it, -(count_ - reminder), std::ranges::begin(base_));
     return it;
   }
 
@@ -70,14 +72,14 @@ public:
 
   constexpr VIEW base() && { return std::move(base_); }
 
-  constexpr Iterator begin() {
+  constexpr iterator begin() {
     auto begin = std::ranges::begin(base_);
-    return Iterator{this, begin, find_next(begin)};
+    return iterator{this, begin, find_next(begin).first};
   }
 
-  constexpr Iterator end() {
+  constexpr iterator end() {
     auto end = std::ranges::end(base_);
-    return Iterator{this, end, end}; }
+    return iterator{this, end, end}; }
 
   constexpr std::ranges::range_difference_t<VIEW> count() const & {
     return count_;
@@ -90,14 +92,15 @@ ChunkView(RANGE &&, std::ranges::range_difference_t<RANGE>)
 
 template <std::ranges::forward_range VIEW>
   requires std::ranges::view<VIEW>
-class ChunkView<VIEW>::Iterator {
+class ChunkView<VIEW>::iterator {
   friend ChunkView;
 
   ChunkView *parent_;
   std::ranges::iterator_t<VIEW> current_;
   std::ranges::iterator_t<VIEW> next_;
+  std::ranges::range_difference_t<VIEW> reminder_{0};
 
-  explicit constexpr Iterator(ChunkView *parent,
+  explicit constexpr iterator(ChunkView *parent,
                               std::ranges::iterator_t<VIEW> current,
                               std::ranges::iterator_t<VIEW> next)
       : parent_{parent}, current_{current}, next_{next} {
@@ -114,35 +117,36 @@ public:
                          std::bidirectional_iterator_tag,
                          std::forward_iterator_tag>;
 
-  Iterator() = default;
+  iterator() = default;
 
   constexpr value_type operator*() const {
     assert (current_ != next_);
     return {current_, next_};
   }
 
-  constexpr Iterator &operator++() {
+  constexpr iterator &operator++() {
     assert(current_ != next_);
     current_ = next_;
-    next_ = parent_->find_next(next_);
+    std::tie(next_, reminder_) = parent_->find_next(next_);
     return *this;
   }
 
-  constexpr Iterator operator++(int) {
+  constexpr iterator operator++(int) {
     auto tmp = *this;
     ++*this;
     return tmp;
   }
 
-  constexpr Iterator &operator--()
+  constexpr iterator &operator--()
     requires std::ranges::bidirectional_range<VIEW>
   {
     next_ = current_;
-    current_ = parent_->find_prev(current_);
+    current_ = parent_->find_prev(current_, reminder_);
+    reminder_ = 0;
     return *this;
   }
 
-  constexpr Iterator operator--(int)
+  constexpr iterator operator--(int)
     requires std::ranges::bidirectional_range<VIEW>
   {
     auto tmp = *this;
@@ -150,11 +154,11 @@ public:
     return tmp;
   }
 
-  friend constexpr bool operator==(const Iterator &lhs, const Iterator &rhs) {
+  friend constexpr bool operator==(const iterator &lhs, const iterator &rhs) {
     return lhs.current_ == rhs.current_;
   }
 
-  friend constexpr bool operator==(const Iterator &lhs,
+  friend constexpr bool operator==(const iterator &lhs,
                                    std::default_sentinel_t) {
     return lhs.current_ == lhs.next_;
   }
