@@ -2,6 +2,7 @@
 #include "Types.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
@@ -244,7 +245,7 @@ ValuePtr str(std::string name, ValuesSpan values) {
 
 namespace mal {
 void installBuiltIns(Env &env) {
-  static ValuesContainer builtIns{
+  static std::array builtIns{
       make<BuiltIn>("+", &addition),
       make<BuiltIn>("-", &subtraction),
       make<BuiltIn>("*", &multiplication),

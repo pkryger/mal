@@ -3,9 +3,9 @@
 #include "Types.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <format>
-#include <iterator>
 // IWYU pragma: no_include <ranges>
 #ifdef __cpp_lib_ranges_stride
 #include <ranges>
@@ -29,11 +29,25 @@ using mal::ValuePtr;
 using mal::ValuesContainer;
 using mal::Vector;
 
-static const std::regex tokenRegexes[] = {
+static const std::array tokenRegexes = {
   std::regex("~@"),
   std::regex("[\\[\\]{}()'`~^@]"),
   std::regex("\"(?:\\\\.|[^\\\\\"])*\""),
   std::regex("[^\\s\\[\\]{}('\"`,;)]+"),
+};
+
+static const std::array constants = {
+  std::pair{"nil", Constant::nilValue()},
+  std::pair{"true", Constant::trueValue()},
+  std::pair{"false", Constant::falseValue()},
+};
+
+static const std::array macros = {
+  std::pair{"@", "deref"},
+  std::pair{"`", "quasiquote"},
+  std::pair{"'", "quote"},
+  std::pair{"~@", "splice-unquote"},
+  std::pair{"~", "unquote"},
 };
 
 class Tokeniser {
@@ -136,28 +150,15 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
     return make<Integer>(std::stol(std::move(token)));
   }
 
-  auto firstIsToken = [&](auto &&elt) noexcept { return elt.first == token; };
-  static const std::pair<std::string, ValuePtr> constants[] = {
-    {"nil", Constant::nilValue()},
-    {"true", Constant::trueValue()},
-    {"false", Constant::falseValue()},
-  };
-  if (auto constant = std::find_if(std::begin(constants), std::end(constants),
-                                   firstIsToken);
-      constant != std::end(constants)) {
+  auto first = [](auto &&elt) noexcept { return elt.first; };
+  auto isToken = [&](auto &&elt) noexcept { return elt == token; };
+  if (auto constant = std::ranges::find_if(constants, isToken, first);
+      constant != constants.end()) {
     return constant->second;
   }
 
-  static const std::pair<std::string, std::string> macros[] = {
-    {"@", "deref"},
-    {"`", "quasiquote"},
-    {"'", "quote"},
-    {"~@", "splice-unquote"},
-    {"~", "unquote"},
-  };
-  if (auto macro = std::find_if(std::begin(macros), std::end(macros),
-                                firstIsToken);
-      macro != std::end(macros)) {
+  if (auto macro = std::ranges::find_if(macros, isToken, first);
+      macro != macros.end()) {
     return make<List>(ValuesContainer{
         make<Symbol>(macro->second),
         readForm(tokeniser),
