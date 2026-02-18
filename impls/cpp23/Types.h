@@ -25,7 +25,7 @@ class Env;
 using EnvPtr = std::shared_ptr<Env>;
 
 class Value;
-using ValuePtr = std::shared_ptr<Value>;
+using ValuePtr = std::shared_ptr<const Value>;
 using ValuesContainer = std::vector<ValuePtr>;
 using ValuesSpan = std::span<const ValuePtr>;
 using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
@@ -37,8 +37,8 @@ std::shared_ptr<std::decay_t<TYPE>> make(ARGS &&...args) {
   return std::make_shared<std::decay_t<TYPE>>(std::forward<ARGS>(args)...);
 }
 
-template <typename TYPE> std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
-  return dynamic_cast<std::decay_t<TYPE> *>(ptr.get());
+template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
+  return dynamic_cast<const std::decay_t<TYPE> *>(ptr.get());
 }
 
 class Env {
@@ -61,9 +61,10 @@ private:
 class Value : public std::enable_shared_from_this<Value> {
 public:
   virtual std::string print(bool readably) const = 0;
-  virtual  ValuePtr eval(EnvPtr) { return shared_from_this(); }
+  virtual  ValuePtr eval(EnvPtr) const { return shared_from_this(); }
 
   bool isTrue() const noexcept;
+
   virtual ValuePtr isEqualTo(ValuePtr rhs) const = 0;
 
   virtual ~Value() = default;
@@ -119,7 +120,8 @@ namespace std {
 template <> struct hash<mal::ValuePtr> {
   std::size_t operator()(const mal::ValuePtr &o) const noexcept {
     assert(mal::to<mal::StringBase>(o));
-    return std::hash<std::string>{}(static_cast<mal::StringBase &>(*o).data);
+    return std::hash<std::string>{}(
+        static_cast<const mal::StringBase &>(*o).data);
   }
 };
 
@@ -198,7 +200,7 @@ namespace mal {
 class Symbol : public StringBase {
 public:
   explicit Symbol(std::string v) noexcept : StringBase{std::move(v)} {}
-  ValuePtr eval(EnvPtr env) override;
+  ValuePtr eval(EnvPtr env) const override;
 
   const std::string &asKey() const {
     return data;
@@ -280,7 +282,7 @@ public:
   }
 
   InvocableResult invoke(EnvPtr env) const;
-  ValuePtr eval(EnvPtr env) override;
+  ValuePtr eval(EnvPtr env) const override;
 };
 
 class Vector : public Sequence {
@@ -292,7 +294,7 @@ public:
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
   }
 
-   ValuePtr eval(EnvPtr env) override;
+   ValuePtr eval(EnvPtr env) const override;
 };
 
 class Hash : public Value {
@@ -301,7 +303,7 @@ public:
 
   std::string print(bool readably) const override;
 
-  ValuePtr eval(EnvPtr env) override;
+  ValuePtr eval(EnvPtr env) const override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 

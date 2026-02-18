@@ -47,7 +47,7 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = [&]() noexcept -> StringBase * {
+  if (auto other = [&]() noexcept -> const StringBase * {
         auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
         if (typeid(*this) == typeid(o)) {
           return to<StringBase>(rhs);
@@ -60,7 +60,7 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-ValuePtr Symbol::eval(EnvPtr env) {
+ValuePtr Symbol::eval(EnvPtr env) const {
   assert(env);
   if (auto &&i = env->find(data))
     return i;
@@ -143,7 +143,7 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-ValuePtr Vector::eval(EnvPtr env) {
+ValuePtr Vector::eval(EnvPtr env) const {
   assert(env);
   auto evaled = data |
                 std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
@@ -165,7 +165,7 @@ InvocableResult List::invoke(EnvPtr env) const {
   throw EvalException{std::format("invalid function '{:r}'", op)};
 }
 
-ValuePtr List::eval(EnvPtr env) {
+ValuePtr List::eval(EnvPtr env) const {
   assert(env);
   if (data.empty()) {
     return shared_from_this();
@@ -178,7 +178,7 @@ std::string Hash::print(bool readably) const {
   return readably ? std::format("{{{:r}}}", data) : std::format("{{{}}}", data);
 }
 
-ValuePtr Hash::eval(EnvPtr env) {
+ValuePtr Hash::eval(EnvPtr env) const {
   assert(env);
   auto evaled = data | std::views::transform([&](auto &&v) {
                   return std::pair{v.first, EVAL(v.second, env)};
@@ -193,7 +193,7 @@ ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = [&]() noexcept -> Hash * {
+  if (auto other = [&]() noexcept -> const Hash * {
         auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
         if (typeid(*this) == typeid(o)) {
           return to<Hash>(rhs);
