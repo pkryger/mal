@@ -1,8 +1,9 @@
 #include "Reader.h"
+#include "Ranges.h"
 #include "Types.h"
 #include <algorithm>
 #include <cassert>
-#include <memory>
+#include <ranges>
 #include <regex>
 #include <string>
 #include <utility>
@@ -177,12 +178,13 @@ ValuePtr readForm(Tokeniser &tokeniser) {
       throw ReaderException{"odd number of items: " +
                                  std::to_string(items.size())};
     }
-    for (auto i = items.begin(); i != items.end(); i+=2) {
-      if (!(to<String>(*i) ||
-            to<Symbol>(*i) ||
-            to<Keyword>(*i))) {
-        throw ReaderException{std::format("unexpected key '{:r}'", *i)};
-    }}
+    for (auto key : items | std::views::stride(2)) {
+      if (!(to<String>(key) ||
+            to<Symbol>(key) ||
+            to<Keyword>(key))) {
+        throw ReaderException{std::format("unexpected key '{:r}'", key)};
+      }
+    }
     return make<Hash>(std::move(items));
   }
 
