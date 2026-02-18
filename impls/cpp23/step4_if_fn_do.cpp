@@ -122,9 +122,9 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
     };
     if (auto special = [&]() -> Specials * {
           if (auto symbol = to<Symbol>(values[0])) {
-            auto res = std::find_if(
-                specials.begin(), specials.end(),
-                [&](auto &&elt) noexcept { return *symbol == elt.first; });
+          auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
+            return *symbol == elt.first;
+          });
             return res != specials.end() ? res : nullptr;
           }
           return nullptr;
