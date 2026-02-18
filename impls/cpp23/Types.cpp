@@ -101,8 +101,7 @@ std::string String::unescape(const std::string& in) {
 std::string String::escape(const std::string& in) {
   std::string out{'"'};
   out.reserve(in.size() + 2);
-  for (auto i = in.begin(); i != in.end(); ++i) {
-    char c = *i;
+  for (auto&& c : in) {
     switch (c) {
     case '\\':
       out += "\\\\";
