@@ -139,7 +139,12 @@ std::string rep(std::string str) {
     return env;
   }();
   static EnvPtr envPtr =
-    std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
+      std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
+
+  static auto defaultNot = [&]() {
+    return EVAL(READ("(def! not (fn* (a) (if a false true)))"), envPtr);
+  }();
+
   return PRINT(EVAL(READ(std::move(str)), envPtr));
 }
 
