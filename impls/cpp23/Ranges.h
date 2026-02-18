@@ -84,8 +84,9 @@ public:
   }
 };
 
-template <typename RANGE, typename COUNT>
-ChunkView(RANGE&&, COUNT&&) -> ChunkView<RANGE>;
+template <typename RANGE>
+ChunkView(RANGE &&, std::ranges::range_difference_t<RANGE>)
+    -> ChunkView<std::views::all_t<RANGE>>;
 
 template <std::ranges::forward_range VIEW>
   requires std::ranges::view<VIEW>
