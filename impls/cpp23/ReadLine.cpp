@@ -27,14 +27,13 @@ ReadLine::~ReadLine() {
   write_history(historyFile.c_str());
 }
 
-bool ReadLine::get(const std::string &prompt, std::string &out)
+std::optional<std::string> ReadLine::get(const std::string &prompt) const
 {
   auto &&line = guardedString(readline(prompt.c_str()));
   if (!line)
-    return false;
+    return {};
 
   add_history(line.get());
   append_history(1, line.get());
-  out = line.get();
-  return true;
+  return line.get();
 }

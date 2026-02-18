@@ -35,11 +35,10 @@ std::string rep(std::string str) {
 } // namespace mal
 
 int main() {
-  std::string line;
-  while (mal::rl.get("user> ", line)) {
+  while (auto line = mal::rl.get("user> ")) {
     std::string out;
     try {
-      out = mal::rep(std::move(line));
+      out = mal::rep(std::move(line.value()));
     } catch (mal::ReaderException ex) {
       out = std::string{"[reader] "} + ex.what();
     } catch (mal::CoreException ex) {

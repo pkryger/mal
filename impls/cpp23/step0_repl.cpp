@@ -19,6 +19,6 @@ std::string rep(std::string str) { return PRINT(EVAL(READ(std::move(str)))); }
 
 int main() {
   std::string line;
-  while (mal::rl.get("user> ", line))
-    std::cout << mal::rep(std::move(line)) << "\n";
+  while (auto line = mal::rl.get("user> "))
+    std::cout << mal::rep(std::move(line.value())) << "\n";
 }
