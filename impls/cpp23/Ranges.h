@@ -28,11 +28,13 @@ namespace mal {
 namespace views {
 
 template <typename FN>
-struct ChunkPipeable
+struct Pipeable
     : FN,
-      std::ranges::range_adaptor_closure<ChunkPipeable<FN>> {
-  constexpr explicit ChunkPipeable(FN&& fn): FN{std::move(fn)} {}
+      std::ranges::range_adaptor_closure<Pipeable<FN>> {
+  constexpr explicit Pipeable(FN &&fn) : FN{std::move(fn)} {}
 };
+template <typename FN>
+Pipeable(FN&&) -> Pipeable<FN>;
 
 template <std::ranges::forward_range VIEW>
   requires std::ranges::view<VIEW>
@@ -166,6 +168,7 @@ public:
 };
 
 namespace chunk_fn {
+
 struct ChunkFn : std::ranges::range_adaptor_closure<ChunkFn> {
   template <typename RANGE>
   [[nodiscard]]
@@ -177,13 +180,12 @@ struct ChunkFn : std::ranges::range_adaptor_closure<ChunkFn> {
   }
 
   [[nodiscard]]
-  constexpr auto operator()(std::ptrdiff_t n) const
-      noexcept {
-    return ChunkPipeable{
-      [n](auto &&range) noexcept(
-          noexcept(ChunkView(std::forward<decltype(range)>(range), n)))
-          -> decltype(ChunkView{std::forward<decltype(range)>(range), n}) {
-          return ChunkView(std::forward<decltype(range)>(range), n);
+  constexpr auto operator()(std::ptrdiff_t n) const noexcept {
+    return Pipeable{
+        [n](auto &&range) noexcept(
+            noexcept(ChunkView{std::forward<decltype(range)>(range), n}))
+            -> decltype(ChunkView{std::forward<decltype(range)>(range), n}) {
+          return ChunkView{std::forward<decltype(range)>(range), n};
         }};
   }
 };
@@ -194,7 +196,6 @@ inline constexpr auto Chunk = chunk_fn::ChunkFn{};
 
 } // namespace views
 } // namespace mal
-
 
 #ifndef __cpp_lib_ranges_chunk
 namespace std {
