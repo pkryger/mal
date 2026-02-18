@@ -37,7 +37,7 @@ target_link_directories(mal INTERFACE ${READLINE_LIBRARY_DIRS})
 set_property(TARGET mal PROPERTY CXX_STANDARD 23)
 target_compile_options(mal PUBLIC -Wmove)
 
-file(GLOB mains step*.cpp)
+file(GLOB mains CONFIGURE_DEPENDS step*.cpp)
 foreach(main ${mains})
   get_filename_component(target ${main} NAME_WLE)
   add_executable(${target} ${main})
