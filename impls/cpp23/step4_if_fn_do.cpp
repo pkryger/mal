@@ -49,7 +49,7 @@ ValuePtr specialLetStar(std::string name, ValuesSpan values, EnvPtr env) {
                throw EvalException{
                    std::format("invalid let* binding '({:r}'", chunk)};
              })) {
-      letEnv->insert_or_assign(std::move(key), value);
+      letEnv->insert_or_assign(std::move(key), std::move(value));
     }
     return EVAL(values[1], letEnv);
   }

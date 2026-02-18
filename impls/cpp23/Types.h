@@ -109,7 +109,7 @@ protected:
 namespace std {
 
 template <> struct hash<mal::ValuePtr> {
-  size_t operator()(const mal::ValuePtr &o) const noexcept {
+  std::size_t operator()(const mal::ValuePtr &o) const noexcept {
     assert(mal::to<mal::StringBase>(o));
     return std::hash<std::string>{}(static_cast<mal::StringBase &>(*o).data);
   }

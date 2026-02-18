@@ -73,7 +73,7 @@ ValuePtr Constant::isEqualTo(ValuePtr rhs) const {
 
 std::string String::unescape(std::string in) {
   std::string out;
-  out.reserve(in.size());
+  out.reserve(in.size() - 2);
   for (auto i = in.begin() + 1, end = in.end() - 1; i != end; ++i) {
     char c = *i;
     if (c == '\\') {
