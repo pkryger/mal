@@ -150,16 +150,17 @@ constexpr auto RangeFormatterParse(RANGE_FORMATTER &rf,
 namespace std {
 
 template <> struct formatter<mal::ValuePtr> : mal::ParseValueMixin {
-  template<typename FormatContext>
-  auto format(const mal::ValuePtr &val, FormatContext &ctx) const {
+  template<typename FORMAT_CONTEXT>
+  auto format(const mal::ValuePtr &val, FORMAT_CONTEXT &ctx) const {
     return format_to(ctx.out(), "{}", val->print(readably));
   }
 };
 
 template <>
 struct formatter<mal::ValuesMap::value_type> : mal::ParseValueMixin {
-  template <typename FormatContext>
-  auto format(const mal::ValuesMap::value_type &val, FormatContext &ctx) const {
+  template <typename FORMAT_CONTEXT>
+  auto format(const mal::ValuesMap::value_type &val,
+              FORMAT_CONTEXT &ctx) const {
     if (readably) {
       return format_to(ctx.out(), "{:r} {:r}", val.first, val.second);
     }
