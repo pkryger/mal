@@ -207,4 +207,164 @@ inline constexpr auto chunk = mal::views::chunk_fn::ChunkFn{};
 } // namespace std
 #endif // __cpp_lib_ranges_chunk
 
+namespace mal {
+namespace views {
+
+template <std::ranges::forward_range VIEW>
+  requires std::ranges::view<VIEW>
+class StrideView : public std::ranges::view_interface<StrideView<VIEW>> {
+  VIEW base_ = VIEW{};
+  std::ranges::range_difference_t<VIEW> count_{0};
+
+  class iterator;
+
+public:
+  StrideView()
+    requires std::default_initializable<VIEW>
+  = default;
+
+  constexpr explicit StrideView(
+      VIEW base, std::ranges::range_difference_t<VIEW> count) noexcept
+      : base_{std::move(base)}, count_{count} {
+    assert(count > 0);
+  }
+
+  constexpr VIEW base() const &
+    requires std::copy_constructible<VIEW>
+  {
+    return base_;
+  }
+
+  constexpr VIEW base() && { return std::move(base_); }
+
+  constexpr iterator begin() {
+    return iterator{this, std::ranges::begin(base_)};
+  }
+
+  constexpr iterator end() {
+    return iterator{this, std::ranges::end(base_)}; }
+
+  constexpr std::ranges::range_difference_t<VIEW> count() const & {
+    return count_;
+  }
+};
+
+template <typename RANGE>
+StrideView(RANGE &&, std::ranges::range_difference_t<RANGE>)
+    -> StrideView<std::views::all_t<RANGE>>;
+
+template <std::ranges::forward_range VIEW>
+  requires std::ranges::view<VIEW>
+class StrideView<VIEW>::iterator {
+  friend StrideView;
+
+  StrideView *parent_;
+  std::ranges::iterator_t<VIEW> current_;
+  std::ranges::range_difference_t<VIEW> reminder_{0};
+
+  explicit constexpr iterator(StrideView *parent,
+                              std::ranges::iterator_t<VIEW> current)
+      : parent_{parent}, current_{current} {
+    assert(parent_);
+  }
+
+
+public:
+  using value_type = std::ranges::iterator_t<VIEW>::value_type;
+  using difference_type = std::ranges::range_difference_t<VIEW>;
+  using iterator_category = std::input_iterator_tag;
+  using iteraotr_concept =
+      std::conditional_t<std::ranges::bidirectional_range<VIEW>,
+                         std::bidirectional_iterator_tag,
+                         std::forward_iterator_tag>;
+
+  iterator() = default;
+
+  constexpr value_type operator*() const {
+    assert(current_ != std::ranges::end(parent_->base()));
+    return *current_;
+  }
+
+  constexpr iterator &operator++() {
+    assert(current_ != std::ranges::end(parent_->base()));
+    reminder_ = std::ranges::advance(current_, parent_->count(),
+                                     std::ranges::end(parent_->base()));
+    return *this;
+  }
+
+  constexpr iterator operator++(int) {
+    auto tmp = *this;
+    ++*this;
+    return tmp;
+  }
+
+  constexpr iterator &operator--()
+    requires std::ranges::bidirectional_range<VIEW>
+  {
+    std::ranges::advance(current_, -(parent_->count() - reminder_),
+                         std::ranges::begin(parent_->base()));
+    reminder_ = 0;
+    return *this;
+  }
+
+  constexpr iterator operator--(int)
+    requires std::ranges::bidirectional_range<VIEW>
+  {
+    auto tmp = *this;
+    --*this;
+    return tmp;
+  }
+
+  friend constexpr bool operator==(const iterator &lhs, const iterator &rhs) {
+    return lhs.current_ == rhs.current_;
+  }
+
+  friend constexpr bool operator==(const iterator &lhs,
+                                   std::default_sentinel_t) {
+    return lhs.current_ == std::ranges::end(lhs.parent_->base());
+  }
+
+};
+
+namespace stride_fn {
+
+struct StrideFn : std::ranges::range_adaptor_closure<StrideFn> {
+  template <typename RANGE>
+  [[nodiscard]]
+  constexpr auto operator()(RANGE &&range,
+                            std::ranges::range_difference_t<RANGE> n) const
+      noexcept(noexcept(StrideView{std::forward<RANGE>(range), n}))
+          -> decltype(StrideView{std::forward<RANGE>(range), n}) {
+    return StrideView{std::forward<RANGE>(range), n};
+  }
+
+  [[nodiscard]]
+  constexpr auto operator()(std::ptrdiff_t n) const noexcept {
+    return Pipeable{
+        [n](auto &&range) noexcept(
+            noexcept(StrideView{std::forward<decltype(range)>(range), n}))
+            -> decltype(StrideView{std::forward<decltype(range)>(range), n}) {
+          return StrideView{std::forward<decltype(range)>(range), n};
+        }};
+  }
+};
+
+} // namespace stride_fn
+
+inline constexpr auto Stride = stride_fn::StrideFn{};
+
+} // namespace views
+} // namespace mal
+
+#ifndef __cpp_lib_ranges_stride
+namespace std {
+namespace ranges {
+namespace views {
+inline constexpr auto stride = mal::views::stride_fn::StrideFn{};
+} // namespace views
+} // namespace ranges
+} // namespace std
+#endif // __cpp_lib_ranges_stride
+
+
 #endif // INCLUDE_RANGES_H
