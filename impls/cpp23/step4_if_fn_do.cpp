@@ -143,7 +143,7 @@ std::string PRINT(ValuePtr ast) {
 std::string rep(std::string str) {
   static Env env = []() {
     Env env{nullptr};
-    installBuiltIns(env);
+    prepareEnv(&EVAL, env);
     return env;
   }();
   static EnvPtr envPtr =

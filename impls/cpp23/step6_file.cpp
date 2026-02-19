@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <format>
 #include <memory>
 #include <optional>
@@ -154,7 +155,8 @@ std::string PRINT(ValuePtr ast) {
   return std::format("{:r}", ast);
 }
 
-std::string rep(std::string str) {
+EnvPtr repEnv(std::span<const char*> args)
+{
   static Env env = []() {
     Env env{nullptr};
     prepareEnv(&EVAL, env);
@@ -163,27 +165,57 @@ std::string rep(std::string str) {
   static EnvPtr envPtr =
       std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
 
+
+  static auto defaultEval = [&]() {
+    auto eval = make<Eval>(envPtr);
+    env.insert_or_assign("eval", eval);
+    return eval;
+  }();
+
   static auto defaultNot = [&]() {
     return EVAL(READ("(def! not (fn* (a) (if a false true)))"), envPtr);
   }();
 
-  return PRINT(EVAL(READ(std::move(str)), envPtr));
+  static auto defaultLoadFile = [&]() {
+    return EVAL(READ("(def! load-file (fn* (f) (eval (read-string (str \"(do "
+                     "\" (slurp f) \"\nnil)\")))))"),
+                envPtr);
+  }();
+  envPtr->insert_or_assign(
+      "*ARGV*", make<List>(args | std::views::drop(1) |
+                           std::views::transform([](auto &&arg) -> ValuePtr {
+                             return make<String>(arg);
+                           }) |
+                           std::ranges::to<std::vector>()));
+  return envPtr;
+}
+
+std::string rep(std::string str, EnvPtr envPtr) {
+  std::string out;
+  try {
+    out = PRINT(EVAL(READ(std::move(str)), envPtr));
+  } catch (mal::ReaderException ex) {
+    out = std::string{"[reader] "} + ex.what();
+  } catch (mal::CoreException ex) {
+    out = std::string{"[core] "} + ex.what();
+  } catch (mal::EvalException ex) {
+    out = std::string{"[eval] "} + ex.what();
+  }
+  return out;
 }
 
 }  // namespace mal
 
-int main() {
+using mal::rep;
+
+int main(int argc, const char *argv[]) {
+  auto args = std::span{argv, static_cast<std::size_t>(argc)}.subspan(1);
+  auto envPtr = mal::repEnv(args);
+  if (!args.empty()) {
+    rep(std::format("(load-file \"{}\")", args[0]), envPtr);
+    return 0;
+  }
   while (auto line = mal::rl.get("user> ")) {
-    std::string out;
-    try {
-      out = mal::rep(std::move(line.value()));
-    } catch (mal::ReaderException ex) {
-      out = std::string{"[reader] "} + ex.what();
-    } catch (mal::CoreException ex) {
-      out = std::string{"[core] "} + ex.what();
-    } catch (mal::EvalException ex) {
-      out = std::string{"[eval] "} + ex.what();
-    }
-    std::print("{}\n", out);
+    std::print("{}\n", rep(std::move(line.value()), envPtr));
   }
 }

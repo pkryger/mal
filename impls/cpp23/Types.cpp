@@ -126,6 +126,16 @@ std::string String::print(bool readably) const {
   return readably ? escape(data) : data;
 }
 
+ValuePtr Atom::isEqualTo(ValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return Constant::trueValue();
+  }
+  if (auto o = to<Atom>(rhs)) {
+    return data->isEqualTo(o->data);
+  }
+  return Constant::falseValue();
+}
+
 ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
@@ -288,5 +298,18 @@ InvocableResult Lambda::apply(ValuesSpan values, EnvPtr /* evalEnv */) const {
   }
   return {body, applyEnv, true};
 }
+
+ValuePtr Eval::isEqualTo(ValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return Constant::trueValue();
+  }
+  return Constant::falseValue();
+}
+
+InvocableResult Eval::apply(ValuesSpan values, EnvPtr evalEnv) const {
+  checkArgsIs("eval", values, 1);
+  return{values[0], env, true};
+}
+
 
 } // namespace mal

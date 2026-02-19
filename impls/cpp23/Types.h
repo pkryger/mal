@@ -260,6 +260,29 @@ public:
   explicit String(std::string v) noexcept : StringBase{std::move(v)} {}
 };
 
+class Atom : public Value {
+public:
+  explicit Atom(ValuePtr value) noexcept : data{std::move(value)} {}
+
+  std::string print(bool readably) const override {
+    return readably ? std::format("(atom {:r})", data)
+                    : std::format("(atom {})", data);
+  }
+
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
+
+  ValuePtr value() const { return data; }
+
+  ValuePtr reset(ValuePtr value) const {
+    data = value;
+    return value;
+  }
+
+private:
+  mutable ValuePtr data;
+};
+
+
 class Sequence : public Value {
 public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
@@ -321,13 +344,13 @@ public:
 
 class BuiltIn : public Invocable {
 public:
-  using Handler = ValuePtr (*)(std::string name, ValuesSpan value);
+  using Handler = ValuePtr (*)(std::string name, ValuesSpan value, EnvPtr Env);
 
   explicit BuiltIn(std::string name, Handler handler) noexcept
       : name{std::move(name)}, handler{handler} {}
 
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override {
-    return {handler(name, value), evalEnv, false};
+    return {handler(name, value, evalEnv), evalEnv, false};
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
@@ -357,6 +380,23 @@ private:
   ValuePtr body;
   EnvPtr env;
 };
+
+class Eval : public Invocable {
+public:
+  explicit Eval(EnvPtr env) : env{std::move(env)} {}
+
+  std::string print(bool /* readably */) const override {
+    return std::format("(λeval-{:p})", reinterpret_cast<const void *>(this));
+  }
+
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
+
+  InvocableResult apply(ValuesSpan values, EnvPtr evalEnv) const override;
+
+private:
+  EnvPtr env;
+};
+
 
 class EvalException : public std::runtime_error {
 public:
