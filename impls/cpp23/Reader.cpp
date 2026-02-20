@@ -160,7 +160,7 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   if (auto macro = std::ranges::find_if(macros, isToken, first);
       macro != macros.end()) {
     return make<List>(ValuesContainer{
-        make<Symbol>(macro->second),
+        make<Symbol>(macro->second, macro->first),
         readForm(tokeniser),
     });
   }

@@ -80,6 +80,9 @@ using mal::to;
 using mal::ValuePtr;
 using mal::ValuesContainer;
 using mal::ValuesSpan;
+using mal::Vector;
+
+namespace detail {
 
 template <typename BINARY_OP, typename UNARY_OP>
 ValuePtr accumulateIntegers(std::string name, ValuesSpan values,
@@ -105,29 +108,31 @@ ValuePtr accumulateIntegers(std::string name, ValuesSpan values,
   throwWrongArgument(std::move(name), values.front());
 }
 
+} // namespace detail
+
 ValuePtr addition(std::string name, ValuesSpan values, EnvPtr /* env */) {
-  return accumulateIntegers(
+  return detail::accumulateIntegers(
       std::move(name), values,
       [](auto &&acc, auto &&v) noexcept { return acc + v; },
       [](auto &&v) noexcept { return v; });
 }
 
 ValuePtr subtraction(std::string name, ValuesSpan values, EnvPtr /* env */) {
-  return accumulateIntegers(
+  return detail::accumulateIntegers(
       std::move(name), values,
       [](auto &&acc, auto &&v) { return acc - v; },
       [](auto &&v) noexcept { return -v; });
 }
 
 ValuePtr multiplication(std::string name, ValuesSpan values, EnvPtr /* env */) {
-  return accumulateIntegers(
+  return detail::accumulateIntegers(
       std::move(name), values,
       [](auto &&acc, auto &&v) { return acc * v; },
       [](auto &&v) noexcept { return v; });
 }
 
 ValuePtr division(std::string name, ValuesSpan values, EnvPtr /* env */) {
-  return accumulateIntegers(
+  return detail::accumulateIntegers(
       name, values,
       [&](auto &&acc, auto &&v) {
         if (v == 0ll)
@@ -308,15 +313,24 @@ ValuePtr resetBang(std::string name, ValuesSpan values, EnvPtr /* env */) {
   throwWrongArgument(std::move(name), values[0]);
 }
 
+namespace detail {
+
+ValuesContainer cons(ValuePtr value, ValuesSpan values) {
+  ValuesContainer res;
+  res.reserve(values.size() + 1);
+  res.emplace_back(std::move(value));
+  std::ranges::copy(values, std::back_inserter(res));
+  return res;
+}
+
+} // namespace detail
+
 ValuePtr swapBang(std::string name, ValuesSpan values, EnvPtr env) {
   assert(repEvalFn);
   checkArgsAtLeast(name, values, 2);
   if (auto atom = to<Atom>(values[0])) {
     if (auto fn = to<Invocable>(values[1])) {
-      ValuesContainer args;
-      args.reserve(values.size() - 1);
-      args.emplace_back(atom->value());
-      std::ranges::copy(values.subspan(2), std::back_inserter(args));
+      auto args = detail::cons(atom->value(), values.subspan(2));
       auto [ast, evalEnv, needsEval] = fn->apply(ValuesSpan{args}, env);
       if (needsEval) {
         ast = repEvalFn.value().get()(ast, evalEnv);
@@ -324,6 +338,35 @@ ValuePtr swapBang(std::string name, ValuesSpan values, EnvPtr env) {
       return atom->reset(ast);
     }
     throwWrongArgument(std::move(name), values[1]);
+  }
+  throwWrongArgument(std::move(name), values[0]);
+}
+
+ValuePtr cons(std::string name, ValuesSpan values, EnvPtr env) {
+  checkArgsIs(std::move(name), values, 2);
+  if (auto sequence = to<Sequence>(values[1])) {
+    return make<List>(detail::cons(values[0], sequence->values()));
+  }
+  return make<List>(values | std::ranges::to<ValuesContainer>());
+}
+
+ValuePtr concat(std::string name, ValuesSpan values, EnvPtr env) {
+  return make<List>(values | std::views::transform([&](auto elt) {
+                      if (auto sequence = to<Sequence>(elt)) {
+                        return sequence->values();
+                      }
+                      throwWrongArgument(std::move(name), elt);
+                    }) |
+                    std::views::join | std::ranges::to<ValuesContainer>());
+}
+
+ValuePtr vec(std::string name, ValuesSpan values, EnvPtr env) {
+  checkArgsIs(std::move(name), values, 1);
+  if (to<Vector>(values[0])) {
+    return values[0];
+  }
+  if (auto list = to<List>(values[0])) {
+    return make<Vector>(list->values() | std::ranges::to<ValuesContainer>());
   }
   throwWrongArgument(std::move(name), values[0]);
 }
@@ -359,6 +402,9 @@ void prepareEnv(EvalFn &evalFn, Env &env) {
       make<BuiltIn>("deref", deref),
       make<BuiltIn>("reset!", resetBang),
       make<BuiltIn>("swap!", swapBang),
+      make<BuiltIn>("cons", cons),
+      make<BuiltIn>("concat", concat),
+      make<BuiltIn>("vec", vec),
   };
 
   for (auto &builtIn : builtIns) {

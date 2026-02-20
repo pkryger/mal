@@ -1,0 +1,25 @@
+;; Soft failing tests due to different approach to TCO, quasiquite, and macros printing in DEBUG-EVAL
+
+(def! a 8)
+;=>8
+(def! c '(1 "b" "d"))
+;=>(1 "b" "d")
+
+(let* (DEBUG-EVAL true) `nil)
+;/EVAL: `nil.*\nnil
+(let* (DEBUG-EVAL true) `7)
+;/EVAL: `7.*\n7
+(let* (DEBUG-EVAL true) `a)
+;/EVAL: `a.*\na
+(let* (DEBUG-EVAL true) `{"a" b})
+;/EVAL: `\{"a" b\}.*\n\{"a" b\}
+(let* (DEBUG-EVAL true) `())
+;/EVAL: `\(\).*\n\(\)
+(let* (DEBUG-EVAL true) `(a 2))
+;/EVAL: \(cons \(quote a\) \(cons \(quote 2\) \(\)\)\).*\n\(a 2\)
+(let* (DEBUG-EVAL true) `(~a 3))
+;/EVAL: \(cons a \(cons \(quote 3\) \(\)\)\).*\n\(8 3\)
+(let* (DEBUG-EVAL true) `(1 ~@c 3))
+;/EVAL: \(cons \(quote 1\) \(concat c \(cons \(quote 3\) \(\)\)\)\).*\n\(1 1 "b" "d" 3\)
+(let* (DEBUG-EVAL true) `[])
+;/EVAL: `\[\].*\n\[\]

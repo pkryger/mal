@@ -199,7 +199,9 @@ namespace mal {
 
 class Symbol : public StringBase {
 public:
-  explicit Symbol(std::string v) noexcept : StringBase{std::move(v)} {}
+  explicit Symbol(std::string value, std::optional<std::string> macro = {}) noexcept
+      : StringBase{std::move(value)}, macro{std::move(macro)} {}
+
   ValuePtr eval(EnvPtr env) const override;
 
   const std::string &asKey() const {
@@ -214,11 +216,14 @@ public:
     return lhs == rhs.data;
   }
 
+  friend class List;
+private:
+  std::optional<std::string> macro;
 };
 
 class Keyword : public StringBase {
 public:
-  explicit Keyword(std::string v) noexcept : StringBase{std::move(v)} {}
+  explicit Keyword(std::string value) noexcept : StringBase{std::move(value)} {}
 };
 
 class Constant : public StringBase {
@@ -286,7 +291,10 @@ private:
 class Sequence : public Value {
 public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
+
   ValuesSpan values() const noexcept { return {data.begin(), data.end()}; };
+
+  std::size_t size() const { return data.size(); }
 
 protected:
   explicit Sequence(ValuesContainer data) noexcept
@@ -300,9 +308,7 @@ public:
   explicit List(ValuesContainer values) noexcept
       : Sequence{std::move(values)} {}
 
-  std::string print(bool readably) const override {
-    return readably ? std::format("({:r})", data) : std::format("({})", data);
-  }
+  std::string print(bool readably) const override;
 
   InvocableResult invoke(EnvPtr env) const;
   ValuePtr eval(EnvPtr env) const override;
@@ -317,7 +323,7 @@ public:
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
   }
 
-   ValuePtr eval(EnvPtr env) const override;
+  ValuePtr eval(EnvPtr env) const override;
 };
 
 class Hash : public Value {

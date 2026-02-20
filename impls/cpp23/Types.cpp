@@ -153,6 +153,22 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
+std::string List::print(bool readably) const {
+  if (auto macro = [&]() -> std::optional<std::string> {
+        if (data.size() == 2) {
+          if (auto symbol = to<Symbol>(data[0])) {
+            return symbol->macro;
+          }
+        }
+        return {};
+      }()) {
+    return readably ? std::format("{}{:r}", *macro, data[1])
+                    : std::format("{}{}", *macro, data[1]);
+
+  }
+  return readably ? std::format("({:r})", data) : std::format("({})", data);
+}
+
 ValuePtr Vector::eval(EnvPtr env) const {
   assert(env);
   auto evaled = data |
