@@ -171,10 +171,8 @@ std::string List::print(bool readably) const {
 
 ValuePtr Vector::eval(EnvPtr env) const {
   assert(env);
-  auto evaled = data |
-                std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
-                std::ranges::to<ValuesContainer>();
-  return make<Vector>(std::move(evaled));
+  return make<Vector>(
+      data | std::views::transform([&](auto &&v) { return EVAL(v, env); }));
 }
 
 InvocableResult List::invoke(EnvPtr env) const {
@@ -302,8 +300,7 @@ InvocableResult Lambda::apply(ValuesSpan values, EnvPtr /* evalEnv */) const {
     bindSize = i - params.begin();
     checkArgsAtLeast(print(false), values, bindSize);
     applyEnv->insert_or_assign(params.back(),
-                               make<List>(ValuesContainer(
-                                   values.begin() + bindSize, values.end())));
+                               make<List>(values | std::views::drop(bindSize)));
   } else {
     checkArgsIs(print(false), values, params.size());
   }

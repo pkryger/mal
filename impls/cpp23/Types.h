@@ -300,6 +300,15 @@ protected:
   explicit Sequence(ValuesContainer data) noexcept
       : data{std::move(data)} {}
 
+  explicit Sequence(ValuesSpan data) noexcept
+      : data{data | std::ranges::to<ValuesContainer>()} {}
+
+  template <std::ranges::input_range RANGE>
+    requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
+                                 ValuePtr>
+  explicit Sequence(RANGE &&range)
+      : data{std::forward<RANGE>(range) | std::ranges::to<ValuesContainer>()} {}
+
   ValuesContainer data;
 };
 
@@ -307,6 +316,13 @@ class List : public Sequence {
 public:
   explicit List(ValuesContainer values) noexcept
       : Sequence{std::move(values)} {}
+
+  explicit List(ValuesSpan values) noexcept : Sequence{values} {}
+
+  template <std::ranges::input_range RANGE>
+    requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
+                                 ValuePtr>
+  explicit List(RANGE &&range) : Sequence{std::forward<RANGE>(range)} {}
 
   std::string print(bool readably) const override;
 
@@ -316,8 +332,15 @@ public:
 
 class Vector : public Sequence {
 public:
-  explicit Vector(ValuesContainer value) noexcept
-      : Sequence{std::move(value)} {}
+  explicit Vector(ValuesContainer values) noexcept
+      : Sequence{std::move(values)} {}
+
+  explicit Vector(ValuesSpan values) noexcept : Sequence{values} {}
+
+  template <std::ranges::input_range RANGE>
+    requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
+                                 ValuePtr>
+  explicit Vector(RANGE &&range) : Sequence{std::forward<RANGE>(range)} {}
 
   std::string print(bool readably) const override {
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);

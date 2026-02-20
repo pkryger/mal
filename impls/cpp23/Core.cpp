@@ -148,7 +148,7 @@ ValuePtr division(std::string name, ValuesSpan values, EnvPtr /* env */) {
 }
 
 ValuePtr list(std::string /* name */, ValuesSpan values, EnvPtr /* env */) {
-  return make<List>(ValuesContainer{values.begin(), values.end()});
+  return make<List>(values);
 }
 
 ValuePtr listQuestion(std::string name, ValuesSpan values, EnvPtr /* env */) {
@@ -347,7 +347,7 @@ ValuePtr cons(std::string name, ValuesSpan values, EnvPtr env) {
   if (auto sequence = to<Sequence>(values[1])) {
     return make<List>(detail::cons(values[0], sequence->values()));
   }
-  return make<List>(values | std::ranges::to<ValuesContainer>());
+  return make<List>(values);
 }
 
 ValuePtr concat(std::string name, ValuesSpan values, EnvPtr env) {
@@ -357,7 +357,7 @@ ValuePtr concat(std::string name, ValuesSpan values, EnvPtr env) {
                       }
                       throwWrongArgument(std::move(name), elt);
                     }) |
-                    std::views::join | std::ranges::to<ValuesContainer>());
+                    std::views::join);
 }
 
 ValuePtr vec(std::string name, ValuesSpan values, EnvPtr env) {
@@ -366,7 +366,7 @@ ValuePtr vec(std::string name, ValuesSpan values, EnvPtr env) {
     return values[0];
   }
   if (auto list = to<List>(values[0])) {
-    return make<Vector>(list->values() | std::ranges::to<ValuesContainer>());
+    return make<Vector>(list->values());
   }
   throwWrongArgument(std::move(name), values[0]);
 }
