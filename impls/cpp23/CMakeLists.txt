@@ -3,6 +3,11 @@ project(mal LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+find_program(IWYU include-what-you-use)
+if(IWYU)
+  set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU};--cxx17ns)
+endif()
+
 if(APPLE)
   execute_process(
     COMMAND brew --prefix
