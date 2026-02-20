@@ -9,7 +9,7 @@
 
 namespace mal {
 
-using EvalFn = ValuePtr (*)(ValuePtr, EnvPtr);
+using EvalFn = ValuePtr (ValuePtr, EnvPtr);
 
 void checkArgsIs(std::string name, ValuesSpan values, std::size_t expected);
 
@@ -22,7 +22,7 @@ void checkArgsBetween(std::string name, ValuesSpan values,
 [[noreturn]]
 void throwWrongArgument(std::string name, ValuePtr val);
 
-void prepareEnv(EvalFn evalFn, Env &env);
+void prepareEnv(EvalFn &evalFn, Env &env);
 
 class CoreException : public std::runtime_error {
 public:

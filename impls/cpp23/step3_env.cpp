@@ -85,7 +85,7 @@ std::string PRINT(ValuePtr ast) {
 std::string rep(std::string str) {
   static Env env = []() {
     Env env{nullptr};
-    prepareEnv(&EVAL, env);
+    prepareEnv(EVAL, env);
     return env;
   }();
   static EnvPtr envPtr =

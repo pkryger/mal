@@ -344,9 +344,9 @@ public:
 
 class BuiltIn : public Invocable {
 public:
-  using Handler = ValuePtr (*)(std::string name, ValuesSpan value, EnvPtr Env);
+  using HandlerFn = ValuePtr (std::string name, ValuesSpan value, EnvPtr Env);
 
-  explicit BuiltIn(std::string name, Handler handler) noexcept
+  explicit BuiltIn(std::string name, HandlerFn &handler) noexcept
       : name{std::move(name)}, handler{handler} {}
 
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override {
@@ -363,7 +363,7 @@ public:
 
 private:
   std::string name;
-  Handler handler;
+  HandlerFn &handler;
 };
 
 class Lambda : public Invocable {

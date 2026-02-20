@@ -27,8 +27,6 @@ static ReadLine rl("~/.mal_history");
 
 ValuePtr READ(std::string str) { return readStr(std::move(str)); }
 
-using SpecialForm = InvocableResult (*)(std::string, ValuesSpan, EnvPtr);
-
 ValuePtr EVAL(ValuePtr, EnvPtr);
 
 InvocableResult specialDefBang(std::string name, ValuesSpan values, EnvPtr env) {
@@ -106,13 +104,14 @@ InvocableResult specialDo(std::string name, ValuesSpan values,
   return {values.back(), env, true};
 }
 
+using SpecialForm = InvocableResult (&)(std::string, ValuesSpan, EnvPtr);
 using Specials = const std::pair<std::string, SpecialForm>;
 static const std::array specials{
-  Specials{"def!", &specialDefBang},
-  Specials{"let*", &specialLetStar},
-  Specials{"if", &specialIf},
-  Specials{"fn*", &specialFnStar},
-  Specials{"do", &specialDo},
+  Specials{"def!", specialDefBang},
+  Specials{"let*", specialLetStar},
+  Specials{"if", specialIf},
+  Specials{"fn*", specialFnStar},
+  Specials{"do", specialDo},
 };
 
 ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
@@ -159,7 +158,7 @@ EnvPtr repEnv(std::span<const char*> args)
 {
   static Env env = []() {
     Env env{nullptr};
-    prepareEnv(&EVAL, env);
+    prepareEnv(EVAL, env);
     return env;
   }();
   static EnvPtr envPtr =

@@ -10,8 +10,10 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <print>
 #include <ranges>
 #include <string>
@@ -22,7 +24,7 @@
 
 
 namespace mal {
-static EvalFn repEvalFn;
+static std::optional<std::reference_wrapper<EvalFn>> repEvalFn;
 
 void checkArgsIs(std::string name, ValuesSpan values, std::size_t expected) {
 
@@ -307,6 +309,7 @@ ValuePtr resetBang(std::string name, ValuesSpan values, EnvPtr /* env */) {
 }
 
 ValuePtr swapBang(std::string name, ValuesSpan values, EnvPtr env) {
+  assert(repEvalFn);
   checkArgsAtLeast(name, values, 2);
   if (auto atom = to<Atom>(values[0])) {
     if (auto fn = to<Invocable>(values[1])) {
@@ -316,7 +319,7 @@ ValuePtr swapBang(std::string name, ValuesSpan values, EnvPtr env) {
       std::ranges::copy(values.subspan(2), std::back_inserter(args));
       auto [ast, evalEnv, needsEval] = fn->apply(ValuesSpan{args}, env);
       if (needsEval) {
-        ast = repEvalFn(ast, evalEnv);
+        ast = repEvalFn.value().get()(ast, evalEnv);
       }
       return atom->reset(ast);
     }
@@ -328,35 +331,34 @@ ValuePtr swapBang(std::string name, ValuesSpan values, EnvPtr env) {
 } // namespace
 
 namespace mal {
-void prepareEnv(EvalFn evalFn, Env &env) {
-  assert(evalFn);
+void prepareEnv(EvalFn &evalFn, Env &env) {
   repEvalFn = evalFn;
   static std::array builtIns{
-      make<BuiltIn>("+", &addition),
-      make<BuiltIn>("-", &subtraction),
-      make<BuiltIn>("*", &multiplication),
-      make<BuiltIn>("/", &division),
-      make<BuiltIn>("list", &list),
-      make<BuiltIn>("list?", &listQuestion),
-      make<BuiltIn>("empty?", &emptyQuestion),
-      make<BuiltIn>("count", &count),
-      make<BuiltIn>("<", &lt),
-      make<BuiltIn>("<=", &lte),
-      make<BuiltIn>(">", &gt),
-      make<BuiltIn>(">=", &gte),
-      make<BuiltIn>("=", &equal),
-      make<BuiltIn>("not", &not_),
-      make<BuiltIn>("prn", &prn),
-      make<BuiltIn>("println", &println),
-      make<BuiltIn>("pr-str", &pr_str),
-      make<BuiltIn>("str", &str),
-      make<BuiltIn>("slurp", &slurp),
-      make<BuiltIn>("read-string", &read_string),
-      make<BuiltIn>("atom", &atom),
-      make<BuiltIn>("atom?", &atomQuestion),
-      make<BuiltIn>("deref", &deref),
-      make<BuiltIn>("reset!", &resetBang),
-      make<BuiltIn>("swap!", &swapBang),
+      make<BuiltIn>("+", addition),
+      make<BuiltIn>("-", subtraction),
+      make<BuiltIn>("*", multiplication),
+      make<BuiltIn>("/", division),
+      make<BuiltIn>("list", list),
+      make<BuiltIn>("list?", listQuestion),
+      make<BuiltIn>("empty?", emptyQuestion),
+      make<BuiltIn>("count", count),
+      make<BuiltIn>("<", lt),
+      make<BuiltIn>("<=", lte),
+      make<BuiltIn>(">", gt),
+      make<BuiltIn>(">=", gte),
+      make<BuiltIn>("=", equal),
+      make<BuiltIn>("not", not_),
+      make<BuiltIn>("prn", prn),
+      make<BuiltIn>("println", println),
+      make<BuiltIn>("pr-str", pr_str),
+      make<BuiltIn>("str", str),
+      make<BuiltIn>("slurp", slurp),
+      make<BuiltIn>("read-string", read_string),
+      make<BuiltIn>("atom", atom),
+      make<BuiltIn>("atom?", atomQuestion),
+      make<BuiltIn>("deref", deref),
+      make<BuiltIn>("reset!", resetBang),
+      make<BuiltIn>("swap!", swapBang),
   };
 
   for (auto &builtIn : builtIns) {
