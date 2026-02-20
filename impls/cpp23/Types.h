@@ -397,14 +397,16 @@ private:
 
 class Lambda : public Invocable {
 public:
-  explicit Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env)
-      : params{std::move(params)}, body{std::move(body)}, env{std::move(env)} {}
+  explicit Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env);
 
   std::string print(bool readably) const override;
+
   ValuePtr isEqualTo(ValuePtr rhs) const override;
+
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override;
 
 private:
+  std::size_t bindSize;
   std::vector<std::string> params;
   ValuePtr body;
   EnvPtr env;

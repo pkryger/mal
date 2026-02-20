@@ -261,6 +261,21 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
+Lambda::Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env)
+    : bindSize{[&]() -> std::size_t {
+        if (auto i = std::ranges::find_if(
+                params, [](auto &&elt) { return elt[0] == '&'; });
+            i != params.end()) {
+          if ((params.end() - i) != 2) {
+            throw EvalException{
+                "there must be exactly one parameter after the &"};
+          }
+          return i - params.begin();
+        }
+        return params.size();
+      }()},
+      params{std::move(params)}, body{std::move(body)}, env{std::move(env)} {}
+
 std::string Lambda::print(bool readable) const {
   if (readable) {
     return std::format("#(λ-{:p} ({}) {:r}", reinterpret_cast<const void *>(this),
@@ -274,8 +289,8 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<Lambda>(rhs);
-      other && params.size() == other->params.size()) {
+  if (auto other = to<Lambda>(rhs); other && bindSize == other->bindSize &&
+                                    params.size() == other->params.size()) {
     auto res =
         std::ranges::mismatch(params, other->params, [](auto &&lhs, auto &&rhs) noexcept {
           return lhs == rhs;
@@ -290,19 +305,12 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
 
 InvocableResult Lambda::apply(ValuesSpan values, EnvPtr /* evalEnv */) const {
   auto applyEnv = make<Env>(env);
-  auto bindSize = params.size();
-  if (auto i = std::find_if(params.begin(), params.end(),
-                            [](auto &&elt) { return elt[0] == '&'; });
-      i != params.end()) {
-    if ((params.end() - i) != 2) {
-      throw EvalException{"there must be exactly one parameter after the &"};
-    }
-    bindSize = i - params.begin();
+  if (bindSize == params.size()) {
+    checkArgsIs(print(false), values, bindSize);
+  } else {
     checkArgsAtLeast(print(false), values, bindSize);
     applyEnv->insert_or_assign(params.back(),
                                make<List>(values | std::views::drop(bindSize)));
-  } else {
-    checkArgsIs(print(false), values, params.size());
   }
   for (auto &&[key, value] :
        std::views::zip(params | std::views::take(bindSize),
