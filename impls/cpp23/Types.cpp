@@ -208,7 +208,7 @@ ValuePtr Hash::eval(EnvPtr env) const {
                   return std::pair{v.first, EVAL(v.second, env)};
                 }) |
                 std::ranges::to<ValuesMap>();
-  auto res = make<Hash>(ValuesContainer{});
+  auto res = make<Hash>();
   res->data = std::move(evaled);
   return res;
 }

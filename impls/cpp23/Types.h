@@ -356,7 +356,8 @@ public:
 
 class Hash : public Value {
 public:
-  explicit Hash(ValuesContainer value) : data{createMap(std::move(value))} {}
+  explicit Hash(ValuesContainer value = {})
+      : data{createMap(std::move(value))} {}
 
   std::string print(bool readably) const override;
 
