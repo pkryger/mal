@@ -390,8 +390,9 @@ public:
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  std::string print(bool readably) const override {
-    return readably ? "#'" + name : name;
+  std::string print(bool /* readably */) const override {
+    return std::format("#<built-in {}@{:p}>", name,
+                       reinterpret_cast<const void *>(this));
   }
 
   const std::string &asKey() const { return name; }
@@ -423,7 +424,7 @@ public:
   explicit Eval(EnvPtr env) : env{std::move(env)} {}
 
   std::string print(bool /* readably */) const override {
-    return std::format("(λeval-{:p})", reinterpret_cast<const void *>(this));
+    return std::format("#<eval@{:p}>", reinterpret_cast<const void *>(this));
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;

@@ -278,11 +278,11 @@ Lambda::Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env)
 
 std::string Lambda::print(bool readable) const {
   if (readable) {
-    return std::format("#(λ-{:p} ({}) {:r}", reinterpret_cast<const void *>(this),
+    return std::format("#<λ@{:p} {} {:r}>", reinterpret_cast<const void *>(this),
                        params, body);
 
   }
-  return std::format("(λ-{:p})", reinterpret_cast<const void *>(this));
+  return std::format("#<λ@{:p}>", reinterpret_cast<const void *>(this));
 }
 
 ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
