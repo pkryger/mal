@@ -184,7 +184,7 @@ InvocableResult List::invoke(EnvPtr env) const {
   if (auto function = to<Invocable>(op)) {
     auto args =
         evaled | std::views::drop(1) | std::ranges::to<ValuesContainer>();
-    return function->apply({args.begin(), args.end()}, env);
+    return function->apply({args}, env);
   }
   throw EvalException{std::format("invalid function '{:r}'", op)};
 }
