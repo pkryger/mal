@@ -274,7 +274,7 @@ Lambda::Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env)
         }
         return params.size();
       }()},
-      params{std::move(params)}, body{std::move(body)}, env{std::move(env)} {}
+      params{std::move(params)}, body{std::move(body)}, captureEnv{std::move(env)} {}
 
 std::string Lambda::print(bool readable) const {
   if (readable) {
@@ -304,7 +304,7 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
 }
 
 InvocableResult Lambda::apply(ValuesSpan values, EnvPtr /* evalEnv */) const {
-  auto applyEnv = make<Env>(env);
+  auto applyEnv = make<Env>(captureEnv);
   if (bindSize == params.size()) {
     checkArgsIs(print(false), values, bindSize);
   } else {

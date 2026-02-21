@@ -415,7 +415,7 @@ private:
   std::size_t bindSize;
   std::vector<std::string> params;
   ValuePtr body;
-  EnvPtr env;
+  EnvPtr captureEnv;
 };
 
 class Eval : public Invocable {
