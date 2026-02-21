@@ -111,7 +111,14 @@ InvocableResult specialQuote(std::string name, ValuesSpan values, EnvPtr env) {
 InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
                                   EnvPtr env) {
   checkArgsIs(std::move(name), values, 1);
-  auto startsWith = [](std::string key, ValuesSpan values) -> ValuePtr {
+  auto valuesIfSequence =
+      []<typename SEQUENCE>(const ValuePtr &value) -> ValuesSpan {
+    if (auto sequence = to<SEQUENCE>(value)) {
+      return  sequence->values();
+    }
+    return {};
+  };
+  auto argIfStartsWith = [](std::string key, ValuesSpan values) -> ValuePtr {
     if (auto symbol = to<Symbol>(values[0]);
         symbol && symbol->asKey() == key) {
       checkArgsIs(key, values.subspan(1), 1);
@@ -120,46 +127,38 @@ InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
     return nullptr;
   };
   auto &&ast = values[0];
-  if (values = [&]() -> ValuesSpan {
-        if (auto sequence = to<Sequence>(ast)) {
-          return sequence->values();
-        }
-        return {};
-      }();
+  if (values = valuesIfSequence.template operator()<Sequence>(ast);
       !values.empty()) {
-    if (auto unquote = startsWith("unquote", values);
-        unquote && to<List>(ast)) {
-      return {std::move(unquote), std::move(env), true};
+    if (auto unquoteArg = argIfStartsWith("unquote", values);
+        unquoteArg && to<List>(ast)) {
+      return {std::move(unquoteArg), std::move(env), true};
     }
-    auto res =
-        std::ranges::fold_left(
-            values | std::views::reverse, make<List>(),
-            [&](auto &&acc, auto &&elt) -> ValuePtr {
-              if (auto spliceUnquote = [&]() -> ValuePtr {
-                    if (auto eltValues = [&]() -> ValuesSpan {
-                          if (auto eltList = to<List>(elt)) {
-                            return eltList->values();
-                          }
-                          return {};
-                        }();
+    auto res = std::ranges::fold_left(
+        values | std::views::reverse, make<List>(),
+        [&](auto &&acc, auto &&elt) -> ValuePtr {
+          if (auto spliceUnquote = [&]() -> ValuePtr {
+                if (auto eltValues =
+                        valuesIfSequence.template operator()<List>(elt);
                         !eltValues.empty()) {
-                      if (auto spliceUnquote =
-                              startsWith("splice-unquote", eltValues)) {
-                        return spliceUnquote;
-                      }
-                    }
-                    return nullptr;
-                  }()) {
-                return make<List>(make<Symbol>("concat"), spliceUnquote, acc);
-              }
-              auto [v, _, needsEval] = specialQuasiquote(
-                  name, ValuesSpan{std::addressof(elt), 1}, env);
-              return make<List>(
-                  make<Symbol>("cons"),
-                  needsEval ? v : make<List>(make<Symbol>("quote"), v), acc);
-            });
+                  if (auto spliceUnquote =
+                          argIfStartsWith("splice-unquote", eltValues)) {
+                    return spliceUnquote;
+                  }
+                }
+                return nullptr;
+              }()) {
+            return make<List>(make<Symbol>("concat"), spliceUnquote, acc);
+          }
+          auto [v, _, needsEval] =
+              specialQuasiquote(name, ValuesSpan{std::addressof(elt), 1}, env);
+          return make<List>(
+              make<Symbol>("cons"),
+              needsEval ? std::move(v)
+                        : make<List>(make<Symbol>("quote"), std::move(v)),
+              acc);
+        });
     if (to<Vector>(ast)) {
-      res = make<List>(make<Symbol>("vec"), res);
+      res = make<List>(make<Symbol>("vec"), std::move(res));
     }
     return {std::move(res), std::move(env), true};
   }
