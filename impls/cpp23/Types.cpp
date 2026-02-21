@@ -332,5 +332,4 @@ InvocableResult Eval::apply(ValuesSpan values, EnvPtr evalEnv) const {
   return{values[0], env, true};
 }
 
-
 } // namespace mal

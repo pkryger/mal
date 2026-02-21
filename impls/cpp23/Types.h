@@ -324,6 +324,11 @@ public:
                                  ValuePtr>
   explicit List(RANGE &&range) : Sequence{std::forward<RANGE>(range)} {}
 
+  template <typename... ARGS>
+    requires(std::convertible_to<ARGS, ValuePtr> && ...)
+  explicit List(ARGS &&...args)
+      : Sequence{ValuesContainer{std::forward<ARGS>(args)...}} {}
+
   std::string print(bool readably) const override;
 
   InvocableResult invoke(EnvPtr env) const;

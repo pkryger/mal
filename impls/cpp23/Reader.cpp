@@ -139,11 +139,8 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
 
   if (token == "^") {
     auto meta{readForm(tokeniser)};
-    return make<List>(ValuesContainer{
-      make<Symbol>("with-meta"),
-      readForm(tokeniser),
-      std::move(meta),
-    });
+    return make<List>(make<Symbol>("with-meta"), readForm(tokeniser),
+                      std::move(meta));
   }
 
   if (std::regex_match(token, std::regex{"^[-+]?\\d+$"})) {
@@ -159,10 +156,8 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
 
   if (auto macro = std::ranges::find_if(macros, isToken, first);
       macro != macros.end()) {
-    return make<List>(ValuesContainer{
-        make<Symbol>(macro->second, macro->first),
-        readForm(tokeniser),
-    });
+    return make<List>(make<Symbol>(macro->second, macro->first),
+                      readForm(tokeniser));
   }
 
   return make<Symbol>(std::move(token));

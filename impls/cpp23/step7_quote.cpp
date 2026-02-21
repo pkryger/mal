@@ -133,7 +133,7 @@ InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
     }
     auto res =
         std::ranges::fold_left(
-            values | std::views::reverse, make<List>(ValuesContainer{}),
+            values | std::views::reverse, make<List>(),
             [&](auto &&acc, auto &&elt) -> ValuePtr {
               if (auto spliceUnquote = [&]() -> ValuePtr {
                     if (auto eltValues = [&]() -> ValuesSpan {
@@ -150,20 +150,16 @@ InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
                     }
                     return nullptr;
                   }()) {
-                return make<List>(ValuesContainer{make<Symbol>("concat"),
-                                                  spliceUnquote, acc});
+                return make<List>(make<Symbol>("concat"), spliceUnquote, acc);
               }
               auto [v, _, needsEval] = specialQuasiquote(
                   name, ValuesSpan{std::addressof(elt), 1}, env);
-              return make<List>(ValuesContainer{
+              return make<List>(
                   make<Symbol>("cons"),
-                  needsEval
-                      ? v
-                      : make<List>(ValuesContainer{make<Symbol>("quote"), v}),
-                  acc});
+                  needsEval ? v : make<List>(make<Symbol>("quote"), v), acc);
             });
     if (to<Vector>(ast)) {
-      res = make<List>(ValuesContainer{make<Symbol>("vec"), res});
+      res = make<List>(make<Symbol>("vec"), res);
     }
     return {std::move(res), std::move(env), true};
   }
