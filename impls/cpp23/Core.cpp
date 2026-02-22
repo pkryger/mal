@@ -71,6 +71,7 @@ using mal::EnvPtr;
 using mal::Integer;
 using mal::Invocable;
 using mal::List;
+using mal::Macro;
 using mal::make;
 using mal::readStr;
 using mal::repEvalFn;
@@ -342,7 +343,7 @@ ValuePtr swapBang(std::string name, ValuesSpan values, EnvPtr env) {
   throwWrongArgument(std::move(name), values[0]);
 }
 
-ValuePtr cons(std::string name, ValuesSpan values, EnvPtr env) {
+ValuePtr cons(std::string name, ValuesSpan values, EnvPtr /* env */) {
   checkArgsIs(std::move(name), values, 2);
   if (auto sequence = to<Sequence>(values[1])) {
     return make<List>(detail::cons(values[0], sequence->values()));
@@ -350,7 +351,7 @@ ValuePtr cons(std::string name, ValuesSpan values, EnvPtr env) {
   return make<List>(values);
 }
 
-ValuePtr concat(std::string name, ValuesSpan values, EnvPtr env) {
+ValuePtr concat(std::string name, ValuesSpan values, EnvPtr /* env */) {
   return make<List>(values | std::views::transform([&](auto elt) {
                       if (auto sequence = to<Sequence>(elt)) {
                         return sequence->values();
@@ -360,7 +361,7 @@ ValuePtr concat(std::string name, ValuesSpan values, EnvPtr env) {
                     std::views::join);
 }
 
-ValuePtr vec(std::string name, ValuesSpan values, EnvPtr env) {
+ValuePtr vec(std::string name, ValuesSpan values, EnvPtr /* env */) {
   checkArgsIs(std::move(name), values, 1);
   if (to<Vector>(values[0])) {
     return values[0];
@@ -369,6 +370,64 @@ ValuePtr vec(std::string name, ValuesSpan values, EnvPtr env) {
     return make<Vector>(list->values());
   }
   throwWrongArgument(std::move(name), values[0]);
+}
+
+ValuePtr nth(std::string name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(std::move(name), values, 2);
+  if (auto integer = to<Integer>(values[1])) {
+    auto index = integer->value();
+    if (auto sequence = to<Sequence>(values[0])) {
+      auto values = sequence->values();
+      if (0 <= index && index < values.size()) {
+        return values[index];
+      }
+      throw CoreException{std::format("index out of bounds {} for '{}'", index,
+                                      std::move(name))};
+    }
+    if (auto constant = to<Constant>(values[0]);
+        constant && index == 0 && Constant::nilValue()->isEqualTo(values[0])) {
+      return Constant::nilValue();
+    }
+    throwWrongArgument(std::move(name), values[0]);
+  }
+  throwWrongArgument(std::move(name), values[1]);
+}
+
+ValuePtr first(std::string name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(std::move(name), values, 1);
+  if (auto sequence = to<Sequence>(values[0])) {
+    auto values = sequence->values();
+    if (!values.empty()) {
+      return values[0];
+    }
+    return Constant::nilValue();
+  }
+  if (auto constant = to<Constant>(values[0]);
+      constant && Constant::nilValue()->isEqualTo(values[0])) {
+    return Constant::nilValue();
+  }
+  throwWrongArgument(std::move(name), values[0]);
+}
+
+ValuePtr rest(std::string name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(std::move(name), values, 1);
+  if (auto sequence = to<Sequence>(values[0])) {
+    auto values = sequence->values();
+    if (!values.empty()) {
+      return make<List>(values.subspan(1));
+    }
+    return make<List>();
+  }
+  if (auto constant = to<Constant>(values[0]);
+      constant && Constant::nilValue()->isEqualTo(values[0])) {
+    return make<List>();
+  }
+  throwWrongArgument(std::move(name), values[0]);
+}
+
+ValuePtr macroQuestion(std::string name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(std::move(name), values, 1);
+  return to<Macro>(values[0]) ? Constant::trueValue() : Constant::falseValue();
 }
 
 } // namespace
@@ -405,6 +464,10 @@ void prepareEnv(EvalFn &evalFn, Env &env) {
       make<BuiltIn>("cons", cons),
       make<BuiltIn>("concat", concat),
       make<BuiltIn>("vec", vec),
+      make<BuiltIn>("nth", nth),
+      make<BuiltIn>("first", first),
+      make<BuiltIn>("rest", rest),
+      make<BuiltIn>("macro?", macroQuestion),
   };
 
   for (auto &builtIn : builtIns) {

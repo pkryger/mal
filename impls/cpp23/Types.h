@@ -43,18 +43,27 @@ template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
 
 class Env {
 public:
+  using Map = std::unordered_map<std::string, ValuePtr>;
+  using MapPtr = std::shared_ptr<Map>;
+
   explicit Env(EnvPtr outer) noexcept : outer{std::move(outer)} {}
+
+  explicit Env(EnvPtr captureEnv, EnvPtr evalEnv);
+
+  explicit Env(EnvPtr outer, MapPtr map)
+      : outer{std::move(outer)}, map{std::move(map)} {}
 
   void insert_or_assign(std::string key, ValuePtr value) {
     assert(value);
-    map.insert_or_assign(std::move(key), std::move(value));
+    map->insert_or_assign(std::move(key), std::move(value));
   }
 
   ValuePtr find(const std::string& key) const;
 
 private:
+
   EnvPtr outer;
-  std::unordered_map<std::string, ValuePtr> map;
+  MapPtr map{std::make_shared<Map>()};
 };
 
 
@@ -402,21 +411,68 @@ private:
   HandlerFn &handler;
 };
 
-class Lambda : public Invocable {
+class FunctionBase : public Invocable {
 public:
-  explicit Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env);
+  struct Params : std::vector<std::string> {
+    using std::vector<std::string>::vector;
+  };
 
-  std::string print(bool readably) const override;
+  explicit FunctionBase(Params params, ValuePtr body, EnvPtr capureEnv);
+
+  explicit FunctionBase(FunctionBase &&other) noexcept
+      : bindSize{other.bindSize}, params{std::move(other.params)},
+        body{std::move(other.body)},
+        captureEnv{std::move(other.captureEnv)} {}
+
+protected:
+  template <typename TYPE> ValuePtr isEqualTo(ValuePtr rhs) const;
+
+  EnvPtr makeApplyEnv(ValuesSpan value, EnvPtr evalEnv) const;
+
+  std::size_t bindSize;
+  Params params;
+  ValuePtr body;
+  EnvPtr captureEnv;
+};
+
+} // namespace mal
+
+namespace std {
+template <>
+struct std::formatter<mal::FunctionBase::Params> : std::range_formatter<std::string> {
+  constexpr formatter() {
+    set_brackets("(", ")");
+    set_separator(" ");
+  }
+};
+
+} //namespace std
+
+namespace mal {
+
+class Lambda : public FunctionBase {
+public:
+  explicit Lambda(FunctionBase::Params params, ValuePtr body, EnvPtr captureEnv)
+      : FunctionBase{std::move(params), std::move(body),
+                     std::move(captureEnv)} {}
+
+  std::string print(bool readable) const override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override;
+};
 
-private:
-  std::size_t bindSize;
-  std::vector<std::string> params;
-  ValuePtr body;
-  EnvPtr captureEnv;
+class Macro : public FunctionBase {
+public:
+  explicit Macro(FunctionBase &&other) noexcept
+      : FunctionBase{std::move(other)} {}
+
+  std::string print(bool readable) const override;
+
+  ValuePtr isEqualTo(ValuePtr rhs) const override;
+
+  InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override;
 };
 
 class Eval : public Invocable {

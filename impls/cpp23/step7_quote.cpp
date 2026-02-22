@@ -79,7 +79,7 @@ InvocableResult specialIf(std::string name, ValuesSpan values, EnvPtr env) {
 }
 
 InvocableResult specialFnStar(std::string name, ValuesSpan values, EnvPtr env) {
-  checkArgsAtLeast(name, values, 2);
+  checkArgsIs(name, values, 2);
   if (auto sequence = to<Sequence>(values[0])) {
     return {make<Lambda>(
                 sequence->values() | std::views::transform([&](auto &&elt) {

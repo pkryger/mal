@@ -29,17 +29,19 @@ ValuePtr READ(std::string str) { return readStr(std::move(str)); }
 
 ValuePtr EVAL(ValuePtr, EnvPtr);
 
-InvocableResult specialDefBang(std::string name, ValuesSpan values, EnvPtr env) {
+InvocableResult specialDefBang(std::string name, ValuesSpan values,
+                               EnvPtr env) {
   checkArgsIs(std::move(name), values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
     auto val = EVAL(values[1], env);
     env->insert_or_assign(symbol->asKey(), val);
-    return {val, env, false};
+    return {std::move(val), std::move(env), false};
   }
   throw EvalException{std::format("invalid def! argument {:r}", values[1])};
 }
 
-InvocableResult specialLetStar(std::string name, ValuesSpan values, EnvPtr env) {
+InvocableResult specialLetStar(std::string name, ValuesSpan values,
+                               EnvPtr env) {
   checkArgsIs(std::move(name), values, 2);
   if (auto sequence = to<Sequence>(values[0])) {
     auto bindings = sequence->values();
@@ -59,26 +61,24 @@ InvocableResult specialLetStar(std::string name, ValuesSpan values, EnvPtr env) 
              })) {
       letEnv->insert_or_assign(std::move(key), std::move(value));
     }
-    return {values[1], letEnv, true};
+    return {values[1], std::move(letEnv), true};
   }
   throw EvalException{std::format("invalid let* bindings '{:r}'", values[0])};
 }
 
-InvocableResult specialIf(std::string name, ValuesSpan values,
-                                    EnvPtr env) {
+InvocableResult specialIf(std::string name, ValuesSpan values, EnvPtr env) {
   checkArgsBetween(std::move(name), values, 2, 3);
   auto cond = EVAL(values[0], env);
   if (cond->isTrue()) {
-    return {values[1], env, true};
+    return {values[1], std::move(env), true};
   } else if (values.size() == 3) {
-    return {values[2], env, true};
+    return {values[2], std::move(env), true};
   } else {
-    return {Constant::nilValue(), env, false};
+    return {Constant::nilValue(), std::move(env), false};
   }
 }
 
-InvocableResult specialFnStar(std::string name, ValuesSpan values,
-                                        EnvPtr env) {
+InvocableResult specialFnStar(std::string name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 2);
   if (auto sequence = to<Sequence>(values[0])) {
     return {make<Lambda>(
@@ -87,21 +87,97 @@ InvocableResult specialFnStar(std::string name, ValuesSpan values,
                     return symbol->asKey();
                   }
                   throwWrongArgument(std::move(name), elt);
-                }) | std::ranges::to<std::vector>(),
+                }) | std::ranges::to<FunctionBase::Params>(),
                 values[1], env),
-            env, false};
+            std::move(env), false};
   }
   throwWrongArgument(std::move(name), values[1]);
 }
 
-InvocableResult specialDo(std::string name, ValuesSpan values,
-                      EnvPtr env) {
+InvocableResult specialDo(std::string name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(std::move(name), values, 1);
   for (auto &&val :
        values | std::views::take(values.size() - 1)) {
     EVAL(val, env);
   }
-  return {values.back(), env, true};
+  return {values.back(), std::move(env), true};
+}
+
+InvocableResult specialQuote(std::string name, ValuesSpan values, EnvPtr env) {
+  checkArgsIs(std::move(name), values, 1);
+  return {values[0], std::move(env), false};
+}
+
+InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
+                                  EnvPtr env) {
+  checkArgsIs(std::move(name), values, 1);
+  auto valuesIfSequence =
+      []<typename SEQUENCE>(const ValuePtr &value) -> ValuesSpan {
+    if (auto sequence = to<SEQUENCE>(value)) {
+      return  sequence->values();
+    }
+    return {};
+  };
+  auto argIfStartsWith = [](std::string key, ValuesSpan values) -> ValuePtr {
+    if (auto symbol = to<Symbol>(values[0]);
+        symbol && symbol->asKey() == key) {
+      checkArgsIs(key, values.subspan(1), 1);
+      return values[1];
+    }
+    return nullptr;
+  };
+  auto &&ast = values[0];
+  if (values = valuesIfSequence.template operator()<Sequence>(ast);
+      !values.empty()) {
+    if (auto unquoteArg = argIfStartsWith("unquote", values);
+        unquoteArg && to<List>(ast)) {
+      return {std::move(unquoteArg), std::move(env), true};
+    }
+    auto res = std::ranges::fold_left(
+        values | std::views::reverse, make<List>(),
+        [&](auto &&acc, auto &&elt) -> ValuePtr {
+          if (auto spliceUnquote = [&]() -> ValuePtr {
+                if (auto eltValues =
+                        valuesIfSequence.template operator()<List>(elt);
+                        !eltValues.empty()) {
+                  if (auto spliceUnquote =
+                          argIfStartsWith("splice-unquote", eltValues)) {
+                    return spliceUnquote;
+                  }
+                }
+                return nullptr;
+              }()) {
+            return make<List>(make<Symbol>("concat"), spliceUnquote, acc);
+          }
+          auto [v, _, needsEval] =
+              specialQuasiquote(name, ValuesSpan{std::addressof(elt), 1}, env);
+          return make<List>(
+              make<Symbol>("cons"),
+              needsEval ? std::move(v)
+                        : make<List>(make<Symbol>("quote"), std::move(v)),
+              acc);
+        });
+    if (to<Vector>(ast)) {
+      res = make<List>(make<Symbol>("vec"), std::move(res));
+    }
+    return {std::move(res), std::move(env), true};
+  }
+  return {ast, std::move(env), false};
+}
+
+InvocableResult specialDefmacroBang(std::string name, ValuesSpan values,
+                                    EnvPtr env) {
+  checkArgsIs(name, values, 2);
+  if (auto symbol = to<Symbol>(values[0])) {
+    auto res = EVAL(values[1], env);
+    if (auto lambda = to<Lambda>(res)) {
+      res = make<Macro>(std::move(const_cast<Lambda&>(*lambda)));
+      env->insert_or_assign(symbol->asKey(), res);
+      return {res, std::move(env), false};
+    }
+    throwWrongArgument(std::move(name), res);
+  }
+  throwWrongArgument(std::move(name), values[0]);
 }
 
 using SpecialForm = InvocableResult (&)(std::string, ValuesSpan, EnvPtr);
@@ -112,6 +188,9 @@ static const std::array specials{
   Specials{"if", specialIf},
   Specials{"fn*", specialFnStar},
   Specials{"do", specialDo},
+  Specials{"quote", specialQuote},
+  Specials{"quasiquote", specialQuasiquote},
+  Specials{"defmacro!", specialDefmacroBang},
 };
 
 ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
@@ -180,6 +259,15 @@ EnvPtr repEnv(std::span<const char*> args)
                      "\" (slurp f) \"\nnil)\")))))"),
                 envPtr);
   }();
+
+  static auto defaultCond = [&]() {
+    return EVAL(
+        READ("(defmacro! cond (fn* (& xs) (if (> (count xs) 0) (list 'if "
+             "(first xs) (if (> (count xs) 1) (nth xs 1) (throw \"odd number "
+             "of forms to cond\")) (cons 'cond (rest (rest xs)))))))"),
+        envPtr);
+  }();
+
   envPtr->insert_or_assign(
       "*ARGV*", make<List>(args | std::views::drop(1) |
                            std::views::transform([](auto &&arg) -> ValuePtr {

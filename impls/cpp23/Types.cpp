@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <format>
+#include <functional>
 #include <ranges>
 #include <tuple>
 #include <typeinfo>
@@ -14,13 +15,33 @@ namespace mal {
 
 extern ValuePtr EVAL(ValuePtr, EnvPtr);
 
+Env::Env(EnvPtr captureEnv, EnvPtr evalEnv) : outer {
+  [&]() {
+    std::vector<MapPtr> captureMaps;
+    while (captureEnv) {
+      captureMaps.push_back(captureEnv->map); // [sic!]
+      captureEnv = captureEnv->outer;
+    }
+    if (captureMaps.empty()) {
+      return evalEnv;
+    }
+    return std::ranges::fold_left(
+        captureMaps | std::views::reverse | std::views::drop(1) |
+            std::views::as_rvalue,
+        make<Env>(std::move(evalEnv), std::move(captureMaps.back())),
+        [](auto &&acc, auto &&elt) {
+          return make<Env>(std::forward<decltype(acc)>(acc),
+                           std::forward<decltype(elt)>(elt));
+        });
+  }()} {}
+
 ValuePtr Env::find(const std::string &key) const {
   for (auto env = this; env; env = [&]() noexcept -> const Env * {
          if (env->outer)
            return env->outer.get();
          return nullptr;
        }()) {
-    if (auto item = env->map.find(key); item != env->map.end()) {
+    if (auto item = env->map->find(key); item != env->map->end()) {
       return item->second;
     }
   }
@@ -178,13 +199,15 @@ ValuePtr Vector::eval(EnvPtr env) const {
 InvocableResult List::invoke(EnvPtr env) const {
   assert(env);
   assert(!data.empty());
-  auto evaled =
-      data | std::views::transform([&](auto &&v) { return EVAL(v, env); });
-  auto op = evaled[0];
+  auto op = EVAL(data[0], env);
+  if (auto function = to<Macro>(op)) {
+    return function->apply(ValuesSpan{data}.subspan(1), env);
+  }
   if (auto function = to<Invocable>(op)) {
-    auto args =
-        evaled | std::views::drop(1) | std::ranges::to<ValuesContainer>();
-    return function->apply({args}, env);
+      auto args = data | std::views::drop(1) |
+               std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
+        std::ranges::to<ValuesContainer>();
+      return function->apply({args}, env);
   }
   throw EvalException{std::format("invalid function '{:r}'", op)};
 }
@@ -261,7 +284,7 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-Lambda::Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env)
+FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr captureEnv)
     : bindSize{[&]() -> std::size_t {
         if (auto i = std::ranges::find_if(
                 params, [](auto &&elt) { return elt[0] == '&'; });
@@ -274,27 +297,20 @@ Lambda::Lambda(std::vector<std::string> params, ValuePtr body, EnvPtr env)
         }
         return params.size();
       }()},
-      params{std::move(params)}, body{std::move(body)}, captureEnv{std::move(env)} {}
+      params{std::move(params)}, body{std::move(body)},
+      captureEnv{std::move(captureEnv)} {}
 
-std::string Lambda::print(bool readable) const {
-  if (readable) {
-    return std::format("#<λ@{:p} {} {:r}>", reinterpret_cast<const void *>(this),
-                       params, body);
-
-  }
-  return std::format("#<λ@{:p}>", reinterpret_cast<const void *>(this));
-}
-
-ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
+template <typename TYPE>
+ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<Lambda>(rhs); other && bindSize == other->bindSize &&
+  if (auto other = to<TYPE>(rhs); other && bindSize == other->bindSize &&
                                     params.size() == other->params.size()) {
-    auto res =
-        std::ranges::mismatch(params, other->params, [](auto &&lhs, auto &&rhs) noexcept {
-          return lhs == rhs;
-        });
+    auto res = std::ranges::mismatch(params, other->params,
+                                     [](auto &&lhs, auto &&rhs) noexcept {
+                                       return lhs == rhs;
+                                     });
     if (res.in1 != params.end() || res.in2 != other->params.end()) {
       return Constant::falseValue();
     }
@@ -303,8 +319,8 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-InvocableResult Lambda::apply(ValuesSpan values, EnvPtr /* evalEnv */) const {
-  auto applyEnv = make<Env>(captureEnv);
+EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
+  auto applyEnv = make<Env>(captureEnv, std::move(evalEnv));
   if (bindSize == params.size()) {
     checkArgsIs(print(false), values, bindSize);
   } else {
@@ -317,7 +333,41 @@ InvocableResult Lambda::apply(ValuesSpan values, EnvPtr /* evalEnv */) const {
                        values)) {
     applyEnv->insert_or_assign(key, value);
   }
-  return {body, applyEnv, true};
+  return applyEnv;
+}
+
+std::string Lambda::print(bool readable) const {
+  if (readable) {
+    return std::format("#<λ@{:p} {} {:r}>",
+                       reinterpret_cast<const void *>(this), params, body);
+
+  }
+  return std::format("#<λ@{:p}>", reinterpret_cast<const void *>(this));
+}
+
+ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
+  return FunctionBase::template isEqualTo<Lambda>(rhs);
+}
+
+InvocableResult Lambda::apply(ValuesSpan values, EnvPtr evalEnv) const {
+  return {body, makeApplyEnv(values, std::move(evalEnv)), true};
+}
+
+std::string Macro::print(bool readable) const {
+  if (readable) {
+    return std::format("#<macro@{:p} {} {:r}>",
+                       reinterpret_cast<const void *>(this), params, body);
+  }
+  return std::format("#<macro@{:p}>", reinterpret_cast<const void *>(this));
+}
+
+ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
+  return FunctionBase::template isEqualTo<Macro>(rhs);
+}
+
+InvocableResult Macro::apply(ValuesSpan values, EnvPtr evalEnv) const {
+  auto applyEnv =  FunctionBase::makeApplyEnv(values, std::move(evalEnv));
+  return {EVAL(body, applyEnv), applyEnv, true};
 }
 
 ValuePtr Eval::isEqualTo(ValuePtr rhs) const {
