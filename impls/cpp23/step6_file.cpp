@@ -87,7 +87,7 @@ InvocableResult specialFnStar(std::string name, ValuesSpan values,
                     return symbol->asKey();
                   }
                   throwWrongArgument(std::move(name), elt);
-                }) | std::ranges::to<std::vector>(),
+                }),
                 values[1], env),
             env, false};
   }

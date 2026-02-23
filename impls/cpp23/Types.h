@@ -452,9 +452,13 @@ namespace mal {
 
 class Lambda : public FunctionBase {
 public:
-  explicit Lambda(FunctionBase::Params params, ValuePtr body, EnvPtr captureEnv)
-      : FunctionBase{std::move(params), std::move(body),
-                     std::move(captureEnv)} {}
+  template <std::ranges::input_range RANGE>
+    requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
+                                 std::string>
+  explicit Lambda(RANGE &&params, ValuePtr body, EnvPtr captureEnv)
+      : FunctionBase{std::forward<RANGE>(params) |
+                         std::ranges::to<FunctionBase::Params>(),
+                     std::move(body), std::move(captureEnv)} {}
 
   std::string print(bool readable) const override;
 
