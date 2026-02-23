@@ -34,7 +34,8 @@ InvocableResult specialDefBang(std::string name, ValuesSpan values,
   checkArgsIs(std::move(name), values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
     auto val = EVAL(values[1], env);
-    env->insert_or_assign(symbol->asKey(), val);
+    assert(dynamic_cast<Env *>(env.get()));
+    dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), val);
     return {std::move(val), std::move(env), false};
   }
   throw EvalException{std::format("invalid def! argument {:r}", values[1])};
@@ -172,7 +173,7 @@ InvocableResult specialDefmacroBang(std::string name, ValuesSpan values,
     auto res = EVAL(values[1], env);
     if (auto lambda = to<Lambda>(res)) {
       res = make<Macro>(std::move(const_cast<Lambda&>(*lambda)));
-      env->insert_or_assign(symbol->asKey(), res);
+      dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), res);
       return {res, std::move(env), false};
     }
     throwWrongArgument(std::move(name), res);
@@ -243,7 +244,6 @@ EnvPtr repEnv(std::span<const char*> args)
   static EnvPtr envPtr =
       std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
 
-
   static auto defaultEval = [&]() {
     auto eval = make<Eval>(envPtr);
     env.insert_or_assign("eval", eval);
@@ -268,7 +268,7 @@ EnvPtr repEnv(std::span<const char*> args)
         envPtr);
   }();
 
-  envPtr->insert_or_assign(
+  env.insert_or_assign(
       "*ARGV*", make<List>(args | std::views::drop(1) |
                            std::views::transform([](auto &&arg) -> ValuePtr {
                              return make<String>(arg);

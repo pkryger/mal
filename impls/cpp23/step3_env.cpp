@@ -42,7 +42,8 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
       }
       if (auto symbol = to<Symbol>(lvalues[1])) {
         auto val = EVAL(lvalues[2], env);
-        env->insert_or_assign(symbol->asKey(), val);
+        assert(dynamic_cast<Env *>(env.get()));
+        dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), val);
         return val;
       }
       throw EvalException{

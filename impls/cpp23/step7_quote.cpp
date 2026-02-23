@@ -34,7 +34,8 @@ InvocableResult specialDefBang(std::string name, ValuesSpan values,
   checkArgsIs(std::move(name), values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
     auto val = EVAL(values[1], env);
-    env->insert_or_assign(symbol->asKey(), val);
+    assert(dynamic_cast<Env *>(env.get()));
+    dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), val);
     return {std::move(val), std::move(env), false};
   }
   throw EvalException{std::format("invalid def! argument {:r}", values[1])};
@@ -244,7 +245,7 @@ EnvPtr repEnv(std::span<const char*> args)
                      "\" (slurp f) \"\nnil)\")))))"),
                 envPtr);
   }();
-  envPtr->insert_or_assign(
+  env.insert_or_assign(
       "*ARGV*", make<List>(args | std::views::drop(1) |
                            std::views::transform([](auto &&arg) -> ValuePtr {
                              return make<String>(arg);

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <format>
 #include <functional> // IWYU pragma: keep
+#include <iterator>
 #include <memory>
 #include <ranges>
 #include <span>
@@ -21,8 +22,9 @@
 
 namespace mal {
 
-class Env;
-using EnvPtr = std::shared_ptr<Env>;
+class EnvBase;
+using EnvPtr = std::shared_ptr<EnvBase>;
+using EnvCPtr = std::shared_ptr<const EnvBase>;
 
 class Value;
 using ValuePtr = std::shared_ptr<const Value>;
@@ -41,31 +43,130 @@ template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
   return dynamic_cast<const std::decay_t<TYPE> *>(ptr.get());
 }
 
-class Env {
+class EnvBase {
 public:
   using Map = std::unordered_map<std::string, ValuePtr>;
   using MapPtr = std::shared_ptr<Map>;
+  using MapCPtr = std::shared_ptr<const Map>;
 
-  explicit Env(EnvPtr outer) noexcept : outer{std::move(outer)} {}
+  template <bool CONST> class Iterator {
 
-  explicit Env(EnvPtr captureEnv, EnvPtr evalEnv);
+  public:
+    using value_type = std::conditional_t<CONST, const EnvBase, EnvBase>;
+    using difference_type = std::ptrdiff_t;
+    using iterator_category = std::input_iterator_tag;
+    using iterator_concept = std::forward_iterator_tag;
 
-  explicit Env(EnvPtr outer, MapPtr map)
-      : outer{std::move(outer)}, map{std::move(map)} {}
+    Iterator() = default;
+    explicit Iterator(const Iterator&) = default;
+    Iterator& operator=(const Iterator&) = default;
+    Iterator(Iterator &&) = default;
+    Iterator& operator=(Iterator &&) = default;
+    ~Iterator() = default;
+    explicit Iterator(value_type *current) noexcept : current{current} {}
+
+
+    value_type &operator*() noexcept { return *current; }
+    value_type &operator*() const noexcept { return *current; }
+
+    value_type *operator->() noexcept { return current; }
+    value_type *operator->() const noexcept { return current; }
+
+    Iterator &operator++() noexcept {
+      current = current->outer.get();
+      return *this;
+    }
+
+    Iterator operator++(int) noexcept {
+      auto it = *this;
+      ++*this;
+      return it;
+    }
+
+    friend constexpr bool operator==(const Iterator &lhs,
+                                     const Iterator &rhs) noexcept {
+      return lhs.current == rhs.current;
+    }
+
+    friend constexpr bool operator==(const Iterator &lhs,
+                                     std::default_sentinel_t) noexcept {
+      return !lhs.current;
+    }
+
+  private:
+    value_type *current{nullptr};
+  };
+
+  explicit EnvBase(EnvCPtr outer) noexcept : outer{std::move(outer)} {}
+
+  EnvBase(EnvBase &&other) noexcept
+      : outer{std::move(other.outer)} {}
+
+  virtual ~EnvBase() = default;
+
+  ValuePtr find(const std::string &key) const;
+
+  virtual ValuePtr findLocal(const std::string &key) const = 0;
+
+  auto begin() noexcept {
+    return Iterator<false>{this};
+  }
+
+  auto begin() const noexcept {
+    return Iterator<true>{this};
+  }
+
+  auto end() noexcept {
+    return std::default_sentinel;
+  }
+
+  auto end() const noexcept {
+    return std::default_sentinel;
+  }
+
+private:
+  EnvCPtr outer;
+};
+
+class Env : public EnvBase {
+public:
+  using EnvBase::EnvBase;
+
+  explicit Env(EnvPtr outer, MapPtr map) noexcept
+      : EnvBase{std::move(outer)}, map{std::move(map)} {}
 
   void insert_or_assign(std::string key, ValuePtr value) {
     assert(value);
     map->insert_or_assign(std::move(key), std::move(value));
   }
 
-  ValuePtr find(const std::string& key) const;
+  ValuePtr findLocal(const std::string &key) const override;
+
+  const MapCPtr mapCPtr() const noexcept {
+    return map;
+  }
 
 private:
-
-  EnvPtr outer;
   MapPtr map{std::make_shared<Map>()};
 };
 
+class CapturedEnv : public EnvBase {
+public:
+  using MapsVec = std::vector<MapCPtr>;
+
+  explicit CapturedEnv(EnvCPtr captureEnv);
+
+  CapturedEnv(CapturedEnv &&other) noexcept
+      : EnvBase{std::move(other)}, maps{std::move(other.maps)} {}
+
+  CapturedEnv(const CapturedEnv &other, EnvPtr outer) noexcept
+      : EnvBase{std::move(outer)}, maps{other.maps} {}
+
+  ValuePtr findLocal(const std::string &key) const override;
+
+private:
+  MapsVec maps;
+};
 
 class Value : public std::enable_shared_from_this<Value> {
 public:
@@ -417,12 +518,11 @@ public:
     using std::vector<std::string>::vector;
   };
 
-  explicit FunctionBase(Params params, ValuePtr body, EnvPtr capureEnv);
+  explicit FunctionBase(Params params, ValuePtr body, EnvPtr env);
 
   explicit FunctionBase(FunctionBase &&other) noexcept
       : bindSize{other.bindSize}, params{std::move(other.params)},
-        body{std::move(other.body)},
-        captureEnv{std::move(other.captureEnv)} {}
+        body{std::move(other.body)}, capturedEnv{std::move(other.capturedEnv)} {}
 
 protected:
   template <typename TYPE> ValuePtr isEqualTo(ValuePtr rhs) const;
@@ -432,7 +532,7 @@ protected:
   std::size_t bindSize;
   Params params;
   ValuePtr body;
-  EnvPtr captureEnv;
+  CapturedEnv capturedEnv;
 };
 
 } // namespace mal
@@ -455,10 +555,10 @@ public:
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  std::string>
-  explicit Lambda(RANGE &&params, ValuePtr body, EnvPtr captureEnv)
+  explicit Lambda(RANGE &&params, ValuePtr body, EnvPtr env)
       : FunctionBase{std::forward<RANGE>(params) |
                          std::ranges::to<FunctionBase::Params>(),
-                     std::move(body), std::move(captureEnv)} {}
+                     std::move(body), std::move(env)} {}
 
   std::string print(bool readable) const override;
 
@@ -469,7 +569,7 @@ public:
 
 class Macro : public FunctionBase {
 public:
-  explicit Macro(FunctionBase &&other) noexcept
+  explicit Macro(Lambda &&other) noexcept
       : FunctionBase{std::move(other)} {}
 
   std::string print(bool readable) const override;

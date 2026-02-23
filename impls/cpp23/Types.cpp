@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cassert>
 #include <format>
-#include <functional>
 #include <ranges>
 #include <tuple>
 #include <typeinfo>
@@ -15,33 +14,39 @@ namespace mal {
 
 extern ValuePtr EVAL(ValuePtr, EnvPtr);
 
-Env::Env(EnvPtr captureEnv, EnvPtr evalEnv) : outer {
-  [&]() {
-    std::vector<MapPtr> captureMaps;
-    while (captureEnv) {
-      captureMaps.push_back(captureEnv->map); // [sic!]
-      captureEnv = captureEnv->outer;
+ValuePtr EnvBase::find(const std::string &key)  const {
+  for (auto &&env : *this) {
+    if (auto value = env.findLocal(key)) {
+      return value;
     }
-    if (captureMaps.empty()) {
-      return evalEnv;
-    }
-    return std::ranges::fold_left(
-        captureMaps | std::views::reverse | std::views::drop(1) |
-            std::views::as_rvalue,
-        make<Env>(std::move(evalEnv), std::move(captureMaps.back())),
-        [](auto &&acc, auto &&elt) {
-          return make<Env>(std::forward<decltype(acc)>(acc),
-                           std::forward<decltype(elt)>(elt));
-        });
-  }()} {}
+  }
+  return nullptr;
+}
 
-ValuePtr Env::find(const std::string &key) const {
-  for (auto env = this; env; env = [&]() noexcept -> const Env * {
-         if (env->outer)
-           return env->outer.get();
-         return nullptr;
-       }()) {
-    if (auto item = env->map->find(key); item != env->map->end()) {
+ValuePtr Env::findLocal(const std::string &key) const {
+  if (auto item = map->find(key); item != map->end()) {
+    return item->second;
+  }
+  return nullptr;
+}
+
+CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
+    : EnvBase{nullptr},
+      maps{*captureEnv | std::views::transform([](auto &&envBase) {
+        if (auto env = dynamic_cast<const Env *>(std::addressof(envBase))) {
+          return MapsVec{env->mapCPtr()};
+        }
+        if (auto capturedEnv =
+                dynamic_cast<const CapturedEnv *>(std::addressof(envBase))) {
+          return capturedEnv->maps;
+        }
+        throw EvalException{"invalid env"};
+      }) | std::views::join |
+           std::ranges::to<MapsVec>()} {}
+
+ValuePtr CapturedEnv::findLocal(const std::string &key) const {
+  for (auto &&map : maps) {
+    if (auto item = map->find(key); item != map->end()) {
       return item->second;
     }
   }
@@ -284,7 +289,7 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr captureEnv)
+FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
     : bindSize{[&]() -> std::size_t {
         if (auto i = std::ranges::find_if(
                 params, [](auto &&elt) { return elt[0] == '&'; });
@@ -298,7 +303,7 @@ FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr captureEnv)
         return params.size();
       }()},
       params{std::move(params)}, body{std::move(body)},
-      captureEnv{std::move(captureEnv)} {}
+      capturedEnv{std::move(env)} {}
 
 template <typename TYPE>
 ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
@@ -320,7 +325,7 @@ ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
 }
 
 EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
-  auto applyEnv = make<Env>(captureEnv, std::move(evalEnv));
+  auto applyEnv = make<Env>(make<CapturedEnv>(capturedEnv, std::move(evalEnv)));
   if (bindSize == params.size()) {
     checkArgsIs(print(false), values, bindSize);
   } else {

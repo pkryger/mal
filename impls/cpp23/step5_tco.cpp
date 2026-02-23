@@ -34,7 +34,8 @@ InvocableResult specialDefBang(std::string name, ValuesSpan values, EnvPtr env) 
   checkArgsIs(std::move(name), values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
     auto val = EVAL(values[1], env);
-    env->insert_or_assign(symbol->asKey(), val);
+    assert(dynamic_cast<Env *>(env.get()));
+    dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), val);
     return {val, env, false};
   }
   throw EvalException{std::format("invalid def! argument {:r}", values[1])};
