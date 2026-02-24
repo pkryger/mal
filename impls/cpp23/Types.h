@@ -47,7 +47,7 @@ template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
 
 class EnvBase {
 public:
-  using Key = std::string;
+  using Key = std::uint64_t;
   using KeyView = std::conditional_t<std::is_trivially_copyable_v<Key> &&
                                          sizeof(Key) <= 2 * sizeof(void *),
                                      Key, const Key &>;
@@ -319,12 +319,22 @@ namespace mal {
 
 class Symbol : public StringBase {
 public:
-  explicit Symbol(std::string value, std::optional<std::string> macro = {}) noexcept
-      : StringBase{std::move(value)}, macro{std::move(macro)} {}
+  explicit Symbol(std::string value, std::optional<std::string> macro = {});
+
+  explicit Symbol(const Symbol &other)
+      : StringBase{other.data}, macro{other.macro}, intern{other.intern} {}
+
+  Symbol(Symbol &&other) noexcept
+      : StringBase{std::move(other.data)}, macro{std::move(other.macro)},
+        intern{other.intern} {}
 
   ValuePtr eval(EnvPtr env) const override;
 
-  Env::KeyView asKey() const { return data; }
+  Env::KeyView asKey() const { return intern; }
+
+  std::string_view name() const { return data; }
+
+  ValuePtr isEqualTo(ValuePtr) const override;
 
   friend bool operator==(const Symbol &lhs, const std::string &rhs) {
     return lhs.data == rhs;
@@ -337,6 +347,10 @@ public:
   friend class List;
 private:
   std::optional<std::string> macro;
+  std::uint64_t intern;
+
+  inline static std::uint64_t counter{0};
+  inline static std::unordered_map<std::string, std::uint64_t> interns;
 };
 
 class Keyword : public StringBase {
@@ -522,8 +536,8 @@ private:
 
 class FunctionBase : public Invocable {
 public:
-  struct Params : std::vector<std::string> {
-    using std::vector<std::string>::vector;
+  struct Params : std::vector<Symbol> {
+    using std::vector<Symbol>::vector;
   };
 
   explicit FunctionBase(Params params, ValuePtr body, EnvPtr env);
@@ -546,8 +560,17 @@ protected:
 } // namespace mal
 
 namespace std {
+
+template <> struct formatter<mal::Symbol> : mal::ParseValueMixin {
+  template<typename FORMAT_CONTEXT>
+  auto format(const mal::Symbol &val, FORMAT_CONTEXT &ctx) const {
+    return format_to(ctx.out(), "{}", val.print(false));
+  }
+};
+
 template <>
-struct std::formatter<mal::FunctionBase::Params> : std::range_formatter<std::string> {
+struct std::formatter<mal::FunctionBase::Params>
+    : std::range_formatter<mal::Symbol> {
   constexpr formatter() {
     set_brackets("(", ")");
     set_separator(" ");
@@ -561,8 +584,7 @@ namespace mal {
 class Lambda : public FunctionBase {
 public:
   template <std::ranges::input_range RANGE>
-    requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
-                                 std::string>
+    requires std::convertible_to<std::ranges::range_reference_t<RANGE>, Symbol>
   explicit Lambda(RANGE &&params, ValuePtr body, EnvPtr env)
       : FunctionBase{std::forward<RANGE>(params) |
                          std::ranges::to<FunctionBase::Params>(),

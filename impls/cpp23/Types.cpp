@@ -90,11 +90,32 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
+Symbol::Symbol(std::string value, std::optional<std::string> macro)
+    : StringBase{value}, macro{std::move(macro)}, intern{[&]() {
+        auto newIntern = ++counter;
+        auto it = interns.emplace(std::move(value), newIntern);
+        if (!it.second) {
+          --counter;
+          return it.first->second;
+        }
+        return newIntern;
+      }()} {}
+
 ValuePtr Symbol::eval(EnvPtr env) const {
   assert(env);
-  if (auto &&i = env->find(data))
+  if (auto &&i = env->find(intern))
     return i;
   throw EvalException{std::format("'{}' not found", data)};
+}
+
+ValuePtr Symbol::isEqualTo(ValuePtr rhs) const {
+  if (this == rhs.get()) {
+    return Constant::trueValue();
+  }
+  if (auto other = to<Symbol>(rhs); other && intern == other->intern) {
+    return Constant::trueValue();
+  }
+  return Constant::falseValue();
 }
 
 ValuePtr Constant::isEqualTo(ValuePtr rhs) const {
@@ -296,7 +317,7 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
 FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
     : bindSize{[&]() -> std::size_t {
         if (auto i = std::ranges::find_if(
-                params, [](auto &&elt) { return elt[0] == '&'; });
+                params, [](auto &&elt) { return elt.name()[0] == '&'; });
             i != params.end()) {
           if ((params.end() - i) != 2) {
             throw EvalException{
@@ -334,11 +355,14 @@ EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
     checkArgsIs(print(false), values, bindSize);
   } else {
     checkArgsAtLeast(print(false), values, bindSize);
-    applyEnv->insert_or_assign(params.back(),
+    applyEnv->insert_or_assign(params.back().asKey(),
                                make<List>(values | std::views::drop(bindSize)));
   }
   for (auto &&[key, value] :
-       std::views::zip(params | std::views::take(bindSize),
+       std::views::zip(params | std::views::take(bindSize) |
+                           std::views::transform([](auto &&param) {
+                             return param.asKey();
+                           }),
                        values)) {
     applyEnv->insert_or_assign(key, value);
   }

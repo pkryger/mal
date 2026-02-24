@@ -20,7 +20,8 @@ ValuePtr READ(std::string str) { return readStr(std::move(str)); }
 ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
-  if (auto dbg = env->find("DEBUG-EVAL");
+  static auto debug_eval = make<Symbol>("DEBUG-EVAL");
+  if (auto dbg = env->find(debug_eval->asKey());
       dbg && dbg->isTrue()) {
     std::print("EVAL: {}\n", ast->print(true));
   }

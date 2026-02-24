@@ -119,8 +119,9 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
   bool needsEval{true};
+  static auto debug_eval = make<Symbol>("DEBUG-EVAL");
   while (needsEval) {
-    if (auto dbg = env->find("DEBUG-EVAL"); dbg && dbg->isTrue()) {
+    if (auto dbg = env->find(debug_eval->asKey()); dbg && dbg->isTrue()) {
       std::print("EVAL: {:r}\n", ast);
     }
 

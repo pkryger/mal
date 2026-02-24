@@ -85,7 +85,7 @@ InvocableResult specialFnStar(std::string name, ValuesSpan values, EnvPtr env) {
     return {make<Lambda>(
                 sequence->values() | std::views::transform([&](auto &&elt) {
                   if (auto symbol = to<Symbol>(elt)) {
-                    return symbol->asKey();
+                    return Symbol{*symbol};
                   }
                   throwWrongArgument(std::move(name), elt);
                 }),
@@ -112,25 +112,27 @@ InvocableResult specialQuote(std::string name, ValuesSpan values, EnvPtr env) {
 InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
                                   EnvPtr env) {
   checkArgsIs(std::move(name), values, 1);
-  auto valuesIfSequence =
+  static auto valuesIfSequence =
       []<typename SEQUENCE>(const ValuePtr &value) -> ValuesSpan {
     if (auto sequence = to<SEQUENCE>(value)) {
       return  sequence->values();
     }
     return {};
   };
-  auto argIfStartsWith = [](std::string key, ValuesSpan values) -> ValuePtr {
-    if (auto symbol = to<Symbol>(values[0]);
-        symbol && symbol->asKey() == key) {
-      checkArgsIs(key, values.subspan(1), 1);
+  static auto argIfStartsWith = [](const Symbol &key,
+                                   ValuesSpan values) -> ValuePtr {
+    if (key.isEqualTo(values[0])->isTrue()) {
+      checkArgsIs(std::string{key.name()}, values.subspan(1), 1);
       return values[1];
     }
     return nullptr;
   };
+  static const auto unquote = Symbol{"unquote"};
+  static const auto splice_unquote = Symbol{"splice-unquote"};
   auto &&ast = values[0];
   if (values = valuesIfSequence.template operator()<Sequence>(ast);
       !values.empty()) {
-    if (auto unquoteArg = argIfStartsWith("unquote", values);
+    if (auto unquoteArg = argIfStartsWith(unquote, values);
         unquoteArg && to<List>(ast)) {
       return {std::move(unquoteArg), std::move(env), true};
     }
@@ -142,7 +144,7 @@ InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
                         valuesIfSequence.template operator()<List>(elt);
                         !eltValues.empty()) {
                   if (auto spliceUnquote =
-                          argIfStartsWith("splice-unquote", eltValues)) {
+                          argIfStartsWith(splice_unquote, eltValues)) {
                     return spliceUnquote;
                   }
                 }
@@ -183,8 +185,9 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
   bool needsEval{true};
+  static auto debug_eval = make<Symbol>("DEBUG-EVAL");
   while (needsEval) {
-    if (auto dbg = env->find("DEBUG-EVAL"); dbg && dbg->isTrue()) {
+    if (auto dbg = env->find(debug_eval->asKey()); dbg && dbg->isTrue()) {
       std::print("EVAL: {:r}\n", ast);
     }
 
@@ -232,7 +235,7 @@ EnvPtr repEnv(std::span<const char*> args)
 
   static auto defaultEval = [&]() {
     auto eval = make<Eval>(envPtr);
-    env.insert_or_assign("eval", eval);
+    env.insert_or_assign(Symbol{"eval"}.asKey(), eval);
     return eval;
   }();
 
@@ -246,11 +249,12 @@ EnvPtr repEnv(std::span<const char*> args)
                 envPtr);
   }();
   env.insert_or_assign(
-      "*ARGV*", make<List>(args | std::views::drop(1) |
-                           std::views::transform([](auto &&arg) -> ValuePtr {
-                             return make<String>(arg);
-                           }) |
-                           std::ranges::to<std::vector>()));
+      Symbol{"*ARGV*"}.asKey(),
+      make<List>(args | std::views::drop(1) |
+                 std::views::transform(
+                     [](auto &&arg) -> ValuePtr { return make<String>(arg); }) |
+                 std::ranges::to<std::vector>()));
+
   return envPtr;
 }
 

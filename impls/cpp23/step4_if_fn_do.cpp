@@ -105,7 +105,9 @@ ValuePtr specialDo(std::string name, ValuesSpan values,
 ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
-  if (auto dbg = env->find("DEBUG-EVAL"); dbg && dbg->isTrue()) {
+  static auto debug_eval = make<Symbol>("DEBUG-EVAL");
+  if (auto dbg = env->find(debug_eval->asKey());
+      dbg && dbg->isTrue()) {
     std::print("EVAL: {:r}\n", ast);
   }
   if (auto list = to<List>(ast)) {
