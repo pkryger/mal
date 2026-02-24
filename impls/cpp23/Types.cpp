@@ -15,8 +15,12 @@ namespace mal {
 extern ValuePtr EVAL(ValuePtr, EnvPtr);
 
 ValuePtr EnvBase::find(KeyView key) const {
+  if (auto value = cache.find(key)) {
+    return *value;
+  }
   for (auto &&env : *this) {
     if (auto value = env.findLocal(key)) {
+      cache.put(key, value);
       return value;
     }
   }

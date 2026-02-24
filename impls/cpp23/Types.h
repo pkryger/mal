@@ -1,6 +1,8 @@
 #ifndef INCLUDE_TYPES_H
 #define INCLUDE_TYPES_H
 
+#include "LruCache.h"
+
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -104,7 +106,7 @@ public:
   explicit EnvBase(EnvCPtr outer) noexcept : outer{std::move(outer)} {}
 
   EnvBase(EnvBase &&other) noexcept
-      : outer{std::move(other.outer)} {}
+  : cache{std::move(other.cache)}, outer{std::move(other.outer)} {}
 
   virtual ~EnvBase() = default;
 
@@ -128,6 +130,9 @@ public:
     return std::default_sentinel;
   }
 
+protected:
+  mutable LruCache<Key, ValuePtr> cache;
+
 private:
   EnvCPtr outer;
 };
@@ -141,6 +146,7 @@ public:
 
   void insert_or_assign(Key key, ValuePtr value) {
     assert(value);
+    cache.put(key, value);
     map->insert_or_assign(std::move(key), std::move(value));
   }
 
