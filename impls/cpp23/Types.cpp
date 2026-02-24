@@ -14,7 +14,7 @@ namespace mal {
 
 extern ValuePtr EVAL(ValuePtr, EnvPtr);
 
-ValuePtr EnvBase::find(const std::string &key)  const {
+ValuePtr EnvBase::find(KeyView key) const {
   for (auto &&env : *this) {
     if (auto value = env.findLocal(key)) {
       return value;
@@ -23,7 +23,7 @@ ValuePtr EnvBase::find(const std::string &key)  const {
   return nullptr;
 }
 
-ValuePtr Env::findLocal(const std::string &key) const {
+ValuePtr Env::findLocal(KeyView key) const {
   if (auto item = map->find(key); item != map->end()) {
     return item->second;
   }
@@ -44,7 +44,7 @@ CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
       }) | std::views::join |
            std::ranges::to<MapsVec>()} {}
 
-ValuePtr CapturedEnv::findLocal(const std::string &key) const {
+ValuePtr CapturedEnv::findLocal(KeyView key) const {
   for (auto &&map : maps) {
     if (auto item = map->find(key); item != map->end()) {
       return item->second;

@@ -45,7 +45,11 @@ template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
 
 class EnvBase {
 public:
-  using Map = std::unordered_map<std::string, ValuePtr>;
+  using Key = std::string;
+  using KeyView = std::conditional_t<std::is_trivially_copyable_v<Key> &&
+                                         sizeof(Key) <= 2 * sizeof(void *),
+                                     Key, const Key &>;
+  using Map = std::unordered_map<Key, ValuePtr>;
   using MapPtr = std::shared_ptr<Map>;
   using MapCPtr = std::shared_ptr<const Map>;
 
@@ -104,9 +108,9 @@ public:
 
   virtual ~EnvBase() = default;
 
-  ValuePtr find(const std::string &key) const;
+  ValuePtr find(KeyView key) const;
 
-  virtual ValuePtr findLocal(const std::string &key) const = 0;
+  virtual ValuePtr findLocal(KeyView key) const = 0;
 
   auto begin() noexcept {
     return Iterator<false>{this};
@@ -135,12 +139,12 @@ public:
   explicit Env(EnvPtr outer, MapPtr map) noexcept
       : EnvBase{std::move(outer)}, map{std::move(map)} {}
 
-  void insert_or_assign(std::string key, ValuePtr value) {
+  void insert_or_assign(Key key, ValuePtr value) {
     assert(value);
     map->insert_or_assign(std::move(key), std::move(value));
   }
 
-  ValuePtr findLocal(const std::string &key) const override;
+  ValuePtr findLocal(KeyView key) const override;
 
   const MapCPtr mapCPtr() const noexcept {
     return map;
@@ -162,7 +166,7 @@ public:
   CapturedEnv(const CapturedEnv &other, EnvPtr outer) noexcept
       : EnvBase{std::move(outer)}, maps{other.maps} {}
 
-  ValuePtr findLocal(const std::string &key) const override;
+  ValuePtr findLocal(KeyView key) const override;
 
 private:
   MapsVec maps;
@@ -314,9 +318,7 @@ public:
 
   ValuePtr eval(EnvPtr env) const override;
 
-  const std::string &asKey() const {
-    return data;
-  }
+  Env::KeyView asKey() const { return data; }
 
   friend bool operator==(const Symbol &lhs, const std::string &rhs) {
     return lhs.data == rhs;
@@ -505,7 +507,7 @@ public:
                        reinterpret_cast<const void *>(this));
   }
 
-  const std::string &asKey() const { return name; }
+  Env::Key asKey() const { return Symbol{name}.asKey(); }
 
 private:
   std::string name;
