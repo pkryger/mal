@@ -31,7 +31,6 @@ endif()
 
 add_library(mal
   Core.cpp
-  LruCache.cpp
   Ranges.cpp
   ReadLine.cpp
   Reader.cpp
