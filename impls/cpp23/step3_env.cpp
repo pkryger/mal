@@ -1,21 +1,32 @@
 #include "Core.h"
 #include "ReadLine.h"
 #include "Reader.h"
+#include "Specials.h"
 #include "Types.h"
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <format>
 #include <memory>
 #include <optional>
 #include <print>
 #include <string>
+#include <type_traits>
 #include <utility>
+// IWYU pragma: no_include <tuple>
 
 namespace mal {
 
 static ReadLine rl("~/.mal_history");
 
 ValuePtr READ(std::string str) { return readStr(std::move(str)); }
+
+using Special = const std::pair<std::string, SpecialForm>;
+static const std::array specials{
+  Special{"def!", specialDefBang},
+  Special{"let*", specialLetStar},
+};
 
 ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
@@ -26,54 +37,25 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
     std::print("EVAL: {}\n", ast->print(true));
   }
   if (auto list = to<List>(ast)) {
-    auto&& lvalues = list->values();
-    if (lvalues.empty()) {
+    auto&& values = list->values();
+    if (values.empty()) {
       return ast->eval(env);
     }
-    auto frontValueIs = [&](std::string name) noexcept {
-      if (auto symbol = to<Symbol>(lvalues[0])) {
-        return *symbol == Symbol{std::move(name)};
-      }
-      return false;
-    };
-    if (frontValueIs("def!")) {
-      if (lvalues.size() != 3) {
-        throw EvalException{"wrong number of def! arguments " +
-          std::to_string(lvalues.size())};
-      }
-      if (auto symbol = to<Symbol>(lvalues[1])) {
-        auto val = EVAL(lvalues[2], env);
-        assert(dynamic_cast<Env *>(env.get()));
-        dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), val);
-        return val;
-      }
-      throw EvalException{
-          std::format("invalid def! argument '{:r}'", lvalues[1])};
-    }
-    if (frontValueIs("let*")) {
-      if (lvalues.size() != 3) {
-        throw EvalException{
-            std::format("wrong number of let* arguments: {:r}", lvalues)};
-      }
-      if (auto bindings = to<Sequence>(lvalues[1])) {
-        auto bvalues = bindings->values();
-        if (bvalues.size() % 2 != 0) {
-          throw EvalException{
-              std::format("odd number of let* bindings: {:r}", bvalues)};
-        }
-        auto letEnv = make<Env>(env);
-        for (auto i = bvalues.begin(); i != bvalues.end(); i += 2) {
-          if (auto symbol = to<Symbol>(*i)) {
-            letEnv->insert_or_assign(symbol->asKey(),
-                                     EVAL(*(i + 1), letEnv));
-          } else {
-            throw EvalException{std::format("invalid let* binding '{:r}'", *i)};
+    if (auto special = [&]() -> Special * {
+          if (auto symbol = to<Symbol>(values[0])) {
+            auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
+              return *symbol == elt.first;
+            });
+            return res != specials.end() ? res : nullptr;
           }
-        }
-        return EVAL(lvalues[2], letEnv);
+          return nullptr;
+        }()) {
+      auto [ast, evalEnv, needsEval] =
+          special->second(special->first, values.subspan(1), env, EVAL);
+      if (needsEval) {
+        return EVAL(ast, evalEnv);
       }
-      throw EvalException{
-          std::format("invalid let* bindings '{:r}'", lvalues[1])};
+      return ast;
     }
   }
   return ast->eval(env);

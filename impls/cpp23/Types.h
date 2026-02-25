@@ -9,10 +9,12 @@
 #include <functional> // IWYU pragma: keep
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>

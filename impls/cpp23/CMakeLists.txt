@@ -34,6 +34,7 @@ add_library(mal
   Ranges.cpp
   ReadLine.cpp
   Reader.cpp
+  Specials.cpp
   Types.cpp
 )
 target_include_directories(mal PUBLIC ${READLINE_INCLUDE_DIRS})
