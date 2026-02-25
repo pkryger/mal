@@ -88,7 +88,7 @@ InvocableResult specialFnStar(std::string name, ValuesSpan values,
                     return Symbol{*symbol};
                   }
                   throwWrongArgument(std::move(name), elt);
-                }),
+                }) | std::views::as_rvalue,
                 values[1], env),
             env, false};
   }

@@ -45,7 +45,9 @@ template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
 
 class EnvBase {
 public:
-  using Key = std::uint64_t;
+  // using Key = std::uint64_t;
+  // xor
+  using Key = std::string;
   using KeyView = std::conditional_t<std::is_trivially_copyable_v<Key> &&
                                          sizeof(Key) <= 2 * sizeof(void *),
                                      Key, const Key &>;
@@ -311,20 +313,73 @@ struct formatter<mal::ValuesMap> : range_formatter<mal::ValuesMap::value_type> {
 
 namespace mal {
 
-class Symbol : public StringBase {
+namespace detail {
+
+template <typename> class Intern;
+
+template <> class Intern<std::string> {
 public:
-  explicit Symbol(std::string value, std::optional<std::string> macro = {});
+  explicit Intern(const std::string &name) noexcept : intern{name} {}
+
+  explicit Intern(const Intern &other, const std::string &name) noexcept
+      : intern{name} {}
+
+  Intern(Intern &&other, const std::string &name) noexcept : intern{name} {}
+
+  template <typename KEY_VIEW> KEY_VIEW asKey() const { return intern.get(); }
+
+private:
+  std::reference_wrapper<const std::string> intern;
+};
+
+template <>
+class Intern<std::uint64_t>  {
+public:
+  explicit Intern(const std::string &name)
+      : intern{[&]() {
+          auto newIntern = ++counter;
+          auto it = interns.emplace(name, newIntern);
+          if (!it.second) {
+            --counter;
+            return it.first->second;
+          }
+          return newIntern;
+        }()} {}
+  explicit Intern(const Intern &other, const std::string & /* name */) noexcept
+      : intern{other.intern} {}
+
+  Intern(Intern &&other, const std::string & /* name */) noexcept
+      : intern{other.intern} {}
+
+protected:
+  template <typename KEY_VIEW>
+  KEY_VIEW asKey() const { return intern; }
+
+private:
+  std::uint64_t intern{0};
+
+  inline static std::uint64_t counter{0};
+  inline static std::unordered_map<std::string, std::uint64_t> interns;
+};
+
+
+} // namespace detail
+
+class Symbol : public StringBase, private detail::Intern<Env::Key> {
+public:
+  explicit Symbol(std::string value, std::optional<std::string> macro = {})
+      : StringBase{value}, Intern{data}, macro{std::move(macro)} {}
 
   explicit Symbol(const Symbol &other)
-      : StringBase{other.data}, macro{other.macro}, intern{other.intern} {}
+  : StringBase{other.data}, Intern{other, data}, macro{other.macro} {}
 
   Symbol(Symbol &&other) noexcept
-      : StringBase{std::move(other.data)}, macro{std::move(other.macro)},
-        intern{other.intern} {}
+      : StringBase{std::move(other.data)}, Intern{std::move(other), data},
+        macro{std::move(other.macro)} {}
 
   ValuePtr eval(EnvPtr env) const override;
 
-  Env::KeyView asKey() const { return intern; }
+  Env::KeyView asKey() const { return Intern::asKey<Env::KeyView>(); }
 
   std::string_view name() const { return data; }
 
@@ -341,10 +396,6 @@ public:
   friend class List;
 private:
   std::optional<std::string> macro;
-  std::uint64_t intern;
-
-  inline static std::uint64_t counter{0};
-  inline static std::unordered_map<std::string, std::uint64_t> interns;
 };
 
 class Keyword : public StringBase {

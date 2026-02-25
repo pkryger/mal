@@ -86,20 +86,9 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-Symbol::Symbol(std::string value, std::optional<std::string> macro)
-    : StringBase{value}, macro{std::move(macro)}, intern{[&]() {
-        auto newIntern = ++counter;
-        auto it = interns.emplace(std::move(value), newIntern);
-        if (!it.second) {
-          --counter;
-          return it.first->second;
-        }
-        return newIntern;
-      }()} {}
-
 ValuePtr Symbol::eval(EnvPtr env) const {
   assert(env);
-  if (auto &&i = env->find(intern))
+  if (auto &&i = env->find(asKey()))
     return i;
   throw EvalException{std::format("'{}' not found", data)};
 }
@@ -108,7 +97,7 @@ ValuePtr Symbol::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<Symbol>(rhs); other && intern == other->intern) {
+  if (auto other = to<Symbol>(rhs); other && asKey() == other->asKey()) {
     return Constant::trueValue();
   }
   return Constant::falseValue();

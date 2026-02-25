@@ -83,10 +83,10 @@ ValuePtr specialFnStar(std::string name, ValuesSpan values, EnvPtr env) {
     return make<Lambda>(
         sequence->values() | std::views::transform([&](auto &&elt) {
           if (auto symbol = to<Symbol>(elt)) {
-            return symbol->asKey();
+            return Symbol{*symbol};
           }
           throwWrongArgument(std::move(name), elt);
-        }),
+        }) | std::views::as_rvalue,
         values[1], env);
   }
   throwWrongArgument(std::move(name), values[1]);

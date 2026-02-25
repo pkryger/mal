@@ -79,19 +79,18 @@ InvocableResult specialIf(std::string name, ValuesSpan values,
   }
 }
 
-InvocableResult specialFnStar(std::string name, ValuesSpan values,
-                                        EnvPtr env) {
+InvocableResult specialFnStar(std::string name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 2);
   if (auto sequence = to<Sequence>(values[0])) {
-    return {make<Lambda>(
-                sequence->values() | std::views::transform([&](auto &&elt) {
-                  if (auto symbol = to<Symbol>(elt)) {
-                    return symbol->asKey();
-                  }
-                  throwWrongArgument(std::move(name), elt);
-                }),
-                values[1], env),
-            env, false};
+    return {make<Lambda>(sequence->values() |
+                             std::views::transform([&](auto &&elt) {
+                               if (auto symbol = to<Symbol>(elt)) {
+                                 return Symbol{*symbol};
+                               }
+                               throwWrongArgument(std::move(name), elt);
+                             }) | std::views::as_rvalue,
+                         values[1], env),
+            std::move(env), false};
   }
   throwWrongArgument(std::move(name), values[1]);
 }
