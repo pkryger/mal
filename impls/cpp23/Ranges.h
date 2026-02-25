@@ -204,6 +204,9 @@ inline constexpr auto Chunk = chunk_fn::ChunkFn{};
 #ifndef __cpp_lib_ranges_chunk
 namespace std {
 namespace ranges {
+template <std::ranges::forward_range VIEW>
+  requires std::ranges::view<VIEW>
+using chunk_view = mal::views::ChunkView<VIEW>;
 namespace views {
 inline constexpr auto chunk = mal::views::chunk_fn::ChunkFn{};
 } // namespace views
@@ -363,6 +366,9 @@ inline constexpr auto Stride = stride_fn::StrideFn{};
 #ifndef __cpp_lib_ranges_stride
 namespace std {
 namespace ranges {
+template <std::ranges::forward_range VIEW>
+  requires std::ranges::view<VIEW>
+using stride_view = mal::views::StrideView<VIEW>;
 namespace views {
 inline constexpr auto stride = mal::views::stride_fn::StrideFn{};
 } // namespace views
