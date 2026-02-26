@@ -47,13 +47,64 @@ template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
 
 class EnvBase {
 public:
-  // using Key = std::uint64_t;
+  using Key = std::uint64_t;
   // xor
-  using Key = std::string;
+  // using Key = std::string;
   using KeyView = std::conditional_t<std::is_trivially_copyable_v<Key> &&
                                          sizeof(Key) <= 2 * sizeof(void *),
                                      Key, const Key &>;
-  using Map = std::unordered_map<Key, ValuePtr>;
+  using HashKeyView = std::conditional_t<std::is_same_v<Key, std::string>,
+                                         std::string_view, Key>;
+
+  struct PreHashedKey {
+    HashKeyView key;
+    std::size_t hash;
+  };
+
+  struct Hash {
+    using is_transparent = void;
+    using hash_type = std::hash<HashKeyView>;
+
+    template <typename T>
+      requires std::same_as<Key, std::string> &&
+               (std::same_as<T, const char *> ||
+                std::same_as<T, std::string_view>)
+    std::size_t operator()(T&& key) const
+    {
+      return hash_type{}(std::forward<T>(key));
+    }
+
+    std::size_t operator()(KeyView key) const {
+      return hash_type{}(key);
+    }
+
+    std::size_t operator()(const PreHashedKey &phk) const {
+      return phk.hash;
+    }
+  };
+
+  struct Equal {
+    using is_transparent = void;
+
+    template <typename T>
+      requires std::same_as<Key, std::string> &&
+               (std::same_as<T, const char *> ||
+                std::same_as<T, std::string_view>)
+    bool operator()(KeyView lhs, T&& rhs) const
+    {
+      return lhs == rhs;
+    }
+
+    bool operator()(KeyView lhs, KeyView rhs) const {
+      return lhs == rhs;
+    }
+
+    bool operator()(KeyView lhs, const PreHashedKey &rhs) const {
+      return lhs == rhs.key;
+    }
+  };
+
+  using Map = std::unordered_map<Key, ValuePtr, Hash, Equal>;
   using MapPtr = std::shared_ptr<Map>;
   using MapCPtr = std::shared_ptr<const Map>;
 
@@ -114,7 +165,7 @@ public:
 
   ValuePtr find(KeyView key) const;
 
-  virtual ValuePtr findLocal(KeyView key) const = 0;
+  virtual ValuePtr findLocal(PreHashedKey phk) const = 0;
 
   auto begin() noexcept {
     return Iterator<false>{this};
@@ -148,7 +199,7 @@ public:
     map->insert_or_assign(std::move(key), std::move(value));
   }
 
-  ValuePtr findLocal(KeyView key) const override;
+  ValuePtr findLocal(PreHashedKey phk) const override;
 
   const MapCPtr mapCPtr() const noexcept {
     return map;
@@ -170,7 +221,7 @@ public:
   CapturedEnv(const CapturedEnv &other, EnvPtr outer) noexcept
       : EnvBase{std::move(outer)}, maps{other.maps} {}
 
-  ValuePtr findLocal(KeyView key) const override;
+  ValuePtr findLocal(PreHashedKey phk) const override;
 
 private:
   MapsVec maps;
