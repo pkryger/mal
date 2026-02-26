@@ -8,17 +8,17 @@
 #include <format>
 #include <memory>
 #include <ranges>
-#include <string>
+#include <string_view>
 #include <utility>
 // IWYU pragma: no_include <span>
-// IWYU pragma: no_include <string_view>
+// IWYU pragma: no_include <string>
 // IWYU pragma: no_include <tuple>
 // IWYU pragma: no_include <type_traits>
 
 namespace mal {
-InvocableResult specialDefBang(std::string name, ValuesSpan values, EnvPtr env,
-                               EvalFn evalFn) {
-  checkArgsIs(std::move(name), values, 2);
+InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
+                               EnvPtr env, EvalFn evalFn) {
+  checkArgsIs(name, values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
     auto val = evalFn(values[1], env);
     assert(dynamic_cast<Env *>(env.get()));
@@ -28,9 +28,9 @@ InvocableResult specialDefBang(std::string name, ValuesSpan values, EnvPtr env,
   throw EvalException{std::format("invalid def! argument {:r}", values[1])};
 }
 
-InvocableResult specialLetStar(std::string name, ValuesSpan values, EnvPtr env,
-                               EvalFn evalFn) {
-  checkArgsIs(std::move(name), values, 2);
+InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
+                               EnvPtr env, EvalFn evalFn) {
+  checkArgsIs(name, values, 2);
   if (auto sequence = to<Sequence>(values[0])) {
     auto bindings = sequence->values();
     if (bindings.size() % 2 != 0) {
@@ -54,9 +54,9 @@ InvocableResult specialLetStar(std::string name, ValuesSpan values, EnvPtr env,
   throw EvalException{std::format("invalid let* bindings '{:r}'", values[0])};
 }
 
-InvocableResult specialIf(std::string name, ValuesSpan values, EnvPtr env,
+InvocableResult specialIf(std::string_view name, ValuesSpan values, EnvPtr env,
                           EvalFn evalFn) {
-  checkArgsBetween(std::move(name), values, 2, 3);
+  checkArgsBetween(name, values, 2, 3);
   auto cond = evalFn(values[0], env);
   if (cond->isTrue()) {
     return {values[1], std::move(env), true};
@@ -67,8 +67,8 @@ InvocableResult specialIf(std::string name, ValuesSpan values, EnvPtr env,
   }
 }
 
-InvocableResult specialFnStar(std::string name, ValuesSpan values, EnvPtr env,
-                              EvalFn evalFn) {
+InvocableResult specialFnStar(std::string_view name, ValuesSpan values,
+                              EnvPtr env, EvalFn evalFn) {
   checkArgsIs(name, values, 2);
   if (auto sequence = to<Sequence>(values[0])) {
     return {make<Lambda>(sequence->values() |
@@ -76,17 +76,17 @@ InvocableResult specialFnStar(std::string name, ValuesSpan values, EnvPtr env,
                                if (auto symbol = to<Symbol>(elt)) {
                                  return Symbol{*symbol};
                                }
-                               throwWrongArgument(std::move(name), elt);
+                               throwWrongArgument(name, elt);
                              }) | std::views::as_rvalue,
                          values[1], env),
             std::move(env), false};
   }
-  throwWrongArgument(std::move(name), values[1]);
+  throwWrongArgument(name, values[1]);
 }
 
-InvocableResult specialDo(std::string name, ValuesSpan values, EnvPtr env,
+InvocableResult specialDo(std::string_view name, ValuesSpan values, EnvPtr env,
                           EvalFn evalFn) {
-  checkArgsAtLeast(std::move(name), values, 1);
+  checkArgsAtLeast(name, values, 1);
   for (auto &&val :
        values | std::views::take(values.size() - 1)) {
     evalFn(val, env);
@@ -94,15 +94,15 @@ InvocableResult specialDo(std::string name, ValuesSpan values, EnvPtr env,
   return {values.back(), std::move(env), true};
 }
 
-InvocableResult specialQuote(std::string name, ValuesSpan values, EnvPtr env,
-                             EvalFn /* evalFn */) {
-  checkArgsIs(std::move(name), values, 1);
+InvocableResult specialQuote(std::string_view name, ValuesSpan values,
+                             EnvPtr env, EvalFn /* evalFn */) {
+  checkArgsIs(name, values, 1);
   return {values[0], std::move(env), false};
 }
 
-InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
+InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
                                   EnvPtr env, EvalFn evalFn) {
-  checkArgsIs(std::move(name), values, 1);
+  checkArgsIs(name, values, 1);
   static auto valuesIfSequence =
       []<typename SEQUENCE>(const ValuePtr &value) -> ValuesSpan {
     if (auto sequence = to<SEQUENCE>(value)) {
@@ -113,7 +113,7 @@ InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
   static auto argIfStartsWith = [](const Symbol &key,
                                    ValuesSpan values) -> ValuePtr {
     if (key.isEqualTo(values[0])->isTrue()) {
-      checkArgsIs(std::string{key.name()}, values.subspan(1), 1);
+      checkArgsIs(key.name(), values.subspan(1), 1);
       return values[1];
     }
     return nullptr;
@@ -159,7 +159,7 @@ InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
   return {ast, std::move(env), false};
 }
 
-InvocableResult specialDefmacroBang(std::string name, ValuesSpan values,
+InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
                                     EnvPtr env, EvalFn evalFn) {
   checkArgsIs(name, values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
@@ -169,9 +169,9 @@ InvocableResult specialDefmacroBang(std::string name, ValuesSpan values,
       dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), res);
       return {res, std::move(env), false};
     }
-    throwWrongArgument(std::move(name), res);
+    throwWrongArgument(name, res);
   }
-  throwWrongArgument(std::move(name), values[0]);
+  throwWrongArgument(name, values[0]);
 }
 
 } // namespace mal

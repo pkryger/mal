@@ -3,35 +3,36 @@
 
 #include "Types.h"
 
-#include <string>
+#include <string_view>
 
 namespace mal {
 
-using SpecialForm = InvocableResult(&)(std::string, ValuesSpan, EnvPtr, EvalFn);
+using SpecialForm = InvocableResult (&)(std::string_view, ValuesSpan, EnvPtr,
+                                        EvalFn);
 
-InvocableResult specialDefBang(std::string name, ValuesSpan values, EnvPtr env,
-                               EvalFn evalFn);
+InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
+                               EnvPtr env, EvalFn evalFn);
 
-InvocableResult specialLetStar(std::string name, ValuesSpan values, EnvPtr env,
-                               EvalFn evalFn);
+InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
+                               EnvPtr env, EvalFn evalFn);
 
-InvocableResult specialIf(std::string name, ValuesSpan values, EnvPtr env,
+InvocableResult specialIf(std::string_view name, ValuesSpan values, EnvPtr env,
                           EvalFn evalFn);
 
-InvocableResult specialFnStar(std::string name, ValuesSpan values, EnvPtr env,
-                              EvalFn evalFn);
+InvocableResult specialFnStar(std::string_view name, ValuesSpan values,
+                              EnvPtr env, EvalFn evalFn);
 
-InvocableResult specialDo(std::string name, ValuesSpan values, EnvPtr env,
+InvocableResult specialDo(std::string_view name, ValuesSpan values, EnvPtr env,
                           EvalFn evalFn);
 
-InvocableResult specialQuote(std::string name, ValuesSpan values, EnvPtr env,
-                             EvalFn /* evalFn */);
+InvocableResult specialQuote(std::string_view name, ValuesSpan values,
+                             EnvPtr env, EvalFn /* evalFn */);
 
-InvocableResult specialQuasiquote(std::string name, ValuesSpan values,
+InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
                                   EnvPtr env, EvalFn /* evalFn */);
 
 
-InvocableResult specialDefmacroBang(std::string name, ValuesSpan values,
+InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
                                     EnvPtr env, EvalFn evalFn);
 
 } // namespace mal

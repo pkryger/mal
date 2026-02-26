@@ -610,7 +610,8 @@ public:
 
 class BuiltIn : public Invocable {
 public:
-  using HandlerFn = ValuePtr (std::string name, ValuesSpan value, EnvPtr Env);
+  using HandlerFn = ValuePtr(std::string_view name, ValuesSpan value,
+                             EnvPtr Env);
 
   explicit BuiltIn(std::string name, HandlerFn &handler) noexcept
       : name{std::move(name)}, handler{handler} {}

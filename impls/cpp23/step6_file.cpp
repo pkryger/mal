@@ -18,6 +18,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
+// IWYU pragma: no_include <string_view>
 
 namespace mal {
 

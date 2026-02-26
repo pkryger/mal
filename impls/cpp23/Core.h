@@ -6,20 +6,21 @@
 #include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace mal {
 
+void checkArgsIs(std::string_view name, ValuesSpan values, std::size_t expected);
 
-void checkArgsIs(std::string name, ValuesSpan values, std::size_t expected);
+void checkArgsAtLeast(std::string_view name, ValuesSpan values,
+                      std::size_t expected);
 
-void checkArgsAtLeast(std::string name, ValuesSpan values, std::size_t expected);
-
-void checkArgsBetween(std::string name, ValuesSpan values,
+void checkArgsBetween(std::string_view name, ValuesSpan values,
                       std::size_t expectedMin, std::size_t expectedMax);
 
 
 [[noreturn]]
-void throwWrongArgument(std::string name, ValuePtr val);
+void throwWrongArgument(std::string_view name, ValuePtr val);
 
 void prepareEnv(EvalFn &evalFn, Env &env);
 
