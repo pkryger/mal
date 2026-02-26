@@ -9,7 +9,6 @@
 
 namespace mal {
 
-using EvalFn = ValuePtr(ValuePtr, EnvPtr);
 
 void checkArgsIs(std::string name, ValuesSpan values, std::size_t expected);
 

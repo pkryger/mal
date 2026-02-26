@@ -1,7 +1,6 @@
 #ifndef INCLUDE_SPECIALS_H
 #define INCLUDE_SPECIALS_H
 
-#include "Core.h"
 #include "Types.h"
 
 #include <string>

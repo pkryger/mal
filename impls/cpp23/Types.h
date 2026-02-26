@@ -34,6 +34,7 @@ using ValuesContainer = std::vector<ValuePtr>;
 using ValuesSpan = std::span<const ValuePtr>;
 using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
 
+using EvalFn = ValuePtr(ValuePtr, EnvPtr);
 using InvocableResult = std::tuple<ValuePtr, EnvPtr, bool>;
 
 template <typename TYPE, typename... ARGS>
