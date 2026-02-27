@@ -50,3 +50,17 @@ foreach(main ${mains})
   target_link_libraries(${target} PRIVATE mal)
   set_property(TARGET ${target} PROPERTY CXX_STANDARD 23)
 endforeach()
+
+cmake_path(RELATIVE_PATH CMAKE_CURRENT_BINARY_DIR
+  BASE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  OUTPUT_VARIABLE relbuilddir)
+if(NOT "${relbuilddir}" MATCHES "^\\.\\./" AND
+   "${relbuilddir}" MATCHES "^build" AND
+   NOT "${relbuilddir}" STREQUAL "build")
+  cmake_path(APPEND CMAKE_CURRENT_BINARY_DIR compile_commands.json
+    OUTPUT_VARIABLE target)
+  cmake_path(APPEND CMAKE_CURRENT_SOURCE_DIR build compile_commands.json
+    OUTPUT_VARIABLE linkname)
+  file(REMOVE "${linkname}")
+  file(CREATE_LINK "${target}" "${linkname}" SYMBOLIC)
+endif()

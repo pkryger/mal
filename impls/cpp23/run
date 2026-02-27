@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec $(dirname $0)/build/${STEP:-stepA_mal} "${@}"
+exec "$(dirname "${0}")/build/${CMAKE_BUILD_TYPE:+${CMAKE_BUILD_TYPE}/}${STEP:-stepA_mal}" "${@}"

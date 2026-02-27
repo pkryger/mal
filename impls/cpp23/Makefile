@@ -1,4 +1,4 @@
-BUILD_DIR=build
+BUILD_DIR=build$(if $(CMAKE_BUILD_TYPE),/$(CMAKE_BUILD_TYPE))
 CMAKE=cmake
 NINJA=ninja
 
