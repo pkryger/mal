@@ -118,7 +118,7 @@ public:
   using value_type = std::ranges::subrange<std::ranges::iterator_t<VIEW>>;
   using difference_type = std::ranges::range_difference_t<VIEW>;
   using iterator_category = std::input_iterator_tag;
-  using iteraotr_concept =
+  using iterator_concept =
       std::conditional_t<std::ranges::bidirectional_range<VIEW>,
                          std::bidirectional_iterator_tag,
                          std::forward_iterator_tag>;
@@ -280,7 +280,7 @@ public:
   using value_type = std::ranges::iterator_t<VIEW>::value_type;
   using difference_type = std::ranges::range_difference_t<VIEW>;
   using iterator_category = std::input_iterator_tag;
-  using iteraotr_concept =
+  using iterator_concept =
       std::conditional_t<std::ranges::bidirectional_range<VIEW>,
                          std::bidirectional_iterator_tag,
                          std::forward_iterator_tag>;
