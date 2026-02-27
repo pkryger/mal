@@ -25,7 +25,8 @@ InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
     dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), val);
     return {std::move(val), std::move(env), false};
   }
-  throw EvalException{std::format("invalid def! argument {:r}", values[1])};
+  throw EvalException{
+      std::format("invalid '{}' argument {:r}", name, values[1])};
 }
 
 InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
@@ -173,5 +174,45 @@ InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
   }
   throwWrongArgument(name, values[0]);
 }
+
+InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
+                               EnvPtr env, EvalFn evalFn) {
+  checkArgsBetween(name, values, 1, 2);
+  if (values.size() == 1) {
+    return {values[0], env, true};
+  }
+
+  if (auto list = to<List>(values[1])) {
+    auto catchValues = list->values();
+    if (auto catchSymbol = to<Symbol>(catchValues[0]);
+        catchSymbol && catchSymbol->name() == "catch*") {
+      checkArgsIs(catchSymbol->name(), catchValues, 3);
+      if (auto symbol = to<Symbol>(catchValues[1])) {
+        auto exceptionHandler = [&](auto &&value) -> InvocableResult {
+          auto catchEnv = make<Env>(env);
+          catchEnv->insert_or_assign(symbol->asKey(), value);
+          return {catchValues[2], catchEnv, true};
+        };
+        try {
+          return {evalFn(values[0], env), env, false};
+        } catch (CoreException ex) {
+          return exceptionHandler(make<String>(ex.what()));
+        } catch (EvalException ex) {
+          return exceptionHandler(make<String>(ex.what()));
+        } catch (MalException ex) {
+          return exceptionHandler(ex.value);
+        }
+        assert(false);
+      }
+      throw EvalException{std::format("invalid '{}' argument {:r}",
+                                      catchSymbol->name(), catchValues[1])};
+    }
+    throw EvalException{
+        std::format("invalid '{}' argument {:r}", name, catchValues[0])};
+  }
+  throw EvalException{
+      std::format("invalid '{}' argument {:r}", name, values[1])};
+}
+
 
 } // namespace mal

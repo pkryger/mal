@@ -1,0 +1,41 @@
+;;
+;; Testing hash-maps with multiple and repeated keys
+
+(hash-map "a" 1 "b" 2)
+;/({"a" 1 "b" 2}|{"b" 2 "a" 1})
+
+(hash-map "a" 0 "a" 1)
+;=>{"a" 1}
+
+(hash-map "a" 0 "a" 1 "b" 0 "b" 2)
+;/({"a" 1 "b" 2}|{"b" 2 "a" 1})
+
+(assoc {})
+;=>{}
+
+(assoc {} "a" 1 "b" 2)
+;/({"a" 1 "b" 2}|{"b" 2 "a" 1})
+
+(assoc {"a" 0} "a" 1 "b" 2)
+;/({"a" 1 "b" 2}|{"b" 2 "a" 1})
+
+(assoc {"a" 0 "b" "0"} "a" 1 "b" 2)
+;/({"a" 1 "b" 2}|{"b" 2 "a" 1})
+
+(assoc {a 0 b 0} 'a 1 'b 2 'c 3)
+;/({a 1 b 2 c 3}|{a 1 c 3 b 2}|{b 2 a 1 c 3}|{b 2 c 3 a 1}|{c 3 a 1 b 2}|{c 3 b 2 a 1})
+
+;;
+;; Testing hash-maps with strings, keywords, and symbols
+
+(hash-map 'a 1 "a" 2 :a 3)
+;/({a 1 "a" 2 :a 3}|{a 1 :a 3 "a" 2}|{"a" 2 a 1 :a 3}|{"a" 2 :a 3 a 1}|{:a 3 a 1 "a" 2}|{:a 3 "a" 2 a 1})
+
+(assoc {a 1} "a" 2 :a 3)
+;/({a 1 "a" 2 :a 3}|{a 1 :a 3 "a" 2}|{"a" 2 a 1 :a 3}|{"a" 2 :a 3 a 1}|{:a 3 a 1 "a" 2}|{:a 3 "a" 2 a 1})
+
+(assoc {"a" 2} 'a 1 :a 3)
+;/({a 1 "a" 2 :a 3}|{a 1 :a 3 "a" 2}|{"a" 2 a 1 :a 3}|{"a" 2 :a 3 a 1}|{:a 3 a 1 "a" 2}|{:a 3 "a" 2 a 1})
+
+(assoc {:a 3} 'a 1 "a" 2)
+;/({a 1 "a" 2 :a 3}|{a 1 :a 3 "a" 2}|{"a" 2 a 1 :a 3}|{"a" 2 :a 3 a 1}|{:a 3 a 1 "a" 2}|{:a 3 "a" 2 a 1})

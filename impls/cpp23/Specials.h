@@ -35,6 +35,10 @@ InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
 InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
                                     EnvPtr env, EvalFn evalFn);
 
+InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
+                               EnvPtr env, EvalFn evalFn);
+
+
 } // namespace mal
 
 #endif // INCLUDE_SPECIALS_H

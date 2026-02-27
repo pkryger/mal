@@ -1,6 +1,8 @@
 #ifndef INCLUDE_TYPES_H
 #define INCLUDE_TYPES_H
 
+#include "Ranges.h"
+
 #include <cassert>
 #include <concepts>
 #include <cstddef>
@@ -248,6 +250,7 @@ protected:
   Value() = default;
 };
 
+
 class Integer : public Value {
 public:
   explicit Integer(std::int64_t value) noexcept : data{value} {}
@@ -298,6 +301,8 @@ template <> struct hash<mal::ValuePtr> {
 } // namespace std
 
 namespace mal {
+
+bool operator==(const ValuePtr &lhs, const ValuePtr &rhs);
 
 struct ParseValueMixin {
   constexpr auto parse(std::format_parse_context &ctx) {
@@ -422,7 +427,7 @@ private:
 class Symbol : public StringBase, private detail::Intern<Env::Key> {
 public:
   explicit Symbol(std::string value, std::optional<std::string> macro = {})
-      : StringBase{value}, Intern{data}, macro{std::move(macro)} {}
+      : StringBase{std::move(value)}, Intern{data}, macro{std::move(macro)} {}
 
   explicit Symbol(const Symbol &other)
   : StringBase{other.data}, Intern{other, data}, macro{other.macro} {}
@@ -489,11 +494,14 @@ private:
 
 class String : public StringBase {
 public:
-  std::string print(bool readably) const override;
-  static std::string unescape(const std::string& in);
-  static std::string escape(const std::string& in);
-
   explicit String(std::string v) noexcept : StringBase{std::move(v)} {}
+
+  std::string print(bool readably) const override;
+
+  const std::string &data() const { return StringBase::data; }
+
+  static std::string unescape(const std::string& in);
+  static std::string escape(const std::string &in);
 };
 
 class Atom : public Value {
@@ -517,7 +525,6 @@ public:
 private:
   mutable ValuePtr data;
 };
-
 
 class Sequence : public Value {
 public:
@@ -587,8 +594,27 @@ public:
 
 class Hash : public Value {
 public:
-  explicit Hash(ValuesContainer value = {})
-      : data{createMap(std::move(value))} {}
+  // To ensure that the last element that with a given key takes a precedence
+  // over previous elements with the same key, use std::views::reverse to
+  // reverse order of elements when creating a map.  Current implementation of
+  // libc++ (and I think libstdc++ as well) uses the first encountered element.
+  // While this has not been specified in standard [1] we'll take a bet this
+  // behaviour won't change.
+  //
+  // [1] as of March 2026 the C++ standard has not taken a stance on that, see
+  //     https://cplusplus.github.io/LWG/issue2844
+  template <std::ranges::input_range RANGE>
+    requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
+                                 ValuePtr>
+  explicit Hash(RANGE &&range)
+      : data{std::from_range, std::forward<RANGE>(range) |
+                                  std::views::chunk(2) | std::views::reverse |
+                                  std::views::transform([](auto &&chunk) {
+                                    assert(to<StringBase>(chunk[0]));
+                                    return std::tie(chunk[0], chunk[1]);
+                                  })} {}
+
+  explicit Hash(const Hash &other, ValuesSpan values);
 
   std::string print(bool readably) const override;
 
@@ -596,10 +622,13 @@ public:
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  auto& value() const noexcept { return data; }
+  ValuePtr find(ValuePtr key) const;
+
+  auto begin() const { return data.begin(); }
+
+  auto end() const { return data.end(); }
 
 private:
-  static ValuesMap createMap(ValuesContainer value);
   ValuesMap data;
 };
 
@@ -729,6 +758,14 @@ private:
 class EvalException : public std::runtime_error {
 public:
   explicit EvalException(const std::string &str) : std::runtime_error{str} {}
+};
+
+class MalException : public std::runtime_error {
+public:
+  MalException(const std::string &str, ValuePtr value)
+      : std::runtime_error{str}, value{std::move(value)} {}
+
+  ValuePtr value;
 };
 
 } // namespace mal

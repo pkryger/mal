@@ -1,5 +1,6 @@
 #include "Core.h" // IWYU pragma: associated
 #include "Reader.h"
+#include "Ranges.h"
 #include "Types.h"
 
 #include <algorithm>
@@ -68,20 +69,31 @@ using mal::Atom;
 using mal::Constant;
 using mal::CoreException;
 using mal::EnvPtr;
+using mal::Hash;
 using mal::Integer;
 using mal::Invocable;
+using mal::Keyword;
 using mal::List;
-using mal::Macro;
 using mal::make;
+using mal::MalException;
 using mal::readStr;
 using mal::repEvalFn;
 using mal::Sequence;
 using mal::String;
+using mal::StringBase;
+using mal::Symbol;
 using mal::to;
 using mal::ValuePtr;
 using mal::ValuesContainer;
 using mal::ValuesSpan;
 using mal::Vector;
+
+template <typename TYPE>
+ValuePtr typeQuestion(std::string_view name, ValuesSpan values,
+                      EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  return to<TYPE>(values[0]) ? Constant::trueValue() : Constant::falseValue();
+}
 
 namespace detail {
 
@@ -149,14 +161,6 @@ ValuePtr division(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
 
 ValuePtr list(std::string_view /* name */, ValuesSpan values, EnvPtr /* env */) {
   return make<List>(values);
-}
-
-ValuePtr listQuestion(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
-  checkArgsIs(name, values, 1);
-  if (to<List>(values.front())) {
-    return Constant::trueValue();
-  }
-  return Constant::falseValue();
 }
 
 ValuePtr emptyQuestion(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
@@ -292,11 +296,6 @@ ValuePtr atom(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
   return make<Atom>(values[0]);
 }
 
-ValuePtr atomQuestion(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
-  checkArgsIs(name, values, 1);
-  return to<Atom>(values[0]) ? Constant::trueValue() : Constant::falseValue();
-}
-
 ValuePtr deref(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
   checkArgsIs(name, values, 1);
   if (auto atom = to<Atom>(values[0])) {
@@ -333,7 +332,7 @@ ValuePtr swapBang(std::string_view name, ValuesSpan values, EnvPtr env) {
       auto args = detail::cons(atom->value(), values.subspan(2));
       auto [ast, evalEnv, needsEval] = fn->apply(ValuesSpan{args}, env);
       if (needsEval) {
-        ast = repEvalFn.value().get()(ast, evalEnv);
+        ast = repEvalFn.value()(ast, evalEnv);
       }
       return atom->reset(ast);
     }
@@ -424,9 +423,219 @@ ValuePtr rest(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
   throwWrongArgument(name, values[0]);
 }
 
-ValuePtr macroQuestion(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+[[noreturn]]
+ValuePtr throw_(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
   checkArgsIs(name, values, 1);
-  return to<Macro>(values[0]) ? Constant::trueValue() : Constant::falseValue();
+  throw MalException{std::format("Exception: {:r}", values[0]), values[0]};
+}
+
+ValuePtr map(std::string_view name, ValuesSpan values, EnvPtr env) {
+  checkArgsIs(name, values, 2);
+  if (auto invocable = to<Invocable>(values[0])) {
+    if (auto sequence = to<Sequence>(values[1])) {
+      return make<List>(
+          sequence->values() | std::views::transform([&](auto &&value) {
+            auto [ast, evalEnv, needsEval] =
+                invocable->apply(ValuesSpan{std::addressof(value), 1}, env);
+            if (needsEval) {
+              return repEvalFn.value()(std::move(ast), std::move(evalEnv));
+            }
+            return ast;
+      }));
+    }
+    throwWrongArgument(name, values[1]);
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr apply(std::string_view name, ValuesSpan values, EnvPtr env) {
+  checkArgsAtLeast(name, values, 2);
+  if (auto invocable = to<Invocable>(values[0])) {
+    ValuesContainer argsContainer;
+    auto args = [&]() {
+      if (auto sequence = to<Sequence>(values.back())) {
+        auto backValues = sequence->values();
+        if (backValues.size() == 0) {
+          if (values.size() == 2) {
+            return values.subspan(2);
+          }
+          return values.subspan(1);
+        }
+        argsContainer.reserve(values.size() - 1 + backValues.size());
+        std::ranges::copy(values.begin() + 1, values.end() - 1,
+                          std::back_inserter(argsContainer));
+        std::ranges::copy(backValues, std::back_inserter(argsContainer));
+        return ValuesSpan{argsContainer};
+      }
+      return values.subspan(1);
+    }();
+    auto [ast, evalEnv, needsEval] = invocable->apply(args, env);
+    if (needsEval) {
+      return repEvalFn.value()(std::move(ast), std::move(evalEnv));
+    }
+    return ast;
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+namespace detail {
+
+ValuePtr constantQuestion(std::string_view name, ValuesSpan values,
+                          ValuePtr constant) {
+  checkArgsIs(name, values, 1);
+  return constant->isEqualTo(values[0]);
+}
+
+} // namespace detail
+
+ValuePtr nilQuestion(std::string_view name, ValuesSpan values,
+                     EnvPtr /* env */) {
+  return detail::constantQuestion(name, values, Constant::nilValue());
+}
+
+ValuePtr trueQuestion(std::string_view name, ValuesSpan values,
+                     EnvPtr /* env */) {
+  return detail::constantQuestion(name, values, Constant::trueValue());
+}
+
+ValuePtr falseQuestion(std::string_view name, ValuesSpan values,
+                     EnvPtr /* env */) {
+  return detail::constantQuestion(name, values, Constant::falseValue());
+}
+
+ValuePtr symbol(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  if (auto string = to<String>(values[0])) {
+    return make<Symbol>(string->data());
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr keyword(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  if (to<Keyword>(values[0])) {
+    return values[0];
+  }
+  if (auto string = to<String>(values[0])) {
+    return make<Keyword>(std::format(":{}", string->data()));
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr vector(std::string_view /*name*/, ValuesSpan values,
+                EnvPtr /* env */) {
+
+  return make<Vector>(values);
+}
+
+ValuePtr hash_map(std::string_view name, ValuesSpan values,
+                  EnvPtr /* env */) {
+  if (values.size() % 2 == 0) {
+    for (auto key : values | std::views::stride(2)) {
+      if (!to<StringBase>(key)) {
+        mal::throwWrongArgument(name, key);
+      }
+    }
+    return make<Hash>(values);
+  }
+  throw CoreException(
+      std::format("odd number of arguments for '{}', {}", name, values.size()));
+}
+
+ValuePtr assoc(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsAtLeast(name, values, 1);
+  if (values.size() % 2 == 1) {
+    if (auto hash = to<Hash>(values[0])) {
+      for (auto key : values.subspan(1) | std::views::stride(2)) {
+        if (!to<StringBase>(key)) {
+          mal::throwWrongArgument(name, key);
+        }
+      }
+      return make<Hash>(*hash, values.subspan(1));
+    }
+    throwWrongArgument(name, values[0]);
+  }
+  throw CoreException(
+      std::format("odd number of arguments for '{}', {}", name, values.size() - 1));
+}
+
+ValuePtr get(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 2);
+  if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
+    return Constant::nilValue();
+  }
+  if (auto hash = to<Hash>(values[0])) {
+    if (to<StringBase>(values[1])) {
+      if (auto res = hash->find(values[1]))
+        return res;
+      else {
+        return Constant::nilValue();
+      }
+    }
+    throwWrongArgument(name, values[1]);
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr containsQuestion(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 2);
+  if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
+    return Constant::nilValue();
+  }
+  if (auto hash = to<Hash>(values[0])) {
+    if (to<StringBase>(values[1])) {
+      if (hash->find(values[1]))
+        return Constant::trueValue();
+      else {
+        return Constant::falseValue();
+      }
+    }
+    throwWrongArgument(name, values[1]);
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr keys(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
+    return Constant::nilValue();
+  }
+  if (auto hash = to<Hash>(values[0])) {
+    return make<List>(
+        *hash | std::views::transform([](auto &&elt) { return elt.first; }));
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr vals(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
+    return Constant::nilValue();
+  }
+  if (auto hash = to<Hash>(values[0])) {
+    return make<List>(
+        *hash | std::views::transform([](auto &&elt) { return elt.second; }));
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr dissoc(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsAtLeast(name, values, 1);
+  if (auto hash = to<Hash>(values[0])) {
+    values = values.subspan(1);
+    for (auto key : values) {
+      if (!to<StringBase>(key)) {
+        throwWrongArgument(name, key);
+      }
+    }
+    return make<Hash>(*hash | std::views::filter([&](auto &&elt) {
+      return !std::ranges::contains(values, elt.first);
+    }) | std::views::transform([](auto &&elt) {
+      return std::array{elt.first, elt.second};
+    }) | std::views::join |
+                      std::ranges::to<ValuesContainer>());
+  }
+  throwWrongArgument(name, values[0]);
 }
 
 } // namespace
@@ -435,12 +644,19 @@ namespace mal {
 void prepareEnv(EvalFn &evalFn, Env &env) {
   repEvalFn = evalFn;
   static std::array builtIns{
+      make<BuiltIn>("atom?", typeQuestion<Atom>),
+      make<BuiltIn>("keyword?", typeQuestion<Keyword>),
+      make<BuiltIn>("list?", typeQuestion<List>),
+      make<BuiltIn>("macro?", typeQuestion<Macro>),
+      make<BuiltIn>("map?", typeQuestion<Hash>),
+      make<BuiltIn>("sequential?", typeQuestion<Sequence>),
+      make<BuiltIn>("symbol?", typeQuestion<Symbol>),
+      make<BuiltIn>("vector?", typeQuestion<Vector>),
       make<BuiltIn>("+", addition),
       make<BuiltIn>("-", subtraction),
       make<BuiltIn>("*", multiplication),
       make<BuiltIn>("/", division),
       make<BuiltIn>("list", list),
-      make<BuiltIn>("list?", listQuestion),
       make<BuiltIn>("empty?", emptyQuestion),
       make<BuiltIn>("count", count),
       make<BuiltIn>("<", lt),
@@ -456,7 +672,6 @@ void prepareEnv(EvalFn &evalFn, Env &env) {
       make<BuiltIn>("slurp", slurp),
       make<BuiltIn>("read-string", read_string),
       make<BuiltIn>("atom", atom),
-      make<BuiltIn>("atom?", atomQuestion),
       make<BuiltIn>("deref", deref),
       make<BuiltIn>("reset!", resetBang),
       make<BuiltIn>("swap!", swapBang),
@@ -466,7 +681,22 @@ void prepareEnv(EvalFn &evalFn, Env &env) {
       make<BuiltIn>("nth", nth),
       make<BuiltIn>("first", first),
       make<BuiltIn>("rest", rest),
-      make<BuiltIn>("macro?", macroQuestion),
+      make<BuiltIn>("throw", throw_),
+      make<BuiltIn>("map", map),
+      make<BuiltIn>("nil?", nilQuestion),
+      make<BuiltIn>("true?", trueQuestion),
+      make<BuiltIn>("false?", falseQuestion),
+      make<BuiltIn>("apply", apply),
+      make<BuiltIn>("symbol", symbol),
+      make<BuiltIn>("keyword", keyword),
+      make<BuiltIn>("vector", vector),
+      make<BuiltIn>("hash-map", hash_map),
+      make<BuiltIn>("assoc", assoc),
+      make<BuiltIn>("get", get),
+      make<BuiltIn>("contains?", containsQuestion),
+      make<BuiltIn>("keys", keys),
+      make<BuiltIn>("vals", vals),
+      make<BuiltIn>("dissoc", dissoc),
   };
 
   for (auto &builtIn : builtIns) {

@@ -3,6 +3,7 @@
 #include "Ranges.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <format>
 #include <ranges>
@@ -57,6 +58,10 @@ ValuePtr CapturedEnv::findLocal(PreHashedKey phk) const {
 bool Value::isTrue() const noexcept {
   return !(this == Constant::nilValue().get() ||
            this == Constant::falseValue().get());
+}
+
+bool operator==(const ValuePtr &lhs, const ValuePtr &rhs) {
+  return lhs->isEqualTo(rhs)->isTrue();
 }
 
 ValuePtr Integer::isEqualTo(ValuePtr rhs) const {
@@ -160,7 +165,7 @@ std::string String::escape(const std::string& in) {
 }
 
 std::string String::print(bool readably) const {
-  return readably ? escape(data) : data;
+  return readably ? escape(StringBase::data) : StringBase::data;
 }
 
 ValuePtr Atom::isEqualTo(ValuePtr rhs) const {
@@ -243,50 +248,36 @@ std::string Hash::print(bool readably) const {
 
 ValuePtr Hash::eval(EnvPtr env) const {
   assert(env);
-  auto evaled = data | std::views::transform([&](auto &&v) {
-                  return std::pair{v.first, EVAL(v.second, env)};
-                }) |
-                std::ranges::to<ValuesMap>();
-  auto res = make<Hash>();
-  res->data = std::move(evaled);
-  return res;
+  return make<Hash>(data | std::views::transform([&](auto &&elt) {
+                      return std::array{elt.first, EVAL(elt.second, env)};
+                    }) |
+                    std::views::join | std::ranges::to<ValuesContainer>());
 }
 
 ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = [&]() noexcept -> const Hash * {
-        auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
-        if (typeid(*this) == typeid(o)) {
-          return to<Hash>(rhs);
-        }
-        return nullptr;
-      }();
-      other && data.size() == other->data.size()) {
-    auto res =
-        std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
-          return lhs.first->isEqualTo(rhs.first)->isTrue() &&
-                 lhs.second->isEqualTo(rhs.second)->isTrue();
-        });
-    return res.in1 == data.end() && res.in2 == other->data.end()
-               ? Constant::trueValue()
-               : Constant::falseValue();
+  if (auto other = to<Hash>(rhs)) {
+    return data == other->data ? Constant::trueValue() : Constant::falseValue();
   }
   return Constant::falseValue();
 }
 
-ValuesMap Hash::createMap(ValuesContainer v) {
-  ValuesMap res;
-  res.reserve(v.size() / 2);
-  for (auto &&[key, value] :
-       v | std::views::chunk(2) | std::views::transform([](auto &&elt) {
-         return std::tie(elt[0], elt[1]);
+Hash::Hash(const Hash &other, ValuesSpan values) : data{other.data} {
+  for (auto [key, value] :
+       values | std::views::chunk(2) | std::views::transform([](auto &&chunk) {
+         assert(to<StringBase>(chunk[0]));
+         return std::tie(chunk[0], chunk[1]);
        })) {
-    assert(to<StringBase>(key));
-    res.emplace(std::move(key), std::move(value));
+    data.insert_or_assign(key, value);
+  }}
+
+ValuePtr Hash::find(ValuePtr key) const {
+  if (auto res = data.find(key); res != data.end()) {
+    return res->second;
   }
-  return res;
+  return nullptr;
 }
 
 ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {

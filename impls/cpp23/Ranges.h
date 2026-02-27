@@ -174,7 +174,7 @@ public:
 namespace chunk_fn {
 
 struct ChunkFn : std::ranges::range_adaptor_closure<ChunkFn> {
-  template <typename RANGE>
+  template <std::ranges::input_range RANGE>
   [[nodiscard]]
   constexpr auto operator()(RANGE &&range,
                             std::ranges::range_difference_t<RANGE> n) const
@@ -336,7 +336,7 @@ public:
 namespace stride_fn {
 
 struct StrideFn : std::ranges::range_adaptor_closure<StrideFn> {
-  template <typename RANGE>
+  template <std::ranges::input_range RANGE>
   [[nodiscard]]
   constexpr auto operator()(RANGE &&range,
                             std::ranges::range_difference_t<RANGE> n) const
