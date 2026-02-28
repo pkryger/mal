@@ -3,7 +3,6 @@
 #include "Ranges.h"
 
 #include <algorithm>
-#include <array>
 #include <cassert>
 #include <format>
 #include <ranges>
@@ -249,9 +248,8 @@ std::string Hash::print(bool readably) const {
 ValuePtr Hash::eval(EnvPtr env) const {
   assert(env);
   return make<Hash>(data | std::views::transform([&](auto &&elt) {
-                      return std::array{elt.first, EVAL(elt.second, env)};
-                    }) |
-                    std::views::join | std::ranges::to<ValuesContainer>());
+                      return std::pair{elt.first, EVAL(elt.second, env)};
+                    }));
 }
 
 ValuePtr Hash::isEqualTo(ValuePtr rhs) const {

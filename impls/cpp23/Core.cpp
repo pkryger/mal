@@ -637,10 +637,7 @@ ValuePtr dissoc(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
     }
     return make<Hash>(*hash | std::views::filter([&](auto &&elt) {
       return !std::ranges::contains(values, elt.first);
-    }) | std::views::transform([](auto &&elt) {
-      return std::array{elt.first, elt.second};
-    }) | std::views::join |
-                      std::ranges::to<ValuesContainer>());
+    }));
   }
   throwWrongArgument(name, values[0]);
 }

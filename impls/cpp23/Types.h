@@ -641,6 +641,12 @@ public:
                                     return std::tie(chunk[0], chunk[1]);
                                   })} {}
 
+  template <std::ranges::input_range RANGE>
+    requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
+                                 ValuesMap::value_type>
+  explicit Hash(RANGE &&range)
+      : data{std::from_range, std::forward<RANGE>(range)} {}
+
   explicit Hash(const Hash &other, ValuesSpan values);
 
   explicit Hash(const Hash &other, ValuePtr meta)
