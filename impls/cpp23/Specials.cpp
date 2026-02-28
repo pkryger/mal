@@ -164,13 +164,23 @@ InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
                                     EnvPtr env, EvalFn evalFn) {
   checkArgsIs(name, values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
+    if (auto lambda = [&]() -> const Lambda * {
+      if (to<Symbol>(values[1])) {
+        return to<Lambda>(evalFn(values[1], env));
+      }
+      return nullptr;
+    }()) {
+      auto res = make<Macro>(*lambda);
+      dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), res);
+      return {res, std::move(env), false};
+    }
     auto res = evalFn(values[1], env);
     if (auto lambda = to<Lambda>(res)) {
       res = make<Macro>(std::move(const_cast<Lambda&>(*lambda)));
       dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), res);
       return {res, std::move(env), false};
     }
-    throwWrongArgument(name, res);
+    throwWrongArgument(name, values[1]);
   }
   throwWrongArgument(name, values[0]);
 }

@@ -671,7 +671,11 @@ public:
 
   explicit FunctionBase(Params params, ValuePtr body, EnvPtr env);
 
-  explicit FunctionBase(FunctionBase &&other) noexcept
+  explicit FunctionBase(const FunctionBase &other)
+      : bindSize{other.bindSize}, params{other.params}, body{other.body},
+        capturedEnv{other.capturedEnv, nullptr} {}
+
+  FunctionBase(FunctionBase &&other) noexcept
       : bindSize{other.bindSize}, params{std::move(other.params)},
         body{std::move(other.body)}, capturedEnv{std::move(other.capturedEnv)} {}
 
@@ -728,8 +732,9 @@ public:
 
 class Macro : public FunctionBase {
 public:
-  explicit Macro(Lambda &&other) noexcept
-      : FunctionBase{std::move(other)} {}
+  explicit Macro(const Lambda &other) noexcept : FunctionBase{other} {}
+
+  explicit Macro(Lambda &&other) noexcept : FunctionBase{std::move(other)} {}
 
   std::string print(bool readable) const override;
 
