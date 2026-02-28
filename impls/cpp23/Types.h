@@ -526,6 +526,21 @@ private:
   mutable ValuePtr data;
 };
 
+class MetaMixIn {
+public:
+  explicit MetaMixIn(ValuePtr meta = Constant::nilValue())
+      : meta_{std::move(meta)} {}
+
+  virtual ~MetaMixIn() = default;
+
+  virtual ValuePtr cloneWithMeta(ValuePtr meta) const = 0;
+
+  ValuePtr meta() const { return meta_; }
+
+private:
+  ValuePtr meta_;
+};
+
 class Sequence : public Value {
 public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
@@ -550,12 +565,13 @@ protected:
   ValuesContainer data;
 };
 
-class List : public Sequence {
+class List : public Sequence, public MetaMixIn {
 public:
   explicit List(ValuesContainer values) noexcept
       : Sequence{std::move(values)} {}
 
-  explicit List(ValuesSpan values) noexcept : Sequence{values} {}
+  explicit List(ValuesSpan values, ValuePtr meta = {}) noexcept
+      : Sequence{values}, MetaMixIn{std::move(meta)} {}
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
@@ -570,15 +586,21 @@ public:
   std::string print(bool readably) const override;
 
   InvocableResult invoke(EnvPtr env) const;
+
   ValuePtr eval(EnvPtr env) const override;
+
+  ValuePtr cloneWithMeta(ValuePtr meta) const override {
+    return make<List>(values(), std::move(meta));
+  }
 };
 
-class Vector : public Sequence {
+class Vector : public Sequence, public MetaMixIn {
 public:
   explicit Vector(ValuesContainer values) noexcept
       : Sequence{std::move(values)} {}
 
-  explicit Vector(ValuesSpan values) noexcept : Sequence{values} {}
+  explicit Vector(ValuesSpan values, ValuePtr meta = {}) noexcept
+      : Sequence{values}, MetaMixIn{std::move(meta)} {}
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
@@ -590,9 +612,14 @@ public:
   }
 
   ValuePtr eval(EnvPtr env) const override;
+
+  ValuePtr cloneWithMeta(ValuePtr meta) const override {
+    return make<Vector>(values(), std::move(meta));
+  }
+
 };
 
-class Hash : public Value {
+class Hash : public Value, public MetaMixIn {
 public:
   // To ensure that the last element that with a given key takes a precedence
   // over previous elements with the same key, use std::views::reverse to
@@ -616,6 +643,9 @@ public:
 
   explicit Hash(const Hash &other, ValuesSpan values);
 
+  explicit Hash(const Hash &other, ValuePtr meta)
+      : MetaMixIn{std::move(meta)}, data{other.data} {}
+
   std::string print(bool readably) const override;
 
   ValuePtr eval(EnvPtr env) const override;
@@ -628,6 +658,10 @@ public:
 
   auto end() const { return data.end(); }
 
+  ValuePtr cloneWithMeta(ValuePtr meta) const override {
+    return make<Hash>(*this, std::move(meta));
+  }
+
 private:
   ValuesMap data;
 };
@@ -637,13 +671,16 @@ public:
   virtual InvocableResult apply(ValuesSpan, EnvPtr) const = 0;
 };
 
-class BuiltIn : public Invocable {
+class BuiltIn : public Invocable, public MetaMixIn {
 public:
   using HandlerFn = ValuePtr(std::string_view name, ValuesSpan value,
                              EnvPtr Env);
 
   explicit BuiltIn(std::string name, HandlerFn &handler) noexcept
       : name{std::move(name)}, handler{handler} {}
+
+  explicit BuiltIn(const BuiltIn &other, ValuePtr meta)
+      : MetaMixIn{std::move(meta)}, name{other.name}, handler{other.handler} {}
 
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override {
     return {handler(name, value, evalEnv), evalEnv, false};
@@ -657,6 +694,10 @@ public:
   }
 
   Env::Key asKey() const { return Symbol{name}.asKey(); }
+
+  ValuePtr cloneWithMeta(ValuePtr meta) const override {
+    return make<BuiltIn>(*this, std::move(meta));
+  }
 
 private:
   std::string name;
@@ -714,7 +755,7 @@ struct std::formatter<mal::FunctionBase::Params>
 
 namespace mal {
 
-class Lambda : public FunctionBase {
+class Lambda : public FunctionBase, public MetaMixIn {
 public:
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>, Symbol>
@@ -723,11 +764,18 @@ public:
                          std::ranges::to<FunctionBase::Params>(),
                      std::move(body), std::move(env)} {}
 
+  explicit Lambda(const Lambda &other, ValuePtr meta)
+      : FunctionBase{other}, MetaMixIn{std::move(meta)} {}
+
   std::string print(bool readable) const override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override;
+
+  ValuePtr cloneWithMeta(ValuePtr meta) const override {
+    return make<Lambda>(*this, std::move(meta));
+  }
 };
 
 class Macro : public FunctionBase {
@@ -743,9 +791,12 @@ public:
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override;
 };
 
-class Eval : public Invocable {
+class Eval : public Invocable, public MetaMixIn {
 public:
   explicit Eval(EnvPtr env) : env{std::move(env)} {}
+
+  explicit Eval(const Eval &other, ValuePtr meta)
+      : MetaMixIn{std::move(meta)}, env{other.env} {}
 
   std::string print(bool /* readably */) const override {
     return std::format("#<eval@{:p}>", reinterpret_cast<const void *>(this));
@@ -754,6 +805,10 @@ public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   InvocableResult apply(ValuesSpan values, EnvPtr evalEnv) const override;
+
+  ValuePtr cloneWithMeta(ValuePtr meta) const override {
+    return make<Eval>(*this, std::move(meta));
+  }
 
 private:
   EnvPtr env;

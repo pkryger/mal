@@ -121,6 +121,9 @@ EnvPtr repEnv(std::span<const char*> args)
                    return make<String>(arg);
                  })));
 
+  env.insert_or_assign(Symbol{"*host-language*"}.asKey(),
+                       make<String>("cpp23"));
+
   return envPtr;
 }
 
@@ -149,7 +152,8 @@ int main(int argc, const char *argv[]) {
     mal::rep(std::format("(load-file \"{}\")", args[0]), envPtr);
     return 0;
   }
+  mal::rep("(println (str \"Mal [\" *host-language* \"]\"))", envPtr);
   while (auto line = mal::rl.get("user> ")) {
-    std::print("{}\n", rep(std::move(line.value()), envPtr));
+    std::print("{}\n", mal::rep(std::move(line.value()), envPtr));
   }
 }

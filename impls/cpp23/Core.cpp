@@ -1,11 +1,13 @@
 #include "Core.h" // IWYU pragma: associated
-#include "Reader.h"
 #include "Ranges.h"
+#include "ReadLine.h"
+#include "Reader.h"
 #include "Types.h"
 
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -22,10 +24,12 @@
 #include <tuple>
 #include <utility>
 // IWYU pragma: no_include <__vector/vector.h>
-
+// IWYU pragma: no_include <type_traits>
 
 namespace mal {
+
 static std::optional<std::reference_wrapper<EvalFn>> repEvalFn;
+static ReadLine coreReadLine{};
 
 void checkArgsIs(std::string_view name, ValuesSpan values, std::size_t expected) {
 
@@ -68,14 +72,17 @@ namespace {
 using mal::Atom;
 using mal::Constant;
 using mal::CoreException;
+using mal::coreReadLine;
 using mal::EnvPtr;
 using mal::Hash;
 using mal::Integer;
 using mal::Invocable;
 using mal::Keyword;
 using mal::List;
+using mal::Macro;
 using mal::make;
 using mal::MalException;
+using mal::MetaMixIn;
 using mal::readStr;
 using mal::repEvalFn;
 using mal::Sequence;
@@ -538,8 +545,8 @@ ValuePtr hash_map(std::string_view name, ValuesSpan values,
     }
     return make<Hash>(values);
   }
-  throw CoreException(
-      std::format("odd number of arguments for '{}', {}", name, values.size()));
+  throw CoreException{
+      std::format("odd number of arguments for '{}', {}", name, values.size())};
 }
 
 ValuePtr assoc(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
@@ -555,8 +562,8 @@ ValuePtr assoc(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
     }
     throwWrongArgument(name, values[0]);
   }
-  throw CoreException(
-      std::format("odd number of arguments for '{}', {}", name, values.size() - 1));
+  throw CoreException{std::format("odd number of arguments for '{}', {}", name,
+                                  values.size() - 1)};
 }
 
 ValuePtr get(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
@@ -638,6 +645,95 @@ ValuePtr dissoc(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
   throwWrongArgument(name, values[0]);
 }
 
+ValuePtr readline(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  if (auto prompt = to<String>(values[0])) {
+    if (auto res = coreReadLine.get(prompt->data())) {
+      return make<String>(*res);
+    }
+    return Constant::nilValue();
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr time_ms(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 0);
+  return make<Integer>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                           std::chrono::steady_clock::now().time_since_epoch())
+                           .count());
+}
+
+ValuePtr seq(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  if (auto constant = to<Constant>(values[0])) {
+    if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
+      return Constant::nilValue();
+    }
+    throwWrongArgument(name, values[0]);
+  }
+  if (auto sequence = to<Sequence>(values[0])) {
+    if (sequence->values().empty()) {
+      return Constant::nilValue();
+    }
+    if (auto vector = to<Vector>(values[0])) {
+      return make<List>(vector->values());
+    }
+    return values[0];
+  }
+  if (auto string = to<String>(values[0])) {
+    if (string->data().empty()) {
+      return Constant::nilValue();
+    }
+    return make<List>(string->data() | std::views::transform([](auto &&c) {
+                        return make<String>(std::string{c});
+                      }));
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr conj(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsAtLeast(name, values, 2);
+  if (auto list = to<List>(values[0])) {
+    values = values.subspan(1);
+    auto res =
+        values | std::views::reverse | std::ranges::to<ValuesContainer>();
+    res.reserve(res.size() + list->values().size());
+    std::ranges::copy(list->values(), std::back_inserter(res));
+    return make<List>(std::move(res));
+  }
+  if (auto vector = to<Vector>(values[0])) {
+    values = values.subspan(1);
+    auto res = vector->values() | std::ranges::to<ValuesContainer>();
+    res.reserve(res.size() + values.size());
+    std::ranges::copy(values, std::back_inserter(res));
+    return make<Vector>(std::move(res));
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr meta(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  if (auto metaMixIn = to<MetaMixIn>(values[0])) {
+    return metaMixIn->meta();
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr with_meta(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 2);
+  if (auto metaMixIn = to<MetaMixIn>(values[0])) {
+    return metaMixIn->cloneWithMeta(values[1]);
+  }
+  throwWrongArgument(name, values[0]);
+}
+
+ValuePtr fnQuestion(std::string_view name, ValuesSpan values, EnvPtr /* env */) {
+  checkArgsIs(name, values, 1);
+  return to<Invocable>(values[0]) && !to<Macro>(values[0])
+    ? Constant::trueValue()
+    : Constant::falseValue();
+}
+
 } // namespace
 
 namespace mal {
@@ -649,7 +745,9 @@ void prepareEnv(EvalFn &evalFn, Env &env) {
       make<BuiltIn>("list?", typeQuestion<List>),
       make<BuiltIn>("macro?", typeQuestion<Macro>),
       make<BuiltIn>("map?", typeQuestion<Hash>),
+      make<BuiltIn>("number?", typeQuestion<Integer>),
       make<BuiltIn>("sequential?", typeQuestion<Sequence>),
+      make<BuiltIn>("string?", typeQuestion<String>),
       make<BuiltIn>("symbol?", typeQuestion<Symbol>),
       make<BuiltIn>("vector?", typeQuestion<Vector>),
       make<BuiltIn>("+", addition),
@@ -697,6 +795,13 @@ void prepareEnv(EvalFn &evalFn, Env &env) {
       make<BuiltIn>("keys", keys),
       make<BuiltIn>("vals", vals),
       make<BuiltIn>("dissoc", dissoc),
+      make<BuiltIn>("readline", readline),
+      make<BuiltIn>("time-ms", time_ms),
+      make<BuiltIn>("seq", seq),
+      make<BuiltIn>("conj", conj),
+      make<BuiltIn>("meta", meta),
+      make<BuiltIn>("with-meta", with_meta),
+      make<BuiltIn>("fn?", fnQuestion),
   };
 
   for (auto &builtIn : builtIns) {
