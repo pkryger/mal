@@ -40,21 +40,24 @@ struct Pipeable
 template <typename FN>
 Pipeable(FN&&) -> Pipeable<FN>;
 
-template <std::ranges::forward_range VIEW>
+template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
 class ChunkView : public std::ranges::view_interface<ChunkView<VIEW>> {
   VIEW base_ = VIEW{};
   std::ranges::range_difference_t<VIEW> count_{1};
 
+  template<bool>
   class iterator;
 
-  auto find_next(std::ranges::iterator_t<VIEW> it) {
+  template <typename VIEW_ITERATOR>
+  auto find_next(VIEW_ITERATOR it) const {
     return std::pair{it,
                      std::ranges::advance(it, count_, std::ranges::end(base_))};
   }
 
-  auto find_prev(std::ranges::iterator_t<VIEW> it,
-                 std::ranges::range_difference_t<VIEW> reminder) {
+  template <typename VIEW_ITERATOR>
+  auto find_prev(VIEW_ITERATOR it,
+                 std::ranges::range_difference_t<VIEW> reminder)  const {
     std::ranges::advance(it, -(count_ - reminder), std::ranges::begin(base_));
     return it;
   }
@@ -78,14 +81,27 @@ public:
 
   constexpr VIEW base() && { return std::move(base_); }
 
-  constexpr iterator begin() {
+  constexpr auto begin() {
     auto begin = std::ranges::begin(base_);
-    return iterator{this, begin, find_next(begin).first};
+    return iterator<false>{
+        this, begin, std::ranges::next(begin, count_, std::ranges::end(base_))};
   }
 
-  constexpr iterator end() {
+  constexpr auto begin() const {
+    auto begin = std::ranges::begin(base_);
+    return iterator<true>{
+        this, begin, std::ranges::next(begin, count_, std::ranges::end(base_))};
+  }
+
+  constexpr auto end() {
     auto end = std::ranges::end(base_);
-    return iterator{this, end, end}; }
+    return iterator<false>{this, end, end};
+  }
+
+  constexpr auto end() const {
+    auto end = std::ranges::end(base_);
+    return iterator<true>{this, end, end};
+  }
 
   constexpr std::ranges::range_difference_t<VIEW> count() const & {
     return count_;
@@ -96,36 +112,39 @@ template <typename RANGE>
 ChunkView(RANGE &&, std::ranges::range_difference_t<RANGE>)
     -> ChunkView<std::views::all_t<RANGE>>;
 
-template <std::ranges::forward_range VIEW>
+template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
+template <bool CONST>
 class ChunkView<VIEW>::iterator {
   friend ChunkView;
 
-  ChunkView *parent_;
-  std::ranges::iterator_t<VIEW> current_;
-  std::ranges::iterator_t<VIEW> next_;
-  std::ranges::range_difference_t<VIEW> reminder_{0};
+  const ChunkView *parent_;
 
-  explicit constexpr iterator(ChunkView *parent,
-                              std::ranges::iterator_t<VIEW> current,
-                              std::ranges::iterator_t<VIEW> next)
+  using View = std::conditional_t<CONST, const VIEW, VIEW>;
+
+  std::ranges::iterator_t<View> current_;
+  std::ranges::iterator_t<View> next_;
+  std::ranges::range_difference_t<View> reminder_{0};
+
+  explicit constexpr iterator(const ChunkView *parent,
+                              std::ranges::iterator_t<View> current,
+                              std::ranges::iterator_t<View> next)
       : parent_{parent}, current_{current}, next_{next} {
     assert(parent_);
   }
 
-
 public:
-  using value_type = std::ranges::subrange<std::ranges::iterator_t<VIEW>>;
-  using difference_type = std::ranges::range_difference_t<VIEW>;
+  using value_type = std::ranges::subrange<std::ranges::iterator_t<View>>;
+  using difference_type = std::ranges::range_difference_t<View>;
   using iterator_category = std::input_iterator_tag;
-  using iterator_concept =
-      std::conditional_t<std::ranges::bidirectional_range<VIEW>,
-                         std::bidirectional_iterator_tag,
-                         std::forward_iterator_tag>;
+  using iterator_concept = std::conditional_t<
+      std::ranges::bidirectional_range<View>, std::bidirectional_iterator_tag,
+      std::conditional_t<std::ranges::forward_range<View>,
+                         std::forward_iterator_tag, std::input_iterator_tag>>;
 
   iterator() = default;
 
-  constexpr value_type operator*() const {
+  constexpr const value_type operator*() const {
     assert (current_ != next_);
     return {current_, next_};
   }
@@ -204,7 +223,7 @@ inline constexpr auto Chunk = chunk_fn::ChunkFn{};
 #ifndef __cpp_lib_ranges_chunk
 namespace std {
 namespace ranges {
-template <std::ranges::forward_range VIEW>
+template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
 using chunk_view = mal::views::ChunkView<VIEW>;
 namespace views {
@@ -217,12 +236,13 @@ inline constexpr auto chunk = mal::views::chunk_fn::ChunkFn{};
 namespace mal {
 namespace views {
 
-template <std::ranges::forward_range VIEW>
+template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
 class StrideView : public std::ranges::view_interface<StrideView<VIEW>> {
   VIEW base_ = VIEW{};
   std::ranges::range_difference_t<VIEW> count_{0};
 
+  template <bool>
   class iterator;
 
 public:
@@ -244,12 +264,21 @@ public:
 
   constexpr VIEW base() && { return std::move(base_); }
 
-  constexpr iterator begin() {
-    return iterator{this, std::ranges::begin(base_)};
+  constexpr auto begin() {
+    return iterator<false>{this, std::ranges::begin(base_)};
   }
 
-  constexpr iterator end() {
-    return iterator{this, std::ranges::end(base_)}; }
+  constexpr auto begin() const {
+    return iterator<true>{this, std::ranges::begin(base_)};
+  }
+
+  constexpr auto end() {
+    return iterator<false>{this, std::ranges::end(base_)};
+  }
+
+  constexpr auto end() const {
+    return iterator<false>{this, std::ranges::end(base_)};
+  }
 
   constexpr std::ranges::range_difference_t<VIEW> count() const & {
     return count_;
@@ -260,34 +289,44 @@ template <typename RANGE>
 StrideView(RANGE &&, std::ranges::range_difference_t<RANGE>)
     -> StrideView<std::views::all_t<RANGE>>;
 
-template <std::ranges::forward_range VIEW>
+template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
+template <bool CONST>
 class StrideView<VIEW>::iterator {
   friend StrideView;
 
-  StrideView *parent_;
-  std::ranges::iterator_t<VIEW> current_;
-  std::ranges::range_difference_t<VIEW> reminder_{0};
+  using View = std::conditional_t<CONST, const VIEW, VIEW>;
 
-  explicit constexpr iterator(StrideView *parent,
-                              std::ranges::iterator_t<VIEW> current)
+  const StrideView *parent_;
+  std::ranges::iterator_t<View> current_;
+  std::ranges::range_difference_t<View> reminder_{0};
+
+  explicit constexpr iterator(const StrideView *parent,
+                              std::ranges::iterator_t<View> current)
       : parent_{parent}, current_{current} {
     assert(parent_);
   }
 
 
 public:
-  using value_type = std::ranges::iterator_t<VIEW>::value_type;
-  using difference_type = std::ranges::range_difference_t<VIEW>;
+  using value_type = std::ranges::iterator_t<View>::value_type;
+  using difference_type = std::ranges::range_difference_t<View>;
   using iterator_category = std::input_iterator_tag;
-  using iterator_concept =
-      std::conditional_t<std::ranges::bidirectional_range<VIEW>,
-                         std::bidirectional_iterator_tag,
-                         std::forward_iterator_tag>;
+  using iterator_concept = std::conditional_t<
+      std::ranges::bidirectional_range<View>, std::bidirectional_iterator_tag,
+      std::conditional_t<std::ranges::forward_range<View>,
+                         std::forward_iterator_tag, std::input_iterator_tag>>;
 
   iterator() = default;
 
-  constexpr value_type operator*() const {
+  constexpr const auto &operator*() const {
+    assert(current_ != std::ranges::end(parent_->base()));
+    return *current_;
+  }
+
+  constexpr auto &operator*()
+    requires(!CONST)
+  {
     assert(current_ != std::ranges::end(parent_->base()));
     return *current_;
   }
@@ -366,7 +405,7 @@ inline constexpr auto Stride = stride_fn::StrideFn{};
 #ifndef __cpp_lib_ranges_stride
 namespace std {
 namespace ranges {
-template <std::ranges::forward_range VIEW>
+template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
 using stride_view = mal::views::StrideView<VIEW>;
 namespace views {
