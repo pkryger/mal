@@ -31,14 +31,21 @@ template <std::ranges::viewable_range R> auto malChunkView(R &&r, std::size_t n)
 namespace mal {
 namespace views {
 
+namespace detail {
 template <typename FN>
 struct Pipeable
     : FN,
       std::ranges::range_adaptor_closure<Pipeable<FN>> {
   constexpr explicit Pipeable(FN &&fn) : FN{std::move(fn)} {}
 };
-template <typename FN>
-Pipeable(FN&&) -> Pipeable<FN>;
+
+template <typename FN> Pipeable(FN &&) -> Pipeable<FN>;
+
+constexpr std::size_t divCeil(std::size_t n, std::size_t denominator) {
+  return n / denominator + (n % denominator ? 1 : 0);
+}
+
+} // namespace detail
 
 template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
@@ -49,15 +56,23 @@ class ChunkView : public std::ranges::view_interface<ChunkView<VIEW>> {
   template<bool>
   class iterator;
 
-  template <typename VIEW_ITERATOR>
-  auto find_next(VIEW_ITERATOR it) const {
-    return std::pair{it,
-                     std::ranges::advance(it, count_, std::ranges::end(base_))};
+  template <typename VIEW_ITERATOR> auto findNext(VIEW_ITERATOR it) const {
+    auto reminder = [&]() {
+      if constexpr (std::ranges::sized_range<VIEW> &&
+                    std::is_same_v<std::ranges::iterator_t<VIEW>,
+                                   std::ranges::sentinel_t<VIEW>>) {
+        return std::ranges::advance(it, count_, std::ranges::end(base_));
+      } else {
+        std::ranges::advance(it, count_);
+        return 0;
+      }
+    }();
+    return std::pair{it, reminder};
   }
 
   template <typename VIEW_ITERATOR>
-  auto find_prev(VIEW_ITERATOR it,
-                 std::ranges::range_difference_t<VIEW> reminder)  const {
+  auto findPrev(VIEW_ITERATOR it,
+                std::ranges::range_difference_t<VIEW> reminder) const {
     std::ranges::advance(it, -(count_ - reminder), std::ranges::begin(base_));
     return it;
   }
@@ -82,29 +97,61 @@ public:
   constexpr VIEW base() && { return std::move(base_); }
 
   constexpr auto begin() {
-    auto begin = std::ranges::begin(base_);
-    return iterator<false>{
-        this, begin, std::ranges::next(begin, count_, std::ranges::end(base_))};
+    auto current = std::ranges::begin(base_);
+    auto [next, reminder] = findNext(std::ranges::begin(base_));
+    return iterator<false>{this, current, next, std::ranges::end(base_),
+                           reminder};
   }
 
-  constexpr auto begin() const {
-    auto begin = std::ranges::begin(base_);
-    return iterator<true>{
-        this, begin, std::ranges::next(begin, count_, std::ranges::end(base_))};
+  constexpr auto begin() const
+    requires std::ranges::range<const VIEW>
+  {
+    auto current = std::ranges::begin(base_);
+    auto [next, reminder] = findNext(std::ranges::begin(base_));
+    return iterator<true>{this, current, next, std::ranges::end(base_),
+                          reminder};
   }
 
   constexpr auto end() {
-    auto end = std::ranges::end(base_);
-    return iterator<false>{this, end, end};
+    using ReminderType = iterator<false>::difference_type;
+    if constexpr (std::ranges::sized_range<VIEW>) {
+      auto end = std::ranges::end(base_);
+      auto n = std::ranges::size(base_);
+      auto reminder = static_cast<ReminderType>(n - ((n / count_) * count_));
+      return iterator<false>{this, end, end, end, reminder};
+    } else {
+      return std::default_sentinel;
+    }
   }
 
-  constexpr auto end() const {
-    auto end = std::ranges::end(base_);
-    return iterator<true>{this, end, end};
+  constexpr auto end() const
+    requires std::ranges::range<const VIEW>
+  {
+    using ReminderType = iterator<true>::difference_type;
+    if constexpr (std::ranges::sized_range<const VIEW>) {
+      auto end = std::ranges::end(base_);
+      auto n = std::ranges::size(base_);
+      auto reminder = static_cast<ReminderType>(n - ((n / count_) * count_));
+      return iterator<true>{this, end, end, end, reminder};
+    } else {
+      return std::default_sentinel;
+    }
   }
 
   constexpr std::ranges::range_difference_t<VIEW> count() const & {
     return count_;
+  }
+
+  std::size_t size()
+    requires std::ranges::sized_range<VIEW>
+  {
+    return detail::divCeil(std::ranges::size(base_), count_);
+  }
+
+  std::size_t size() const
+    requires std::ranges::sized_range<const VIEW>
+  {
+    return detail::divCeil(std::ranges::size(base_), count_);
   }
 };
 
@@ -121,21 +168,26 @@ class ChunkView<VIEW>::iterator {
   const ChunkView *parent_;
 
   using View = std::conditional_t<CONST, const VIEW, VIEW>;
+  using ViewIterator = std::ranges::iterator_t<View>;
+  using ViewSentinel = std::ranges::sentinel_t<View>;
+  using ViewDifference = std::ranges::range_difference_t<View>;
 
-  std::ranges::iterator_t<View> current_;
-  std::ranges::iterator_t<View> next_;
-  std::ranges::range_difference_t<View> reminder_{0};
+  ViewIterator current_;
+  ViewIterator next_;
+  ViewSentinel end_;
+  ViewDifference reminder_;
 
-  explicit constexpr iterator(const ChunkView *parent,
-                              std::ranges::iterator_t<View> current,
-                              std::ranges::iterator_t<View> next)
-      : parent_{parent}, current_{current}, next_{next} {
+  explicit constexpr iterator(const ChunkView *parent, ViewIterator current,
+                              ViewIterator next, ViewSentinel end,
+                              ViewDifference reminder)
+      : parent_{parent}, current_{current}, next_{next}, end_{end},
+        reminder_{reminder} {
     assert(parent_);
   }
 
 public:
-  using value_type = std::ranges::subrange<std::ranges::iterator_t<View>>;
-  using difference_type = std::ranges::range_difference_t<View>;
+  using value_type = std::ranges::subrange<ViewIterator, ViewSentinel>;
+  using difference_type = ViewDifference;
   using iterator_category = std::input_iterator_tag;
   using iterator_concept = std::conditional_t<
       std::ranges::bidirectional_range<View>, std::bidirectional_iterator_tag,
@@ -144,15 +196,27 @@ public:
 
   iterator() = default;
 
-  constexpr const value_type operator*() const {
-    assert (current_ != next_);
+  constexpr const value_type operator*() const
+  {
+    if constexpr (std::is_same_v<ViewIterator, ViewSentinel>) {
+      assert(current_ != next_);
+      return {current_, next_};
+    } else {
+      assert(current_ != end_);
+      return {current_, end_, parent_->count()};
+    }
     return {current_, next_};
   }
 
+
   constexpr iterator &operator++() {
-    assert(current_ != next_);
+    if constexpr (std::is_same_v<ViewIterator, ViewSentinel>) {
+      assert(current_ != next_);
+    } else {
+      assert(next_ != end_);
+    }
     current_ = next_;
-    std::tie(next_, reminder_) = parent_->find_next(next_);
+    std::tie(next_, reminder_) = parent_->findNext(next_);
     return *this;
   }
 
@@ -163,16 +227,18 @@ public:
   }
 
   constexpr iterator &operator--()
-    requires std::ranges::bidirectional_range<VIEW>
+    requires std::ranges::bidirectional_range<VIEW> &&
+             std::same_as<ViewIterator, ViewSentinel>
   {
     next_ = current_;
-    current_ = parent_->find_prev(current_, reminder_);
+    current_ = parent_->findPrev(current_, reminder_);
     reminder_ = 0;
     return *this;
   }
 
   constexpr iterator operator--(int)
-    requires std::ranges::bidirectional_range<VIEW>
+    requires std::ranges::bidirectional_range<VIEW> &&
+             std::same_as<ViewIterator, ViewSentinel>
   {
     auto tmp = *this;
     --*this;
@@ -185,7 +251,11 @@ public:
 
   friend constexpr bool operator==(const iterator &lhs,
                                    std::default_sentinel_t) {
-    return lhs.current_ == lhs.next_;
+    if constexpr (std::is_same_v<ViewIterator, ViewSentinel>) {
+      return lhs.current_ == lhs.next_;
+    } else {
+      return lhs.current_ == lhs.end_;
+    }
   }
 
 };
@@ -204,7 +274,7 @@ struct ChunkFn : std::ranges::range_adaptor_closure<ChunkFn> {
 
   [[nodiscard]]
   constexpr auto operator()(std::ptrdiff_t n) const noexcept {
-    return Pipeable{
+    return detail::Pipeable{
         [n](auto &&range) noexcept(
             noexcept(ChunkView{std::forward<decltype(range)>(range), n}))
             -> decltype(ChunkView{std::forward<decltype(range)>(range), n}) {
@@ -268,20 +338,44 @@ public:
     return iterator<false>{this, std::ranges::begin(base_)};
   }
 
-  constexpr auto begin() const {
+  constexpr auto begin() const
+    requires std::ranges::range<const VIEW>
+  {
     return iterator<true>{this, std::ranges::begin(base_)};
   }
 
   constexpr auto end() {
-    return iterator<false>{this, std::ranges::end(base_)};
+    if constexpr (std::ranges::sized_range<VIEW>) {
+      return iterator<false>{this, std::ranges::end(base_)};
+    } else {
+      return std::default_sentinel;
+    }
   }
 
-  constexpr auto end() const {
-    return iterator<false>{this, std::ranges::end(base_)};
+  constexpr auto end() const
+    requires std::ranges::range<const VIEW>
+  {
+    if constexpr (std::ranges::sized_range<VIEW>) {
+      return iterator<true>{this, std::ranges::end(base_)};
+    } else {
+      return std::default_sentinel;
+    }
   }
 
   constexpr std::ranges::range_difference_t<VIEW> count() const & {
     return count_;
+  }
+
+  std::size_t size()
+    requires std::ranges::sized_range<VIEW>
+  {
+    return detail::divCeil(std::ranges::size(base_), count_);
+  }
+
+  std::size_t size() const
+    requires std::ranges::sized_range<const VIEW>
+  {
+    return detail::divCeil(std::ranges::size(base_), count_);
   }
 };
 
@@ -298,18 +392,19 @@ class StrideView<VIEW>::iterator {
   using View = std::conditional_t<CONST, const VIEW, VIEW>;
 
   const StrideView *parent_;
-  std::ranges::iterator_t<View> current_;
+  using ViewIterator = std::ranges::iterator_t<View>;
+
+  ViewIterator current_;
   std::ranges::range_difference_t<View> reminder_{0};
 
-  explicit constexpr iterator(const StrideView *parent,
-                              std::ranges::iterator_t<View> current)
+  explicit constexpr iterator(const StrideView *parent, ViewIterator current)
       : parent_{parent}, current_{current} {
     assert(parent_);
   }
 
 
 public:
-  using value_type = std::ranges::iterator_t<View>::value_type;
+  using value_type = ViewIterator::value_type;
   using difference_type = std::ranges::range_difference_t<View>;
   using iterator_category = std::input_iterator_tag;
   using iterator_concept = std::conditional_t<
@@ -320,21 +415,25 @@ public:
   iterator() = default;
 
   constexpr const auto &operator*() const {
-    assert(current_ != std::ranges::end(parent_->base()));
+    //assert(current_ != std::ranges::end(parent_->base()));
     return *current_;
   }
 
   constexpr auto &operator*()
     requires(!CONST)
   {
-    assert(current_ != std::ranges::end(parent_->base()));
+    //assert(current_ != std::ranges::end(parent_->base()));
     return *current_;
   }
 
   constexpr iterator &operator++() {
-    assert(current_ != std::ranges::end(parent_->base()));
-    reminder_ = std::ranges::advance(current_, parent_->count(),
-                                     std::ranges::end(parent_->base()));
+    //assert(current_ != std::ranges::end(parent_->base()));
+    if constexpr (std::ranges::sized_range<VIEW>) {
+      reminder_ = std::ranges::advance(current_, parent_->count(),
+                                       std::ranges::end(parent_->base()));
+    } else {
+      std::ranges::advance(current_, parent_->count());
+    }
     return *this;
   }
 
@@ -386,7 +485,7 @@ struct StrideFn : std::ranges::range_adaptor_closure<StrideFn> {
 
   [[nodiscard]]
   constexpr auto operator()(std::ptrdiff_t n) const noexcept {
-    return Pipeable{
+    return detail::Pipeable{
         [n](auto &&range) noexcept(
             noexcept(StrideView{std::forward<decltype(range)>(range), n}))
             -> decltype(StrideView{std::forward<decltype(range)>(range), n}) {
