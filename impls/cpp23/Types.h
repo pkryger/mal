@@ -48,6 +48,17 @@ template <typename TYPE> const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
   return dynamic_cast<const std::decay_t<TYPE> *>(ptr.get());
 }
 
+namespace detail {
+
+template <typename T>
+concept IsHashContainer = requires(T t) {
+  typename T::hasher;
+  typename T::key_type;
+  typename T::mapped_type;
+};
+
+} // namespace detail
+
 class EnvBase {
 public:
   using Key = std::uint64_t;
@@ -109,6 +120,9 @@ public:
 
   using Map = std::unordered_map<Key, ValuePtr, Hash, Equal>;
 
+  using FindLocalKey =
+      std::conditional_t<detail::IsHashContainer<Map>, PreHashedKey, KeyView>;
+
   template <bool CONST> class Iterator {
 
   public:
@@ -164,7 +178,7 @@ public:
 
   ValuePtr find(KeyView key) const;
 
-  virtual ValuePtr findLocal(PreHashedKey phk) const = 0;
+  virtual ValuePtr findLocal(FindLocalKey phk) const = 0;
 
   auto begin() noexcept {
     return Iterator<false>{this};
@@ -202,7 +216,7 @@ public:
     map.insert_or_assign(std::move(key), std::move(value));
   }
 
-  ValuePtr findLocal(PreHashedKey phk) const override;
+  ValuePtr findLocal(FindLocalKey phk) const override;
 
   friend class CapturedEnv;
 private:
@@ -219,7 +233,7 @@ public:
   CapturedEnv(const CapturedEnv &other, EnvPtr outer) noexcept
       : EnvBase{std::move(outer)}, map{other.map} {}
 
-  ValuePtr findLocal(PreHashedKey phk) const override;
+  ValuePtr findLocal(FindLocalKey phk) const override;
 
 private:
   Map map;

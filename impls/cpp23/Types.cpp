@@ -15,16 +15,21 @@ namespace mal {
 extern ValuePtr EVAL(ValuePtr, EnvPtr);
 
 ValuePtr EnvBase::find(KeyView key) const {
-  auto phk = PreHashedKey{key, Hash{}(key)};
+  auto findKey = [&]() {
+    if constexpr (detail::IsHashContainer<Map>) {
+      return PreHashedKey{key, Hash{}(key)};
+    } else {
+      return key;
+    }}();
   for (auto &&env : *this) {
-    if (auto value = env.findLocal(phk)) {
+    if (auto value = env.findLocal(findKey)) {
       return value;
     }
   }
   return nullptr;
 }
 
-ValuePtr Env::findLocal(PreHashedKey phk) const {
+ValuePtr Env::findLocal(FindLocalKey phk) const {
   if (auto item = map.find(phk); item != map.end()) {
     return item->second;
   }
@@ -48,7 +53,7 @@ CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
                    }) | std::views::join;
           }()} {}
 
-ValuePtr CapturedEnv::findLocal(PreHashedKey phk) const {
+ValuePtr CapturedEnv::findLocal(FindLocalKey phk) const {
   if (auto item = map.find(phk); item != map.end()) {
     return item->second;
   }
