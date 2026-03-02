@@ -108,8 +108,6 @@ public:
   };
 
   using Map = std::unordered_map<Key, ValuePtr, Hash, Equal>;
-  using MapPtr = std::shared_ptr<Map>;
-  using MapCPtr = std::shared_ptr<const Map>;
 
   template <bool CONST> class Iterator {
 
@@ -139,10 +137,8 @@ public:
       return *this;
     }
 
-    Iterator operator++(int) noexcept {
-      auto it = *this;
+    void operator++(int) noexcept {
       ++*this;
-      return it;
     }
 
     friend constexpr bool operator==(const Iterator &lhs,
@@ -186,6 +182,13 @@ public:
     return std::default_sentinel;
   }
 
+  std::size_t size() const noexcept {
+    if (outer) {
+      return outer->size() + 1;
+    }
+    return 1;
+  }
+
 private:
   EnvCPtr outer;
 };
@@ -194,40 +197,32 @@ class Env : public EnvBase {
 public:
   using EnvBase::EnvBase;
 
-  explicit Env(EnvPtr outer, MapPtr map) noexcept
-      : EnvBase{std::move(outer)}, map{std::move(map)} {}
-
   void insert_or_assign(Key key, ValuePtr value) {
     assert(value);
-    map->insert_or_assign(std::move(key), std::move(value));
+    map.insert_or_assign(std::move(key), std::move(value));
   }
 
   ValuePtr findLocal(PreHashedKey phk) const override;
 
-  const MapCPtr mapCPtr() const noexcept {
-    return map;
-  }
-
+  friend class CapturedEnv;
 private:
-  MapPtr map{std::make_shared<Map>()};
+  Map map;
 };
 
 class CapturedEnv : public EnvBase {
 public:
-  using MapsVec = std::vector<MapCPtr>;
-
   explicit CapturedEnv(EnvCPtr captureEnv);
 
   CapturedEnv(CapturedEnv &&other) noexcept
-      : EnvBase{std::move(other)}, maps{std::move(other.maps)} {}
+      : EnvBase{std::move(other)}, map{std::move(other.map)} {}
 
   CapturedEnv(const CapturedEnv &other, EnvPtr outer) noexcept
-      : EnvBase{std::move(outer)}, maps{other.maps} {}
+      : EnvBase{std::move(outer)}, map{other.map} {}
 
   ValuePtr findLocal(PreHashedKey phk) const override;
 
 private:
-  MapsVec maps;
+  Map map;
 };
 
 class Value : public std::enable_shared_from_this<Value> {

@@ -25,7 +25,7 @@ ValuePtr EnvBase::find(KeyView key) const {
 }
 
 ValuePtr Env::findLocal(PreHashedKey phk) const {
-  if (auto item = map->find(phk); item != map->end()) {
+  if (auto item = map.find(phk); item != map.end()) {
     return item->second;
   }
   return nullptr;
@@ -33,23 +33,24 @@ ValuePtr Env::findLocal(PreHashedKey phk) const {
 
 CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
     : EnvBase{nullptr},
-      maps{*captureEnv | std::views::transform([](auto &&envBase) {
-        if (auto env = dynamic_cast<const Env *>(std::addressof(envBase))) {
-          return MapsVec{env->mapCPtr()};
-        }
-        if (auto capturedEnv =
-                dynamic_cast<const CapturedEnv *>(std::addressof(envBase))) {
-          return capturedEnv->maps;
-        }
-        throw EvalException{"invalid env"};
-      }) | std::views::join |
-           std::ranges::to<MapsVec>()} {}
+      map{std::from_range, [&]() {
+            return *captureEnv | std::views::take(captureEnv->size() - 1) |
+                   std::views::transform([](auto &&envBase) {
+                     if (auto env = dynamic_cast<const Env *>(
+                             std::addressof(envBase))) {
+                       return env->map;
+                     }
+                     if (auto capturedEnv = dynamic_cast<const CapturedEnv *>(
+                             std::addressof(envBase))) {
+                       return capturedEnv->map;
+                     }
+                     throw EvalException{"invalid env"};
+                   }) | std::views::join;
+          }()} {}
 
 ValuePtr CapturedEnv::findLocal(PreHashedKey phk) const {
-  for (auto &&map : maps) {
-    if (auto item = map->find(phk); item != map->end()) {
-      return item->second;
-    }
+  if (auto item = map.find(phk); item != map.end()) {
+    return item->second;
   }
   return nullptr;
 }
