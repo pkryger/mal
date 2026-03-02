@@ -37,23 +37,23 @@ ValuePtr Env::findLocal(FindLocalKey phk) const {
 }
 
 CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
-    : EnvBase{nullptr},
-      map{std::from_range, [&]() {
+    : map{std::from_range, [&]() {
             return *captureEnv | std::views::take(captureEnv->size() - 1) |
                    std::views::transform([](auto &&envBase) {
                      if (auto env = dynamic_cast<const Env *>(
                              std::addressof(envBase))) {
                        return env->map;
                      }
-                     if (auto capturedEnv = dynamic_cast<const CapturedEnv *>(
+                     if (auto applyEnv = dynamic_cast<const ApplyEnv *>(
                              std::addressof(envBase))) {
-                       return capturedEnv->map;
+                       return applyEnv->map;
                      }
                      throw EvalException{"invalid env"};
-                   }) | std::views::join;
+                   }) |
+                   std::views::join;
           }()} {}
 
-ValuePtr CapturedEnv::findLocal(FindLocalKey phk) const {
+ValuePtr ApplyEnv::findLocal(FindLocalKey phk) const {
   if (auto item = map.find(phk); item != map.end()) {
     return item->second;
   }
@@ -309,7 +309,8 @@ FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
         return params.size();
       }()},
       params{std::move(params)}, body{std::move(body)},
-      capturedEnv{std::move(env)} {}
+      capturedEnv{std::move(env)} {
+}
 
 template <typename TYPE>
 ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
@@ -331,7 +332,7 @@ ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
 }
 
 EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
-  auto applyEnv = make<Env>(make<CapturedEnv>(capturedEnv, std::move(evalEnv)));
+  auto applyEnv = make<ApplyEnv>(std::move(evalEnv), capturedEnv);
   if (bindSize == params.size()) {
     checkArgsIs(print(false), values, bindSize);
   } else {

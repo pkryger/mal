@@ -61,9 +61,9 @@ concept IsHashContainer = requires(T t) {
 
 class EnvBase {
 public:
-  using Key = std::uint64_t;
+  // using Key = std::uint64_t;
   // xor
-  // using Key = std::string;
+  using Key = std::string;
   using KeyView = std::conditional_t<std::is_trivially_copyable_v<Key> &&
                                          sizeof(Key) <= 2 * sizeof(void *),
                                      Key, const Key &>;
@@ -223,20 +223,31 @@ private:
   Map map;
 };
 
-class CapturedEnv : public EnvBase {
+class CapturedEnv {
 public:
   explicit CapturedEnv(EnvCPtr captureEnv);
 
-  CapturedEnv(CapturedEnv &&other) noexcept
-      : EnvBase{std::move(other)}, map{std::move(other.map)} {}
+  explicit CapturedEnv(const CapturedEnv &other) : map{other.map} {}
 
-  CapturedEnv(const CapturedEnv &other, EnvPtr outer) noexcept
-      : EnvBase{std::move(outer)}, map{other.map} {}
+  CapturedEnv(CapturedEnv &&other) noexcept : map{std::move(other.map)} {}
 
-  ValuePtr findLocal(FindLocalKey phk) const override;
+  friend class ApplyEnv;
 
 private:
-  Map map;
+  EnvBase::Map map;
+};
+
+class ApplyEnv : public EnvBase, public CapturedEnv {
+public:
+  ApplyEnv(EnvPtr evalEnv, const CapturedEnv &capturedEnv)
+      : EnvBase{std::move(evalEnv)}, CapturedEnv{capturedEnv} {}
+
+  void insert_or_assign(Key key, ValuePtr value) {
+    assert(value);
+    map.insert_or_assign(std::move(key), std::move(value));
+  }
+
+  ValuePtr findLocal(FindLocalKey phk) const override;
 };
 
 class Value : public std::enable_shared_from_this<Value> {
@@ -729,7 +740,7 @@ public:
 
   explicit FunctionBase(const FunctionBase &other)
       : bindSize{other.bindSize}, params{other.params}, body{other.body},
-        capturedEnv{other.capturedEnv, nullptr} {}
+        capturedEnv{other.capturedEnv} {}
 
   FunctionBase(FunctionBase &&other) noexcept
       : bindSize{other.bindSize}, params{std::move(other.params)},
