@@ -309,6 +309,14 @@ private:
   std::int64_t data;
 };
 
+namespace detail {
+
+template <typename...> class Intern;
+
+} // namespace detail
+
+class Symbol;
+
 class StringBase : public Value {
 public:
   std::string print(bool /* readably */) const override { return data; }
@@ -320,6 +328,7 @@ public:
   }
 
   friend std::hash<ValuePtr>;
+  friend detail::Intern<std::string, Symbol>;
 
 protected:
   explicit StringBase(std::string v) noexcept : data{std::move(v)} {}
@@ -417,25 +426,21 @@ namespace mal {
 
 namespace detail {
 
-template <typename> class Intern;
-
-template <> class Intern<std::string> {
+template <typename BASE> class Intern<std::string, BASE> {
 public:
-  explicit Intern(const std::string &name) noexcept : intern{name} {}
+  explicit Intern(const std::string & /* name */) noexcept {};
 
-  explicit Intern(const Intern &other, const std::string &name) noexcept
-      : intern{name} {}
+  explicit Intern(const Intern & /* other */) noexcept = default;
 
-  Intern(Intern &&other, const std::string &name) noexcept : intern{name} {}
+  Intern(Intern && /* other */) noexcept = default;
 
-  template <typename KEY_VIEW> KEY_VIEW asKey() const { return intern.get(); }
-
-private:
-  std::reference_wrapper<const std::string> intern;
+protected:
+  template <typename KEY_VIEW> KEY_VIEW asKey() const {
+    return static_cast<const BASE *>(this)->data;
+  }
 };
 
-template <>
-class Intern<std::uint64_t>  {
+template <typename BASE> class Intern<std::uint64_t, BASE> {
 public:
   explicit Intern(const std::string &name)
       : intern{[&]() {
@@ -447,11 +452,10 @@ public:
           }
           return newIntern;
         }()} {}
-  explicit Intern(const Intern &other, const std::string & /* name */) noexcept
-      : intern{other.intern} {}
 
-  Intern(Intern &&other, const std::string & /* name */) noexcept
-      : intern{other.intern} {}
+  explicit Intern(const Intern &other) noexcept = default;
+
+  Intern(Intern &&other) noexcept = default;
 
 protected:
   template <typename KEY_VIEW>
@@ -467,16 +471,16 @@ private:
 
 } // namespace detail
 
-class Symbol : public StringBase, private detail::Intern<Env::Key> {
+class Symbol : public StringBase, public detail::Intern<Env::Key, Symbol> {
 public:
   explicit Symbol(std::string value, std::optional<std::string> macro = {})
       : StringBase{std::move(value)}, Intern{data}, macro{std::move(macro)} {}
 
   explicit Symbol(const Symbol &other)
-  : StringBase{other.data}, Intern{other, data}, macro{other.macro} {}
+  : StringBase{other.data}, Intern{other}, macro{other.macro} {}
 
   Symbol(Symbol &&other) noexcept
-      : StringBase{std::move(other.data)}, Intern{std::move(other), data},
+      : StringBase{std::move(other.data)}, Intern{std::move(other)},
         macro{std::move(other.macro)} {}
 
   ValuePtr eval(EnvPtr env) const override;
