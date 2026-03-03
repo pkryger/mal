@@ -186,6 +186,8 @@ public:
 
   ValuePtr find(KeyView key) const;
 
+  ValuePtr find(const PreHashedKey& key) const;
+
   virtual ValuePtr findLocal(FindLocalKey phk) const = 0;
 
   virtual void insert_or_assign(Key key, ValuePtr value) = 0;
