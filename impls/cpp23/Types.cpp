@@ -41,9 +41,21 @@ CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
             return *captureEnv | std::views::take(captureEnv->size() - 1) |
                    std::views::transform([](auto &&env) { return env.map(); }) |
                    std::views::join;
-          }()} {}
+          }()} {
+  for (auto &&key : std::views::keys(map)) {
+    filter.insert(key);
+  }
+}
+
+void CapturedEnv::insert_or_assign(EnvBase::Key key, ValuePtr value) {
+  filter.insert(key);
+  map.insert_or_assign(std::move(key), std::move(value));
+}
 
 ValuePtr CapturedEnv::findLocal(EnvBase::FindLocalKey phk) const {
+  if (!filter.possiblyContains(phk)) {
+    return nullptr;
+  }
   if (auto item = map.find(phk); item != map.end()) {
     return item->second;
   }

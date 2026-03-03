@@ -30,6 +30,7 @@ if(NOT READLINE_FOUND)
 endif()
 
 add_library(mal
+  BloomFilter.cpp
   Core.cpp
   Ranges.cpp
   ReadLine.cpp

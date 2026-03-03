@@ -1,6 +1,7 @@
 #ifndef INCLUDE_TYPES_H
 #define INCLUDE_TYPES_H
 
+#include "BloomFilter.h"
 #include "Ranges.h"
 
 #include <cassert>
@@ -238,19 +239,23 @@ class CapturedEnv {
 public:
   explicit CapturedEnv(EnvCPtr captureEnv);
 
-  explicit CapturedEnv(const CapturedEnv &other) : map{other.map} {}
+  explicit CapturedEnv(const CapturedEnv &other) = default;
 
-  CapturedEnv(CapturedEnv &&other) noexcept : map{std::move(other.map)} {}
+  CapturedEnv(CapturedEnv &&other) noexcept = default;
 
-  void insert_or_assign(EnvBase::Key key, ValuePtr value) {
-    map.insert_or_assign(std::move(key), std::move(value));
-  }
+  void insert_or_assign(EnvBase::Key key, ValuePtr value);
 
   ValuePtr findLocal(EnvBase::FindLocalKey phk) const;
 
   friend class ApplyEnv;
+
 private:
   EnvBase::Map map;
+  BloomFilter<EnvBase::Key, std::size_t{1} << 13, // 8192 bits = 1KiB
+              std::size_t{1} << 10, // 1024 keys -> 5 iterations for with 1% of
+                                    // false positive probability
+              EnvBase::Hash>
+      filter;
 };
 
 class ApplyEnv : public EnvBase {
