@@ -26,13 +26,13 @@ private:
 
   template <std::uint32_t... Is>
   void setBits(std::size_t hash, std::integer_sequence<std::uint32_t, Is...>) {
-    (bits.set(bitNumber(hash, Is)), ...);
+    (bits.set(bitNumber(hash, Is + 1)), ...);
   }
 
   template <std::uint32_t... Is>
   bool testBits(std::size_t hash,
                 std::integer_sequence<std::uint32_t, Is...>) const {
-    return (bits.test(bitNumber(hash, Is)) && ...);
+    return (bits.test(bitNumber(hash, Is + 1)) && ...);
   }
 
 public:
