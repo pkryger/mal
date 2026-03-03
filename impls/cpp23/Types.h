@@ -123,8 +123,8 @@ public:
 
   using Map = std::unordered_map<Key, ValuePtr, Hash, Equal>;
 
-  using FindLocalKey =
-      std::conditional_t<detail::IsHashContainer<Map>, PreHashedKey, KeyView>;
+  using FindLocalKey = std::conditional_t<detail::IsHashContainer<Map>,
+                                          const PreHashedKey &, KeyView>;
 
   template <bool CONST> class Iterator {
 
