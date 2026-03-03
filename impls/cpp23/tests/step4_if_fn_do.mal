@@ -1,0 +1,20 @@
+;;
+;; Testing def! in captured environments
+
+(def! f (fn* () (do (def! a 2) a)))
+(f)
+;=>2
+a
+;/.*'?a'? not found.*
+
+(def! f (let* [a 1] (do (def! a 2) (fn* () a))))
+(f)
+;=>2
+a
+;/.*'?a'? not found.*
+
+(def! f (let* [a 1] (fn* () (do (def! a 2) a))))
+(f)
+;=>2
+a
+;/.*'?a'? not found.*

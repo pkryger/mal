@@ -185,6 +185,10 @@ public:
 
   virtual ValuePtr findLocal(FindLocalKey phk) const = 0;
 
+  virtual void insert_or_assign(Key key, ValuePtr value) = 0;
+
+  virtual const Map& map() const = 0;
+
   auto begin() noexcept {
     return Iterator<false>{this};
   }
@@ -214,16 +218,20 @@ class Env : public EnvBase {
 public:
   using EnvBase::EnvBase;
 
-  void insert_or_assign(Key key, ValuePtr value) {
+  void insert_or_assign(Key key, ValuePtr value) override {
     assert(value);
-    map.insert_or_assign(std::move(key), std::move(value));
+    map_.insert_or_assign(std::move(key), std::move(value));
   }
 
   ValuePtr findLocal(FindLocalKey phk) const override;
 
+  const Map &map() const override {
+    return map_;
+  }
+
   friend class CapturedEnv;
 private:
-  Map map;
+  Map map_;
 };
 
 class CapturedEnv {
@@ -234,23 +242,35 @@ public:
 
   CapturedEnv(CapturedEnv &&other) noexcept : map{std::move(other.map)} {}
 
-  friend class ApplyEnv;
+  void insert_or_assign(EnvBase::Key key, ValuePtr value) {
+    map.insert_or_assign(std::move(key), std::move(value));
+  }
 
+  ValuePtr findLocal(EnvBase::FindLocalKey phk) const;
+
+  friend class ApplyEnv;
 private:
   EnvBase::Map map;
 };
 
-class ApplyEnv : public EnvBase, public CapturedEnv {
+class ApplyEnv : public EnvBase {
 public:
   ApplyEnv(EnvPtr evalEnv, const CapturedEnv &capturedEnv)
-      : EnvBase{std::move(evalEnv)}, CapturedEnv{capturedEnv} {}
+      : EnvBase{std::move(evalEnv)}, capturedEnv{capturedEnv} {}
 
-  void insert_or_assign(Key key, ValuePtr value) {
+  void insert_or_assign(Key key, ValuePtr value) override {
     assert(value);
-    map.insert_or_assign(std::move(key), std::move(value));
+    capturedEnv.insert_or_assign(std::move(key), std::move(value));
   }
 
   ValuePtr findLocal(FindLocalKey phk) const override;
+
+  const Map &map() const override {
+    return capturedEnv.map;
+  }
+
+private:
+  CapturedEnv capturedEnv;
 };
 
 class Value : public std::enable_shared_from_this<Value> {

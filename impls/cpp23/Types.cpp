@@ -30,7 +30,7 @@ ValuePtr EnvBase::find(KeyView key) const {
 }
 
 ValuePtr Env::findLocal(FindLocalKey phk) const {
-  if (auto item = map.find(phk); item != map.end()) {
+  if (auto item = map_.find(phk); item != map_.end()) {
     return item->second;
   }
   return nullptr;
@@ -39,25 +39,19 @@ ValuePtr Env::findLocal(FindLocalKey phk) const {
 CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
     : map{std::from_range, [&]() {
             return *captureEnv | std::views::take(captureEnv->size() - 1) |
-                   std::views::transform([](auto &&envBase) {
-                     if (auto env = dynamic_cast<const Env *>(
-                             std::addressof(envBase))) {
-                       return env->map;
-                     }
-                     if (auto applyEnv = dynamic_cast<const ApplyEnv *>(
-                             std::addressof(envBase))) {
-                       return applyEnv->map;
-                     }
-                     throw EvalException{"invalid env"};
-                   }) |
+                   std::views::transform([](auto &&env) { return env.map(); }) |
                    std::views::join;
           }()} {}
 
-ValuePtr ApplyEnv::findLocal(FindLocalKey phk) const {
+ValuePtr CapturedEnv::findLocal(EnvBase::FindLocalKey phk) const {
   if (auto item = map.find(phk); item != map.end()) {
     return item->second;
   }
   return nullptr;
+}
+
+ValuePtr ApplyEnv::findLocal(FindLocalKey phk) const {
+  return capturedEnv.findLocal(std::move(phk));
 }
 
 bool Value::isTrue() const noexcept {

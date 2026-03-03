@@ -21,8 +21,7 @@ InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
   checkArgsIs(name, values, 2);
   if (auto symbol = to<Symbol>(values[0])) {
     auto val = evalFn(values[1], env);
-    assert(dynamic_cast<Env *>(env.get()));
-    dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), val);
+    env->insert_or_assign(symbol->asKey(), val);
     return {std::move(val), std::move(env), false};
   }
   throw EvalException{
