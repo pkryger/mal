@@ -105,8 +105,8 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
 
 ValuePtr Symbol::eval(EnvPtr env) const {
   assert(env);
-  if (auto &&i = env->find(asKey()))
-    return i;
+  if (auto value = env->find(asKey()))
+    return value;
   throw EvalException{std::format("'{}' not found", data)};
 }
 
