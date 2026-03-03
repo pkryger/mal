@@ -77,7 +77,7 @@ public:
 
   struct Hash {
     using is_transparent = void;
-    using hash_type = std::hash<HashKeyView>;
+    using hash_type = std::hash<Key>;
 
     template <typename T>
       requires std::same_as<Key, std::string> &&
