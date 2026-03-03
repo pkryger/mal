@@ -247,14 +247,14 @@ InvocableResult List::invoke(EnvPtr env) const {
   assert(env);
   assert(!data.empty());
   auto op = EVAL(data[0], env);
-  if (auto function = to<Macro>(op)) {
-    return function->apply(ValuesSpan{data}.subspan(1), env);
+  if (auto macro = to<Macro>(op)) {
+    return macro->apply(ValuesSpan{data}.subspan(1), env);
   }
-  if (auto function = to<Invocable>(op)) {
+  if (auto invocable = to<Invocable>(op)) {
       auto args = data | std::views::drop(1) |
                std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
         std::ranges::to<ValuesContainer>();
-      return function->apply({args}, env);
+      return invocable->apply({args}, env);
   }
   throw EvalException{std::format("invalid function '{:r}'", op)};
 }
