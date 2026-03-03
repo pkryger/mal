@@ -38,7 +38,7 @@ ValuePtr Env::findLocal(FindLocalKey phk) const {
 
 CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
     : map{std::from_range, [&]() {
-            return *captureEnv | std::views::take(captureEnv->size() - 1) |
+            return *captureEnv |
                    std::views::transform([](auto &&env) { return env.map(); }) |
                    std::views::join;
           }()} {
