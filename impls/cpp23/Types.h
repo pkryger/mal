@@ -147,7 +147,7 @@ public:
     value_type *operator->() const noexcept { return current; }
 
     Iterator &operator++() noexcept {
-      current = current->outer.get();
+      current = current->outer_.get();
       return *this;
     }
 
@@ -169,10 +169,15 @@ public:
     value_type *current{nullptr};
   };
 
-  explicit EnvBase(EnvCPtr outer) noexcept : outer{std::move(outer)} {}
+  explicit EnvBase(EnvCPtr outer) noexcept
+      : outer_{std::move(outer)}, size_{outer_ ? outer_->size() + 1 : 1} {}
 
   EnvBase(EnvBase &&other) noexcept
-      : outer{std::move(other.outer)} {}
+      : outer_{std::move(other.outer_)}, size_{[&]() {
+          auto ret = other.size_;
+          other.size_ = 0;
+          return ret;
+        }()} {}
 
   virtual ~EnvBase() = default;
 
@@ -197,14 +202,12 @@ public:
   }
 
   std::size_t size() const noexcept {
-    if (outer) {
-      return outer->size() + 1;
-    }
-    return 1;
+    return size_;
   }
 
 private:
-  EnvCPtr outer;
+  EnvCPtr outer_;
+  std::size_t size_;
 };
 
 class Env : public EnvBase {
