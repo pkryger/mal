@@ -62,6 +62,8 @@ concept IsHashContainer = requires(T t) {
 
 class EnvBase {
 public:
+  // using Key = std::uint32_t;
+  // xor
   // using Key = std::uint64_t;
   // xor
   using Key = std::string;
@@ -445,7 +447,10 @@ protected:
   }
 };
 
-template <typename BASE> class Intern<std::uint64_t, BASE> {
+template <typename UINT, typename BASE>
+  requires std::same_as<UINT, std::uint64_t> ||
+           std::same_as<UINT, std::uint32_t>
+class Intern<UINT, BASE> {
 public:
   explicit Intern(const std::string &name)
       : intern{[&]() {
