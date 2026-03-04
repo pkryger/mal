@@ -1,8 +1,12 @@
 #ifndef INCLUDE_BLOOMFILTER_H
 #define INCLUDE_BLOOMFILTER_H
-#include <concepts>
-#include <type_traits>
+
 #include <bitset>
+#include <concepts>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <type_traits>
 #include <utility>
 
 namespace mal {
