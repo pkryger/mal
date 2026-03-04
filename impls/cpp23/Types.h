@@ -728,8 +728,8 @@ public:
 
 class BuiltIn : public Invocable, public MetaMixIn {
 public:
-  using HandlerFn = ValuePtr(std::string_view name, ValuesSpan value,
-                             EnvPtr Env);
+  using HandlerFn = InvocableResult(std::string_view name, ValuesSpan value,
+                                    EnvPtr Env);
 
   explicit BuiltIn(std::string name, HandlerFn &handler) noexcept
       : name{std::move(name)}, handler{handler} {}
@@ -738,7 +738,7 @@ public:
       : MetaMixIn{std::move(meta)}, name{other.name}, handler{other.handler} {}
 
   InvocableResult apply(ValuesSpan value, EnvPtr evalEnv) const override {
-    return {handler(name, value, evalEnv), evalEnv, false};
+    return handler(name, value, evalEnv);
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
