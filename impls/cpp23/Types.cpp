@@ -15,12 +15,16 @@ namespace mal {
 extern ValuePtr EVAL(ValuePtr, EnvPtr);
 
 ValuePtr EnvBase::find(KeyView key) const {
+  if (key == debugEval.asKey()) {
+    return debugEval_;
+  }
   auto findKey = [&]() {
     if constexpr (detail::IsHashContainer<Map>) {
       return PreHashedKey{key, Hash{}(key)};
     } else {
       return key;
-    }}();
+    }
+  }();
   for (auto &&env : *this) {
     if (auto value = env.findLocal(findKey)) {
       return value;
@@ -30,6 +34,9 @@ ValuePtr EnvBase::find(KeyView key) const {
 }
 
 ValuePtr EnvBase::find(const PreHashedKey &phk) const {
+  if (phk.key == debugEval.asKey()) {
+    return debugEval_;
+  }
   const auto &findKey = [&]() {
     if constexpr (detail::IsHashContainer<Map>) {
       return phk;
@@ -44,6 +51,12 @@ ValuePtr EnvBase::find(const PreHashedKey &phk) const {
   return nullptr;
 }
 
+void EnvBase::registerDebugEval(KeyView key, const ValuePtr &value) {
+  if (key == debugEval.asKey()) {
+    debugEval_ = value;
+  }
+}
+
 ValuePtr Env::findLocal(FindLocalKey phk) const {
   if (auto item = map_.find(phk); item != map_.end()) {
     return item->second;
@@ -51,34 +64,54 @@ ValuePtr Env::findLocal(FindLocalKey phk) const {
   return nullptr;
 }
 
-CapturedEnv::CapturedEnv(EnvCPtr captureEnv)
-    : map{std::from_range, [&]() {
-            return *captureEnv |
-                   std::views::transform([](auto &&env) { return env.map(); }) |
-                   std::views::join;
-          }()} {
-  for (auto &&key : std::views::keys(map)) {
-    filter.insert(key);
+void Env::insert_or_assign(Key key, ValuePtr value) {
+  assert(value);
+  registerDebugEval(key, value);
+  map_.insert_or_assign(std::move(key), std::move(value));
+}
+
+std::vector<EnvBase::Key> ApplyEnv::keys() const {
+  std::vector<Key> res;
+  res.reserve(mapsSize());
+  for (auto &&key : std::views::keys(map_)) {
+    res.push_back(key);
+  }
+  for (auto &&key : capturedEnvKeys()) {
+    res.emplace_back(std::move(key));
+  }
+  return res;
+}
+
+ApplyEnv::ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept
+    : EnvBase{std::move(evalEnv)}, capturedEnv_{std::move(capturedEnv)} {
+  for (auto &&key : capturedEnvKeys()) {
+    filter_.insert(key);
   }
 }
 
-void CapturedEnv::insert_or_assign(EnvBase::Key key, ValuePtr value) {
-  filter.insert(key);
-  map.insert_or_assign(std::move(key), std::move(value));
+void ApplyEnv::insert_or_assign(Key key, ValuePtr value) {
+  assert(value);
+  registerDebugEval(key, value);
+  filter_.insert(key);
+  map_.insert_or_assign(std::move(key), std::move(value));
 }
 
-ValuePtr CapturedEnv::findLocal(EnvBase::FindLocalKey phk) const {
-  if (!filter.possiblyContains(phk)) {
-    return nullptr;
-  }
-  if (auto item = map.find(phk); item != map.end()) {
-    return item->second;
-  }
-  return nullptr;
-}
 
 ValuePtr ApplyEnv::findLocal(FindLocalKey phk) const {
-  return capturedEnv.findLocal(std::move(phk));
+  if (!filter_.possiblyContains(phk)) {
+    return nullptr;
+  }
+  if (auto it = map_.find(phk); it != map_.end()) {
+    return it->second;
+  }
+  return capturedEnv_->find(phk);
+}
+
+std::size_t ApplyEnv::mapsSize() const {
+  return std::ranges::fold_left(
+      *capturedEnv_ |
+          std::views::transform([](auto &&env) { return env.mapsSize(); }),
+      map_.size(), std::plus<>{});
 }
 
 bool Value::isTrue() const noexcept {

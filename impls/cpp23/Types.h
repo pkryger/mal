@@ -29,7 +29,6 @@ namespace mal {
 
 class EnvBase;
 using EnvPtr = std::shared_ptr<EnvBase>;
-using EnvCPtr = std::shared_ptr<const EnvBase>;
 
 class Value;
 using ValuePtr = std::shared_ptr<const Value>;
@@ -120,7 +119,6 @@ public:
       return lhs == rhs.key;
     }
   };
-
   using Map = std::unordered_map<Key, ValuePtr, Hash, Equal>;
 
   using FindLocalKey = std::conditional_t<detail::IsHashContainer<Map>,
@@ -172,15 +170,14 @@ public:
     value_type *current{nullptr};
   };
 
-  explicit EnvBase(EnvCPtr outer) noexcept
-      : outer_{std::move(outer)}, size_{outer_ ? outer_->size() + 1 : 1} {}
+  explicit EnvBase(EnvPtr outer) noexcept
+      : outer_{std::move(outer)}, debugEval_{nullptr},
+        size_{outer_ ? outer_->size() + 1 : 1} {}
 
   EnvBase(EnvBase &&other) noexcept
-      : outer_{std::move(other.outer_)}, size_{[&]() {
-          auto ret = other.size_;
-          other.size_ = 0;
-          return ret;
-        }()} {}
+      : outer_{std::move(other.outer_)},
+        debugEval_{std::move(other.debugEval_)},
+        size_{std::exchange(other.size_, 0)} {}
 
   virtual ~EnvBase() = default;
 
@@ -192,7 +189,9 @@ public:
 
   virtual void insert_or_assign(Key key, ValuePtr value) = 0;
 
-  virtual const Map& map() const = 0;
+  virtual std::size_t mapsSize() const = 0;
+
+  virtual std::vector<Key> keys() const = 0;
 
   auto begin() noexcept {
     return Iterator<false>{this};
@@ -214,72 +213,60 @@ public:
     return size_;
   }
 
+protected:
+  void registerDebugEval(KeyView key, const ValuePtr& value);
+
 private:
-  EnvCPtr outer_;
+  ValuePtr debugEval_;
+  EnvPtr outer_;
   std::size_t size_;
 };
 
 class Env : public EnvBase {
 public:
-  using EnvBase::EnvBase;
+  Env(EnvPtr outer) : EnvBase{std::move(outer)} {}
 
-  void insert_or_assign(Key key, ValuePtr value) override {
-    assert(value);
-    map_.insert_or_assign(std::move(key), std::move(value));
-  }
+  void insert_or_assign(Key key, ValuePtr value) override;
 
   ValuePtr findLocal(FindLocalKey phk) const override;
 
-  const Map &map() const override {
-    return map_;
+  std::vector<Key> keys() const override {
+    return std::views::keys(map_) | std::ranges::to<std::vector>();
   }
 
-  friend class CapturedEnv;
+  std::size_t mapsSize() const override { return map_.size(); }
+
 private:
   Map map_;
 };
 
-class CapturedEnv {
-public:
-  explicit CapturedEnv(EnvCPtr captureEnv);
-
-  explicit CapturedEnv(const CapturedEnv &other) = default;
-
-  CapturedEnv(CapturedEnv &&other) noexcept = default;
-
-  void insert_or_assign(EnvBase::Key key, ValuePtr value);
-
-  ValuePtr findLocal(EnvBase::FindLocalKey phk) const;
-
-  friend class ApplyEnv;
-
-private:
-  EnvBase::Map map;
-  BloomFilter<EnvBase::Key, std::size_t{1} << 13, // 8192 bits = 1KiB
-              std::size_t{1} << 10, // 1024 keys -> 5 iterations for with 1% of
-                                    // false positive probability
-              EnvBase::Hash>
-      filter;
-};
 
 class ApplyEnv : public EnvBase {
-public:
-  ApplyEnv(EnvPtr evalEnv, const CapturedEnv &capturedEnv)
-      : EnvBase{std::move(evalEnv)}, capturedEnv{capturedEnv} {}
-
-  void insert_or_assign(Key key, ValuePtr value) override {
-    assert(value);
-    capturedEnv.insert_or_assign(std::move(key), std::move(value));
+  auto capturedEnvKeys() const {
+    return *capturedEnv_ |
+           std::views::transform([&](auto &&env) { return env.keys(); }) |
+           std::views::join;
   }
+  std::vector<Key> keys() const override;
+
+public:
+  explicit ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept;
+
+  void insert_or_assign(Key key, ValuePtr value) override;
 
   ValuePtr findLocal(FindLocalKey phk) const override;
 
-  const Map &map() const override {
-    return capturedEnv.map;
-  }
+  std::size_t mapsSize() const override;
 
 private:
-  CapturedEnv capturedEnv;
+
+  BloomFilter<Key, std::size_t{1} << 13, // 8192 bits = 1KiB
+              std::size_t{1} << 10,      // 1024 keys -> 5 iterations for 1% of
+                                         // false positive probability
+              Hash>
+      filter_;
+  Map map_;
+  EnvPtr capturedEnv_;
 };
 
 class Value : public std::enable_shared_from_this<Value> {
@@ -512,9 +499,12 @@ public:
   }
 
   friend class List;
+
 private:
   std::optional<std::string> macro;
 };
+
+inline static Symbol debugEval{"DEBUG-EVAL"};
 
 class Keyword : public StringBase {
 public:
@@ -793,7 +783,7 @@ protected:
   std::size_t bindSize;
   Params params;
   ValuePtr body;
-  CapturedEnv capturedEnv;
+  EnvPtr capturedEnv;
 };
 
 } // namespace mal

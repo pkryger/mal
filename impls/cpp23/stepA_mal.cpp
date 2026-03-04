@@ -43,16 +43,9 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
   bool needsEval{true};
-  static auto debugEval = make<Symbol>("DEBUG-EVAL");
-  static auto debugEvalKey = [&]() {
-    if constexpr (detail::IsHashContainer<EnvBase::Map>) {
-      return EnvBase::PreHashedKey{debugEval->asKey(),
-                                   EnvBase::Hash{}(debugEval->asKey())};
-    } else {
-      return debugEval->asKey();
-    }}();
+
   while (needsEval) {
-    if (auto dbg = env->find(debugEvalKey); dbg && dbg->isTrue()) {
+    if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
       std::print("EVAL: {:r}\n", ast);
     }
 

@@ -35,9 +35,7 @@ static const std::array specials{
 ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
-  static auto debug_eval = make<Symbol>("DEBUG-EVAL");
-  if (auto dbg = env->find(debug_eval->asKey());
-      dbg && dbg->isTrue()) {
+  if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
     std::print("EVAL: {:r}\n", ast);
   }
   if (auto list = to<List>(ast)) {
