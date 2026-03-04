@@ -3,7 +3,11 @@ uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
 CXX=g++
 ifeq ($(uname_S),Darwin)
 	# Native build on yosemite. Requires: brew install readline
-	READLINE=/usr/local/opt/readline
+	READLINE=$(shell brew --prefix readline 2>/dev/null)
+	ifndef READLINE
+		$(warning Homebrew installed readline was not detected in your PATH. Build may fail if dependencies are missing.)
+		READLINE=/usr/local/opt/readline
+	endif
 	INCPATHS=-I$(READLINE)/include
 	LIBPATHS=-L$(READLINE)/lib
 endif
