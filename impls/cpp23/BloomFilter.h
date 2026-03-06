@@ -8,6 +8,7 @@
 #include <functional>
 #include <type_traits>
 #include <utility>
+// IWYU pragma: no_include <memory>
 
 namespace mal {
 

@@ -1,4 +1,6 @@
 #include "Core.h" // IWYU pragma: associated
+#include "Env.h"
+#include "Mal.h"
 #include "Ranges.h"
 #include "ReadLine.h"
 #include "Reader.h"

@@ -34,7 +34,9 @@ target_sources(mal
     FILES
       BloomFilter.h
       Core.h
+      Env.h
       GarbageCollector.h
+      Mal.h
       Ranges.h
       Reader.h
       ReadLine.h
@@ -42,6 +44,7 @@ target_sources(mal
       Types.h
   PRIVATE
     Core.cpp
+    Env.cpp
     ReadLine.cpp
     Reader.cpp
     Specials.cpp

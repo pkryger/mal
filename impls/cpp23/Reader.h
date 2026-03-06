@@ -1,7 +1,7 @@
 #ifndef INCLUDE_READER_H
 #define INCLUDE_READER_H
 
-#include "Types.h"
+#include "Mal.h"
 
 #include <stdexcept>
 #include <string>

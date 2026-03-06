@@ -2,10 +2,16 @@
 #define INCLUDE_GARBAGE_COLLECTOR
 
 #include <atomic>
-#include <thread>
 #include <chrono>
-#include <mutex>
 #include <condition_variable>
+#include <cstddef>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <stop_token>
+#include <thread>
+#include <type_traits>
+#include <utility>
 
 namespace mal {
 template <typename T>

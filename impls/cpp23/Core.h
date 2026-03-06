@@ -1,7 +1,7 @@
 #ifndef INCLUDE_CORE_H
 #define INCLUDE_CORE_H
 
-#include "Types.h"
+#include "Mal.h"
 
 #include <cstddef>
 #include <stdexcept>
@@ -9,6 +9,8 @@
 #include <string_view>
 
 namespace mal {
+
+class Env;
 
 void checkArgsIs(std::string_view name, ValuesSpan values, std::size_t expected);
 

@@ -1,7 +1,7 @@
 #ifndef INCLUDE_SPECIALS_H
 #define INCLUDE_SPECIALS_H
 
-#include "Types.h"
+#include "Mal.h"
 
 #include <string_view>
 

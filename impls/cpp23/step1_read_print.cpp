@@ -1,3 +1,4 @@
+#include "Mal.h"
 #include "ReadLine.h"
 #include "Reader.h"
 #include "Types.h"

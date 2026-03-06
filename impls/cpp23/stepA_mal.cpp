@@ -1,3 +1,5 @@
+#include "Env.h"
+#include "Mal.h"
 #include "Core.h"
 #include "ReadLine.h"
 #include "Reader.h"

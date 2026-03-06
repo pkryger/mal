@@ -1,5 +1,7 @@
 #include "Specials.h" // IWYU pragma: associated
 #include "Core.h"
+#include "Env.h"
+#include "Mal.h"
 #include "Ranges.h"
 #include "Types.h"
 
