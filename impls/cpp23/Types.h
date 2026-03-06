@@ -40,7 +40,7 @@ using EvalFn = ValuePtr(ValuePtr, EnvPtr);
 using InvocableResult = std::tuple<ValuePtr, EnvPtr, bool>;
 
 template <typename TYPE, typename... ARGS>
-std::shared_ptr<std::decay_t<TYPE>> make(ARGS &&...args) {
+[[nodiscard]] std::shared_ptr<std::decay_t<TYPE>> make(ARGS &&...args) {
   return std::make_shared<std::decay_t<TYPE>>(std::forward<ARGS>(args)...);
 }
 
@@ -217,8 +217,8 @@ protected:
   void registerDebugEval(KeyView key, const ValuePtr& value);
 
 private:
-  ValuePtr debugEval_;
   EnvPtr outer_;
+  ValuePtr debugEval_;
   std::size_t size_;
 };
 

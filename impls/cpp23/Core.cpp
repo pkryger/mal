@@ -288,7 +288,7 @@ InvocableResult str(std::string_view name, ValuesSpan values, EnvPtr env) {
 InvocableResult slurp(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
   if (auto string = to<String>(values[0])) {
-    auto path = std::format("{}", values[0]);
+    auto path = string->data();
     auto file_size = std::filesystem::file_size(path);
     std::ifstream file{path, std::ios::in | std::ios::binary};
     if (!file) {
@@ -683,7 +683,7 @@ InvocableResult time_ms(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult seq(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto constant = to<Constant>(values[0])) {
+  if (to<Constant>(values[0])) {
     if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
       return {Constant::nilValue(), std::move(env), false};
     }

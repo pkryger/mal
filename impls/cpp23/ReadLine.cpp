@@ -20,6 +20,7 @@ namespace mal {
 namespace detail {
 
 ReadLineHistoryInit::ReadLineHistoryInit(std::size_t size) noexcept {
+  [[maybe_unused]]
   static bool initialised = [&]() {
     using_history();
     stifle_history(size);
