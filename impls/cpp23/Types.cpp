@@ -156,16 +156,16 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
 }
 
 std::string List::print(bool readably) const {
-  if (auto macro = [&]() -> std::optional<std::string> {
+  if (auto fromMacro = [&]() -> std::optional<std::string> {
         if (data.size() == 2) {
           if (auto symbol = to<Symbol>(data[0])) {
-            return symbol->macro;
+            return symbol->fromMacro;
           }
         }
         return {};
       }()) {
-    return readably ? std::format("{}{:r}", *macro, data[1])
-                    : std::format("{}{}", *macro, data[1]);
+    return readably ? std::format("{}{:r}", *fromMacro, data[1])
+                    : std::format("{}{}", *fromMacro, data[1]);
 
   }
   return readably ? std::format("({:r})", data) : std::format("({})", data);

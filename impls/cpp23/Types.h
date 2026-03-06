@@ -231,15 +231,16 @@ private:
 
 class Symbol : public StringBase, public detail::Intern<Env::Key, Symbol> {
 public:
-  explicit Symbol(std::string value, std::optional<std::string> macro = {})
-      : StringBase{std::move(value)}, Intern{data}, macro{std::move(macro)} {}
+  explicit Symbol(std::string value, std::optional<std::string> fromMacro = {})
+      : StringBase{std::move(value)}, Intern{data},
+        fromMacro{std::move(fromMacro)} {}
 
   explicit Symbol(const Symbol &other)
-  : StringBase{other.data}, Intern{other}, macro{other.macro} {}
+  : StringBase{other.data}, Intern{other}, fromMacro{other.fromMacro} {}
 
   Symbol(Symbol &&other) noexcept
       : StringBase{std::move(other.data)}, Intern{std::move(other)},
-        macro{std::move(other.macro)} {}
+        fromMacro{std::move(other.fromMacro)} {}
 
   ValuePtr eval(EnvPtr env) const override;
 
@@ -260,7 +261,7 @@ public:
   friend class List;
 
 private:
-  std::optional<std::string> macro;
+  std::optional<std::string> fromMacro;
 };
 
 inline static Symbol debugEval{"DEBUG-EVAL"};
