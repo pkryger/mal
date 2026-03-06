@@ -39,7 +39,7 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   assert(ast);
   assert(env);
   if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
-    std::print("EVAL: {:r}\n", ast);
+    std::print("EVAL: {:l}\n", ast);
   }
   if (auto list = to<List>(ast)) {
     auto&& values = list->values();

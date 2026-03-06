@@ -28,9 +28,35 @@ namespace mal {
 using ValuesContainer = std::vector<ValuePtr>;
 using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
 
+class PrintType {
+public:
+  enum class Type : signed char {
+    Simple = 0,
+    LegacyReadable = 1,
+    Readable = 2
+  };
+
+  constexpr PrintType(Type type) noexcept : type_(type) {}
+
+  constexpr explicit operator bool() const noexcept {
+    return type_ != Type::Simple;
+  }
+
+  constexpr PrintType() noexcept = default;
+  constexpr PrintType(const PrintType &) noexcept = default;
+  constexpr PrintType &operator=(const PrintType &) noexcept = default;
+  constexpr PrintType(PrintType &&) noexcept = default;
+  constexpr PrintType &operator=(PrintType &&) noexcept = default;
+
+  constexpr auto operator<=>(const PrintType &) const noexcept = default;
+  constexpr bool operator==(const PrintType &) const noexcept = default;
+
+  Type type_{Type::Simple};
+};
+
 class Value : public GarbageCollectible, public std::enable_shared_from_this<Value> {
 public:
-  virtual std::string print(bool readably) const = 0;
+  virtual std::string print(PrintType readably) const = 0;
   virtual  ValuePtr eval(EnvPtr) const { return shared_from_this(); }
 
   bool isTrue() const noexcept;
@@ -53,7 +79,7 @@ class Integer : public Value {
 public:
   explicit Integer(std::int64_t value) noexcept : data{value} {}
 
-  std::string print(bool /* readably */) const override {
+  std::string print(PrintType /* readably */) const override {
     return std::to_string(data);
   }
 
@@ -74,7 +100,7 @@ class Symbol;
 
 class StringBase : public Value {
 public:
-  std::string print(bool /* readably */) const override { return data; }
+  std::string print(PrintType /* readably */) const override { return data; }
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   friend bool operator==(const StringBase &lhs,
@@ -114,13 +140,22 @@ bool operator==(const ValuePtr &lhs, const ValuePtr &rhs);
 struct ParseValueMixin {
   constexpr auto parse(std::format_parse_context &ctx) {
     auto it = ctx.begin();
-    if (it != ctx.end() && *it == 'r') {
-      readably = true;
-      ++it;
+    if (it != ctx.end()) {
+      switch (*it) {
+        using enum PrintType::Type;
+      case 'r':
+        printType = Readable;
+        ++it;
+        break;
+      case 'l':
+        printType = LegacyReadable;
+        ++it;
+        break;
+      }
     }
     return it;
   }
-  bool readably{false};
+  PrintType printType{PrintType::Type::Simple};
 };
 
 template <typename RANGE_FORMATTER>
@@ -130,9 +165,18 @@ constexpr auto RangeFormatterParse(RANGE_FORMATTER &rf,
   rf.set_brackets("", "");
   rf.set_separator(" ");
   auto it = ctx.begin();
-  if (it != ctx.end() && *it == 'r') {
-    rf.underlying().readably = true;
-    ++it;
+  if (it != ctx.end()) {
+    using enum PrintType::Type;
+    switch (*it) {
+    case 'r':
+      rf.underlying().printType = Readable;
+      ++it;
+      break;
+    case 'l':
+      rf.underlying().printType = LegacyReadable;
+      ++it;
+      break;
+    }
   }
   return it;
 }
@@ -144,7 +188,7 @@ namespace std {
 template <> struct formatter<mal::ValuePtr> : mal::ParseValueMixin {
   template<typename FORMAT_CONTEXT>
   auto format(const mal::ValuePtr &val, FORMAT_CONTEXT &ctx) const {
-    return format_to(ctx.out(), "{}", val->print(readably));
+    return format_to(ctx.out(), "{}", val->print(printType));
   }
 };
 
@@ -153,10 +197,18 @@ struct formatter<mal::ValuesMap::value_type> : mal::ParseValueMixin {
   template <typename FORMAT_CONTEXT>
   auto format(const mal::ValuesMap::value_type &val,
               FORMAT_CONTEXT &ctx) const {
-    if (readably) {
+    switch (printType.type_) {
+      using enum mal::PrintType::Type;
+    case Simple:
+      return format_to(ctx.out(), "{} {}", val.first, val.second);
+      break;
+    case Readable:
       return format_to(ctx.out(), "{:r} {:r}", val.first, val.second);
+      break;
+    case LegacyReadable:
+      return format_to(ctx.out(), "{:l} {:l}", val.first, val.second);
+      break;
     }
-    return format_to(ctx.out(), "{} {}", val.first, val.second);
   }
 };
 
@@ -305,7 +357,7 @@ class String : public StringBase {
 public:
   explicit String(std::string v) noexcept : StringBase{std::move(v)} {}
 
-  std::string print(bool readably) const override;
+  std::string print(PrintType readably) const override;
 
   const std::string &data() const { return StringBase::data; }
 
@@ -317,7 +369,7 @@ class Atom : public Value {
 public:
   explicit Atom(ValuePtr value) noexcept : data{std::move(value)} {}
 
-  std::string print(bool readably) const override {
+  std::string print(PrintType readably) const override {
     return readably ? std::format("(atom {:r})", data)
                     : std::format("(atom {})", data);
   }
@@ -392,7 +444,7 @@ public:
   explicit List(ARGS &&...args)
       : Sequence{ValuesContainer{std::forward<ARGS>(args)...}} {}
 
-  std::string print(bool readably) const override;
+  std::string print(PrintType readably) const override;
 
   InvocableResult invoke(EnvPtr env) const;
 
@@ -416,7 +468,7 @@ public:
                                  ValuePtr>
   explicit Vector(RANGE &&range) : Sequence{std::forward<RANGE>(range)} {}
 
-  std::string print(bool readably) const override {
+  std::string print(PrintType readably) const override {
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
   }
 
@@ -461,7 +513,7 @@ public:
   explicit Hash(const Hash &other, ValuePtr meta)
       : MetaMixIn{std::move(meta)}, data{other.data} {}
 
-  std::string print(bool readably) const override;
+  std::string print(PrintType readably) const override;
 
   ValuePtr eval(EnvPtr env) const override;
 
@@ -503,7 +555,7 @@ public:
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  std::string print(bool /* readably */) const override {
+  std::string print(PrintType /* readably */) const override {
     return std::format("#<built-in {}@{:p}>", name,
                        reinterpret_cast<const void *>(this));
   }
@@ -553,7 +605,7 @@ namespace std {
 template <> struct formatter<mal::Symbol> : mal::ParseValueMixin {
   template<typename FORMAT_CONTEXT>
   auto format(const mal::Symbol &val, FORMAT_CONTEXT &ctx) const {
-    return format_to(ctx.out(), "{}", val.print(false));
+    return format_to(ctx.out(), "{}", val.print(mal::PrintType::Type::Simple));
   }
 };
 
@@ -582,7 +634,7 @@ public:
   explicit Lambda(const Lambda &other, ValuePtr meta)
       : FunctionBase{other}, MetaMixIn{std::move(meta)} {}
 
-  std::string print(bool readable) const override;
+  std::string print(PrintType readable) const override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
@@ -599,7 +651,7 @@ public:
 
   explicit Macro(Lambda &&other) noexcept : FunctionBase{std::move(other)} {}
 
-  std::string print(bool readable) const override;
+  std::string print(PrintType readable) const override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
@@ -613,7 +665,7 @@ public:
   explicit Eval(const Eval &other, ValuePtr meta)
       : MetaMixIn{std::move(meta)}, env{other.env} {}
 
-  std::string print(bool /* readably */) const override {
+  std::string print(PrintType /* readably */) const override {
     return std::format("#<eval@{:p}>", reinterpret_cast<const void *>(this));
   }
 

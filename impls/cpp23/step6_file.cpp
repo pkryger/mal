@@ -44,7 +44,7 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
   bool needsEval{true};
   while (needsEval) {
     if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
-      std::print("EVAL: {:r}\n", ast);
+      std::print("EVAL: {:l}\n", ast);
     }
 
     if (auto list = to<List>(ast)) {

@@ -124,7 +124,7 @@ std::string String::escape(const std::string& in) {
   return out;
 }
 
-std::string String::print(bool readably) const {
+std::string String::print(PrintType readably) const {
   return readably ? escape(StringBase::data) : StringBase::data;
 }
 
@@ -155,7 +155,10 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-std::string List::print(bool readably) const {
+std::string List::print(PrintType readably) const {
+  if (readably == PrintType::Type::LegacyReadable) {
+    return std::format("({:l})", data);
+  }
   if (auto fromMacro = [&]() -> std::optional<std::string> {
         if (data.size() == 2) {
           if (auto symbol = to<Symbol>(data[0])) {
@@ -202,7 +205,7 @@ ValuePtr List::eval(EnvPtr env) const {
   return needsEval ? EVAL(ast, evalEnv) : ast;
 }
 
-std::string Hash::print(bool readably) const {
+std::string Hash::print(PrintType readably) const {
   return readably ? std::format("{{{:r}}}", data) : std::format("{{{}}}", data);
 }
 
@@ -287,11 +290,12 @@ ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
 }
 
 EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
+  using enum PrintType::Type;
   auto applyEnv = make<ApplyEnv>(std::move(evalEnv), capturedEnv);
   if (bindSize == params.size()) {
-    checkArgsIs(print(false), values, bindSize);
+    checkArgsIs(print(Simple), values, bindSize);
   } else {
-    checkArgsAtLeast(print(false), values, bindSize);
+    checkArgsAtLeast(print(Simple), values, bindSize);
     applyEnv->insert_or_assign(params.back().asKey(),
                                make<List>(values | std::views::drop(bindSize)));
   }
@@ -306,7 +310,7 @@ EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
   return applyEnv;
 }
 
-std::string Lambda::print(bool readable) const {
+std::string Lambda::print(PrintType readable) const {
   if (readable) {
     return std::format("#<λ@{:p} {} {:r}>",
                        reinterpret_cast<const void *>(this), params, body);
@@ -323,7 +327,7 @@ InvocableResult Lambda::apply(ValuesSpan values, EnvPtr evalEnv) const {
   return {body, makeApplyEnv(values, std::move(evalEnv)), true};
 }
 
-std::string Macro::print(bool readable) const {
+std::string Macro::print(PrintType readable) const {
   if (readable) {
     return std::format("#<macro@{:p} {} {:r}>",
                        reinterpret_cast<const void *>(this), params, body);

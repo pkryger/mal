@@ -24,7 +24,7 @@ ValuePtr EVAL(ValuePtr val, EnvPtr) {
 
 std::string PRINT(ValuePtr val) {
   assert(val);
-  return std::format("{:r}", val);
+  return std::format("{:l}", val);
 }
 
 std::string rep(std::string str) {
