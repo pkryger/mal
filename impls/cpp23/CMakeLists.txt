@@ -35,6 +35,7 @@ target_sources(mal
       BloomFilter.h
       Core.h
       Env.h
+      FunctionRef.h
       GarbageCollector.h
       Mal.h
       Ranges.h

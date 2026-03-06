@@ -1,9 +1,12 @@
 #include "Mal.h"
+#include "GarbageCollector.h"
 #include "ReadLine.h"
 #include "Reader.h"
-#include "Types.h"
+#include "Types.h" // IWYU pragma: keep
 
 #include <cassert>
+#include <memory>
+#include <format>
 #include <optional>
 #include <print>
 #include <string>
@@ -21,10 +24,16 @@ ValuePtr EVAL(ValuePtr val, EnvPtr) {
 
 std::string PRINT(ValuePtr val) {
   assert(val);
-  return val->print(true);
+  return std::format("{:r}", val);
 }
 
 std::string rep(std::string str) {
+  static GarbageCollector<GarbageCollectiblePtr> gc;
+  static auto gcRegister = [&](GarbageCollectiblePtr value) {
+    gc.registerValue(std::move(value));
+  };
+  static GarbageCollectGuard gcGuard(gcRegister);
+
   return PRINT(EVAL(READ(std::move(str)), nullptr));
 }
 

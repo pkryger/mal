@@ -1,4 +1,5 @@
 #include "Env.h"
+#include "GarbageCollector.h"
 #include "Mal.h"
 #include "Core.h"
 #include "ReadLine.h"
@@ -30,6 +31,12 @@ std::string PRINT(ValuePtr ast) {
 }
 
 std::string rep(std::string str) {
+  static GarbageCollector<GarbageCollectiblePtr> gc;
+  static auto gcRegister = [&](GarbageCollectiblePtr value) {
+    gc.registerValue(std::move(value));
+  };
+  static GarbageCollectGuard gcGuard(gcRegister);
+
   static Env env = []() {
     Env env{nullptr};
     prepareEnv(EVAL, env);

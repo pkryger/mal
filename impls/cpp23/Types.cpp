@@ -1,6 +1,5 @@
 #include "Types.h" // IWYU pragma: associated
 #include "Core.h"
-#include "GarbageCollector.h"
 #include "Ranges.h"
 
 #include <algorithm>
@@ -288,9 +287,7 @@ ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
 }
 
 EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
-  static GarbageCollector<EnvPtr> gc;
   auto applyEnv = make<ApplyEnv>(std::move(evalEnv), capturedEnv);
-  gc.list_.push_front(applyEnv);
   if (bindSize == params.size()) {
     checkArgsIs(print(false), values, bindSize);
   } else {

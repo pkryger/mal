@@ -30,7 +30,7 @@ concept IsHashContainer = requires(T t) {
 
 } // namespace detail
 
-class EnvBase {
+class EnvBase : public GarbageCollectible {
 public:
   // using Key = std::uint32_t;
   // xor

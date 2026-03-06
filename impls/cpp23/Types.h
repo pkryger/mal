@@ -28,7 +28,7 @@ namespace mal {
 using ValuesContainer = std::vector<ValuePtr>;
 using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
 
-class Value : public std::enable_shared_from_this<Value> {
+class Value : public GarbageCollectible, public std::enable_shared_from_this<Value> {
 public:
   virtual std::string print(bool readably) const = 0;
   virtual  ValuePtr eval(EnvPtr) const { return shared_from_this(); }

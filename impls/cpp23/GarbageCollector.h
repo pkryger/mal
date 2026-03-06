@@ -177,9 +177,12 @@ public:
     cv_.notify_all();
   }
 
-  SPSCList<T> list_;
+  void registerValue(T value) {
+    list_.push_front(std::move(value));
+  }
 
 private:
+  SPSCList<T> list_;
   std::condition_variable_any cv_;
   std::mutex mtx_;
   std::jthread thread_;
