@@ -34,6 +34,7 @@ target_sources(mal
     FILES
       BloomFilter.h
       Core.h
+      GarbageCollector.h
       Ranges.h
       Reader.h
       ReadLine.h
