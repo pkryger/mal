@@ -24,7 +24,7 @@ void checkArgsBetween(std::string_view name, ValuesSpan values,
 [[noreturn]]
 void throwWrongArgument(std::string_view name, ValuePtr val);
 
-void prepareEnv(EvalFn &evalFn, Env &env);
+void prepareEnv(Env &env);
 
 class CoreException : public std::runtime_error {
 public:

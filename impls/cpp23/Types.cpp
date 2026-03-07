@@ -1,5 +1,7 @@
 #include "Types.h" // IWYU pragma: associated
 #include "Core.h"
+#include "FunctionRef.h"
+#include "Mal.h"
 #include "Ranges.h"
 
 #include <algorithm>
@@ -11,9 +13,6 @@
 #include <utility>
 
 namespace mal {
-
-extern ValuePtr EVAL(ValuePtr, EnvPtr);
-
 
 bool Value::isTrue() const noexcept {
   return !(this == Constant::nilValue().get() ||
@@ -176,20 +175,26 @@ std::string List::print(PrintType readably) const {
 
 ValuePtr Vector::eval(EnvPtr env) const {
   assert(env);
-  return make<Vector>(
-      data | std::views::transform([&](auto &&v) { return EVAL(v, env); }));
+  assert(!EvalFnStack::empty());
+  auto &evalFn = EvalFnStack::top();
+  return make<Vector>(data | std::views::transform([&](auto &&v) {
+                        return evalFn(v, env);
+                      }));
 }
 
 InvocableResult List::invoke(EnvPtr env) const {
   assert(env);
   assert(!data.empty());
-  auto op = EVAL(data[0], env);
+  assert(!EvalFnStack::empty());
+  auto &evalFn = EvalFnStack::top();
+  auto op = evalFn(data[0], env);
   if (auto macro = to<Macro>(op)) {
     return macro->apply(ValuesSpan{data}.subspan(1), env);
   }
   if (auto invocable = to<Invocable>(op)) {
-      auto args = data | std::views::drop(1) |
-               std::views::transform([&](auto &&v) { return EVAL(v, env); }) |
+    auto args = data | std::views::drop(1) |
+                std::views::transform(
+                    [&](auto &&v) { return evalFn(v, env); }) |
         std::ranges::to<ValuesContainer>();
       return invocable->apply({args}, env);
   }
@@ -198,11 +203,12 @@ InvocableResult List::invoke(EnvPtr env) const {
 
 ValuePtr List::eval(EnvPtr env) const {
   assert(env);
+    assert(!EvalFnStack::empty());
   if (data.empty()) {
     return shared_from_this();
   }
   auto [ast, evalEnv, needsEval] = invoke(env);
-  return needsEval ? EVAL(ast, evalEnv) : ast;
+  return needsEval ? EvalFnStack::top()(ast, evalEnv) : ast;
 }
 
 std::string Hash::print(PrintType readably) const {
@@ -211,8 +217,10 @@ std::string Hash::print(PrintType readably) const {
 
 ValuePtr Hash::eval(EnvPtr env) const {
   assert(env);
+  assert(!EvalFnStack::empty());
+  auto &evalFn = EvalFnStack::top();
   return make<Hash>(data | std::views::transform([&](auto &&elt) {
-                      return std::pair{elt.first, EVAL(elt.second, env)};
+                      return std::pair{elt.first, evalFn(elt.second, env)};
                     }));
 }
 
@@ -340,8 +348,9 @@ ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
 }
 
 InvocableResult Macro::apply(ValuesSpan values, EnvPtr evalEnv) const {
+  assert(!EvalFnStack::empty());
   auto applyEnv =  FunctionBase::makeApplyEnv(values, std::move(evalEnv));
-  return {EVAL(body, applyEnv), applyEnv, true};
+  return {EvalFnStack::top()(body, applyEnv), applyEnv, true};
 }
 
 ValuePtr Eval::isEqualTo(ValuePtr rhs) const {

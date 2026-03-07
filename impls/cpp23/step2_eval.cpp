@@ -35,11 +35,12 @@ std::string rep(std::string str) {
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
     gc.registerValue(std::move(value));
   };
-  static GarbageCollectGuard gcGuard(gcRegister);
+  static GarbageCollectStack::Guard gcGuard{gcRegister};
+  static EvalFnStack::Guard evalGuard{EVAL};
 
   static Env env = []() {
     Env env{nullptr};
-    prepareEnv(EVAL, env);
+    prepareEnv(env);
     return env;
   }();
   static EnvPtr envPtr =

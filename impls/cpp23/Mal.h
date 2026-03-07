@@ -4,9 +4,6 @@
 #include "FunctionRef.h"
 
 #include <cassert>
-#ifndef NDEBUG
-#include <cstddef>
-#endif
 #include <memory>
 #include <span>
 #include <stack>
@@ -16,43 +13,42 @@
 
 namespace mal {
 
+namespace detail {
+
+template <typename FN> class FnStack {
+public:
+  using StackType = std::stack<std::function_ref<FN>>;
+
+  static StackType::value_type &top() { return stack.top(); }
+
+  static bool empty() { return stack.empty(); };
+
+  class Guard {
+  public:
+    template <typename FUNC>
+    explicit Guard(FUNC &&func) {
+      stack.emplace(std::forward<FUNC>(func));
+    }
+
+    ~Guard() {
+      stack.pop();
+    }
+  };
+
+private:
+  inline static StackType stack;
+};
+
+} // namespace detail
+
 class GarbageCollectible {
 public:
   virtual ~GarbageCollectible() = default;
 };
 using GarbageCollectiblePtr = std::shared_ptr<GarbageCollectible>;
 
-using GarbageCollectRegister = void(GarbageCollectiblePtr);
-using GarbageCollectRegisterStack =
-    std::stack<std::function_ref<GarbageCollectRegister>>;
-
-inline GarbageCollectRegisterStack& gcStack() {
-  static GarbageCollectRegisterStack stack;
-  return stack;
-}
-
-class GarbageCollectGuard {
-public:
-  template <typename FUNC>
-  explicit GarbageCollectGuard(FUNC &&func) {
-    gcStack().emplace(std::forward<FUNC>(func));
-#ifndef NDEBUG
-    stackSize = gcStack().size();
-#endif
-  }
-
-  ~GarbageCollectGuard() {
-#ifndef NDEBUG
-    assert(gcStack().size() == stackSize);
-#endif
-    gcStack().pop();
-  }
-
-#ifndef NDEBUG
-private:
-  std::size_t stackSize;
-#endif
-};
+using GarbageCollectFn = void(GarbageCollectiblePtr);
+using GarbageCollectStack = detail::FnStack<GarbageCollectFn>;
 
 class EnvBase;
 using EnvPtr = std::shared_ptr<EnvBase>;
@@ -64,9 +60,9 @@ using ValuesSpan = std::span<const ValuePtr>;
 
 template <typename TYPE, typename... ARGS>
 [[nodiscard]] std::shared_ptr<std::decay_t<TYPE>> make(ARGS &&...args) {
-  assert(!gcStack().empty());
   auto res = std::make_shared<std::decay_t<TYPE>>(std::forward<ARGS>(args)...);
-  gcStack().top()(res);
+  assert(!GarbageCollectStack::empty());
+  GarbageCollectStack::top()(res);
   return res;
 }
 
@@ -76,8 +72,9 @@ template <typename TYPE>
 }
 
 using EvalFn = ValuePtr(ValuePtr, EnvPtr);
-using InvocableResult = std::tuple<ValuePtr, EnvPtr, bool>;
+using EvalFnStack = detail::FnStack<EvalFn>;
 
+using InvocableResult = std::tuple<ValuePtr, EnvPtr, bool>;
 
 } // namespace mal
 

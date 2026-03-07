@@ -15,7 +15,6 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
-#include <functional>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -30,7 +29,6 @@
 
 namespace mal {
 
-static std::optional<std::reference_wrapper<EvalFn>> repEvalFn;
 static ReadLine coreReadLine{};
 
 void checkArgsIs(std::string_view name, ValuesSpan values, std::size_t expected) {
@@ -76,6 +74,7 @@ using mal::Constant;
 using mal::CoreException;
 using mal::coreReadLine;
 using mal::EnvPtr;
+using mal::EvalFnStack;
 using mal::Hash;
 using mal::Integer;
 using mal::Invocable;
@@ -87,7 +86,6 @@ using mal::make;
 using mal::MalException;
 using mal::MetaMixIn;
 using mal::readStr;
-using mal::repEvalFn;
 using mal::Sequence;
 using mal::String;
 using mal::StringBase;
@@ -348,14 +346,14 @@ ValuesContainer cons(ValuePtr value, ValuesSpan values) {
 } // namespace detail
 
 InvocableResult swapBang(std::string_view name, ValuesSpan values, EnvPtr env) {
-  assert(repEvalFn);
+  assert(!EvalFnStack::empty());
   checkArgsAtLeast(name, values, 2);
   if (auto atom = to<Atom>(values[0])) {
     if (auto fn = to<Invocable>(values[1])) {
       auto args = detail::cons(atom->value(), values.subspan(2));
       auto [ast, evalEnv, needsEval] = fn->apply(ValuesSpan{args}, env);
       if (needsEval) {
-        ast = (*repEvalFn)(ast, evalEnv);
+        ast = EvalFnStack::top()(ast, evalEnv);
       }
       return {atom->reset(ast), std::move(env), false};
     }
@@ -455,6 +453,7 @@ InvocableResult throw_(std::string_view name, ValuesSpan values, EnvPtr env) {
 }
 
 InvocableResult map(std::string_view name, ValuesSpan values, EnvPtr env) {
+  assert(!EvalFnStack::empty());
   checkArgsIs(name, values, 2);
   if (auto invocable = to<Invocable>(values[0])) {
     if (auto sequence = to<Sequence>(values[1])) {
@@ -464,7 +463,7 @@ InvocableResult map(std::string_view name, ValuesSpan values, EnvPtr env) {
                 auto [ast, evalEnv, needsEval] =
                     invocable->apply(ValuesSpan{std::addressof(value), 1}, env);
                 if (needsEval) {
-                  return (*repEvalFn)(std::move(ast), std::move(evalEnv));
+                  return EvalFnStack::top()(std::move(ast), std::move(evalEnv));
                 }
                 return ast;
               })),
@@ -759,8 +758,7 @@ InvocableResult fnQuestion(std::string_view name, ValuesSpan values, EnvPtr env)
 } // namespace
 
 namespace mal {
-void prepareEnv(EvalFn &evalFn, Env &env) {
-  repEvalFn = evalFn;
+void prepareEnv(Env &env) {
   static std::array builtIns{
       BuiltIn{"atom?", typeQuestion<Atom>},
       BuiltIn{"keyword?", typeQuestion<Keyword>},

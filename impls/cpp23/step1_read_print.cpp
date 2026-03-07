@@ -32,7 +32,8 @@ std::string rep(std::string str) {
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
     gc.registerValue(std::move(value));
   };
-  static GarbageCollectGuard gcGuard(gcRegister);
+  static GarbageCollectStack::Guard gcGuard{gcRegister};
+  static EvalFnStack::Guard evalGuard{EVAL};
 
   return PRINT(EVAL(READ(std::move(str)), nullptr));
 }
