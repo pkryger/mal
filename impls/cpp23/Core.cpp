@@ -351,7 +351,7 @@ InvocableResult swapBang(std::string_view name, ValuesSpan values, EnvPtr env) {
   if (auto atom = to<Atom>(values[0])) {
     if (auto fn = to<Invocable>(values[1])) {
       auto args = detail::cons(atom->value(), values.subspan(2));
-      auto [ast, evalEnv, needsEval] = fn->apply(ValuesSpan{args}, env);
+      auto [ast, evalEnv, needsEval] = fn->apply(true, ValuesSpan{args}, env);
       if (needsEval) {
         ast = EvalFnStack::top()(ast, evalEnv);
       }
@@ -458,10 +458,10 @@ InvocableResult map(std::string_view name, ValuesSpan values, EnvPtr env) {
   if (auto invocable = to<Invocable>(values[0])) {
     if (auto sequence = to<Sequence>(values[1])) {
       return {
-          make<List>(
-              sequence->values() | std::views::transform([&](auto &&value) {
-                auto [ast, evalEnv, needsEval] =
-                    invocable->apply(ValuesSpan{std::addressof(value), 1}, env);
+        make<List>(sequence->values() |
+                   std::views::transform([&](auto &&value) {
+                     auto [ast, evalEnv, needsEval] = invocable->apply(
+                         true, ValuesSpan{std::addressof(value), 1}, env);
                 if (needsEval) {
                   return EvalFnStack::top()(std::move(ast), std::move(evalEnv));
                 }
@@ -495,7 +495,7 @@ InvocableResult apply(std::string_view name, ValuesSpan values, EnvPtr env) {
       }
       return values.subspan(1);
     }();
-    return invocable->apply(args, env);
+    return invocable->apply(true, args, env);
   }
   throwWrongArgument(name, values[0]);
 }
