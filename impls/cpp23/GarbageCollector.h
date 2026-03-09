@@ -72,17 +72,20 @@ public:
     Node *current_;
   };
 
-  auto begin() { return Iterator<false>{head_}; }
+  auto begin() {
+    return Iterator<false>{head_.getSync()};
+  }
 
-  auto begin() const { return Iterator<true>{head_}; }
+  auto begin() const {
+    return Iterator<true>{head_.getSync()};
+  }
 
   auto end() { return std::default_sentinel; }
 
   auto end() const { return std::default_sentinel; }
 
   void push_front(T value) {
-    Node *node = new Node{head_, std::move(value)};
-    head_ = node;
+    head_.setSync(new Node{head_.get(), std::move(value)});
   }
 
   explicit SPSCList() : head_{new Node{nullptr, nullptr}} {}
@@ -94,14 +97,34 @@ public:
   }
 
   ~SPSCList() {
-    Node *current = head_;
+    Node *current = head_.get();
     while (current) {
       delete std::exchange(current, current->next_);
     }
   }
 
 private:
-  std::atomic<Node *> head_;
+  class Head {
+  public:
+    explicit Head(Node *ptr) noexcept : head_{ptr}, sync_{ptr} {}
+
+    Node *getSync() const noexcept {
+      return sync_.load(std::memory_order::acquire);
+    }
+
+    Node *get() const noexcept {
+      return head_;
+    }
+
+    void setSync(Node *ptr) noexcept {
+      head_ = ptr;
+      sync_.store(ptr, std::memory_order::release);
+    }
+
+  private:
+    Node *head_;
+    std::atomic<Node *> sync_;
+  } head_;
 };
 
 inline static std::size_t ChunkSize = 16;
