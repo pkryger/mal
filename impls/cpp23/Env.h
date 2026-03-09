@@ -142,12 +142,13 @@ public:
   };
 
   explicit EnvBase(EnvPtr outer) noexcept
-      : outer_{std::move(outer)}, debugEval_{nullptr},
+      : debugEval_{outer ? outer->debugEval_ : nullptr},
+        outer_{std::move(outer)},
         size_{outer_ ? outer_->size() + 1 : 1} {}
 
   EnvBase(EnvBase &&other) noexcept
-      : outer_{std::move(other.outer_)},
-        debugEval_{std::move(other.debugEval_)},
+      : debugEval_{std::move(other.debugEval_)},
+        outer_{std::move(other.outer_)},
         size_{std::exchange(other.size_, 0)} {}
 
   virtual ~EnvBase() = default;
@@ -188,8 +189,8 @@ protected:
   void registerDebugEval(KeyView key, const ValuePtr& value);
 
 private:
-  EnvPtr outer_;
   ValuePtr debugEval_;
+  EnvPtr outer_;
   std::size_t size_;
 };
 

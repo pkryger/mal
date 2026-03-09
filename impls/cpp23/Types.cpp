@@ -1,6 +1,5 @@
 #include "Types.h" // IWYU pragma: associated
 #include "Core.h"
-#include "FunctionRef.h"
 #include "Mal.h"
 #include "Ranges.h"
 
