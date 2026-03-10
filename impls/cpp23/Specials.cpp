@@ -6,7 +6,7 @@
 #include "Ranges.h"
 #include "Types.h"
 
-#include <algorithm>
+#include <algorithm> // IWYU pragma: keep
 #include <cassert>
 #include <format>
 #include <memory>

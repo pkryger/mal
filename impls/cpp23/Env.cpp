@@ -1,7 +1,7 @@
 #include "Env.h" // IWYU pragma: associated
 #include "Types.h"
 
-#include <algorithm>
+#include <algorithm> // IWYU pragma: keep
 #include <cassert>
 #include <memory>
 #include <ranges>
