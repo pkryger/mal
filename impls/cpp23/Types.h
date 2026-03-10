@@ -448,8 +448,6 @@ public:
 
   std::string print(PrintType readably) const override;
 
-  InvocableResult invoke(EnvPtr env) const;
-
   ValuePtr eval(EnvPtr env) const override;
 
   ValuePtr cloneWithMeta(ValuePtr meta) const override {

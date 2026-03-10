@@ -1,5 +1,6 @@
 #include "Types.h" // IWYU pragma: associated
 #include "Core.h"
+#include "FunctionRef.h"
 #include "Mal.h"
 #include "Ranges.h"
 
@@ -198,24 +199,21 @@ ValuePtr Vector::eval(EnvPtr env) const {
                       }));
 }
 
-InvocableResult List::invoke(EnvPtr env) const {
-  assert(env);
-  assert(!data.empty());
-  assert(!EvalFnStack::empty());
-  auto op = EvalFnStack::top()(data[0], env);
-  if (auto invocable = to<Invocable>(op)) {
-    return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
-  }
-  throw EvalException{std::format("invalid function '{:r}'", op)};
-}
-
 ValuePtr List::eval(EnvPtr env) const {
   assert(env);
     assert(!EvalFnStack::empty());
   if (data.empty()) {
     return shared_from_this();
   }
-  auto [ast, evalEnv, needsEval] = invoke(env);
+  auto &evalFn = EvalFnStack::top();
+  auto [ast, evalEnv, needsEval] = [&]() {
+    auto op = evalFn(data[0], env);
+    if (auto invocable = to<Invocable>(op)) {
+      return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
+    }
+    throw EvalException{std::format("invalid function '{:r}'", op)};
+  }();
+
   return needsEval ? EvalFnStack::top()(ast, evalEnv) : ast;
 }
 

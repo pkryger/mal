@@ -66,7 +66,14 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
         std::tie(ast, env, needsEval) =
             special->second(special->first, values.subspan(1), env);
       } else {
-        std::tie(ast, env, needsEval) = list->invoke(env);
+        std::tie(ast, env, needsEval) = [&]() {
+          auto data = list->values();
+          auto op = EVAL(data[0], env);
+          if (auto invocable = to<Invocable>(op)) {
+            return invocable->apply(false, data.subspan(1), env);
+          }
+          throw EvalException{std::format("invalid function '{:r}'", op)};
+        }();
       }
     } else {
       return ast->eval(env);
