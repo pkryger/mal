@@ -19,12 +19,12 @@ using mal::EvalFnStack;
 using mal::ValuesContainer;
 using mal::ValuesSpan;
 
-ValuesContainer evalValues(ValuesSpan values, EnvPtr evalEnv) {
+template <typename VALUES>
+auto evalValues(VALUES &&values, EnvPtr evalEnv)  {
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
-  return values |
-         std::views::transform([&](auto &&v) { return evalFn(v, evalEnv); }) |
-         std::ranges::to<ValuesContainer>();
+  return std::forward<VALUES>(values) |
+         std::views::transform([&](auto &&v) { return evalFn(v, evalEnv); });
 }
 
 }
@@ -258,8 +258,12 @@ ValuePtr Hash::find(ValuePtr key) const {
 
 InvocableResult BuiltIn::apply(bool evaled, ValuesSpan values,
                                EnvPtr evalEnv) const {
-  return handler(name, evaled ? values : evalValues(values, evalEnv),
-                 std::move(evalEnv));
+  if (evaled) {
+    return handler(name, values, std::move(evalEnv));
+  }
+  return handler(
+      name, evalValues(values, evalEnv) | std::ranges::to<ValuesContainer>(),
+      std::move(evalEnv));
 }
 
 ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
@@ -309,22 +313,24 @@ ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
+template <typename VALUES>
+EnvPtr FunctionBase::makeApplyEnv(VALUES &&values, EnvPtr evalEnv) const {
   auto applyEnv = make<ApplyEnv>(std::move(evalEnv), capturedEnv);
   if (bindSize == params.size()) {
-    checkArgsIs(print(Simply), values, bindSize);
+    checkArgsIs(print(Simply), values.size(), bindSize);
   } else {
-    checkArgsAtLeast(print(Simply), values, bindSize);
-    applyEnv->insert_or_assign(params.back().asKey(),
-                               make<List>(values | std::views::drop(bindSize)));
+    checkArgsAtLeast(print(Simply), values.size(), bindSize);
+    applyEnv->insert_or_assign(
+        params.back().asKey(),
+        make<List>(std::forward<VALUES>(values) | std::views::drop(bindSize)));
   }
   for (auto &&[key, value] :
        std::views::zip(params | std::views::take(bindSize) |
                            std::views::transform([](auto &&param) {
                              return param.asKey();
                            }),
-                       values)) {
-    applyEnv->insert_or_assign(key, value);
+                       std::forward<VALUES>(values))) {
+    applyEnv->insert_or_assign(key, std::forward<decltype(value)>(value));
   }
   return applyEnv;
 }
@@ -344,11 +350,14 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
 
 InvocableResult Lambda::apply(bool evaled, ValuesSpan values,
                               EnvPtr evalEnv) const {
+  if (evaled) {
+    return {body,
+            makeApplyEnv(values, std::move(evalEnv)), true};
+  }
   return {body,
-          makeApplyEnv(evaled ? values : evalValues(values, evalEnv),
+          makeApplyEnv(evalValues(values, evalEnv),
                        std::move(evalEnv)),
           true};
-
 }
 
 std::string Macro::print(PrintType readable) const {

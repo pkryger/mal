@@ -591,7 +591,8 @@ public:
 protected:
   template <typename TYPE> ValuePtr isEqualTo(ValuePtr rhs) const;
 
-  EnvPtr makeApplyEnv(ValuesSpan value, EnvPtr evalEnv) const;
+  template <typename VALUES>
+  EnvPtr makeApplyEnv(VALUES &&values, EnvPtr evalEnv) const;
 
   std::size_t bindSize;
   Params params;

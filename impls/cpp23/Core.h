@@ -12,12 +12,22 @@ namespace mal {
 
 class Env;
 
-void checkArgsIs(std::string_view name, ValuesSpan values, std::size_t expected);
+void checkArgsIs(std::string_view name, ValuesSpan values,
+                 std::size_t expected);
+
+void checkArgsIs(std::string_view name, std::size_t actual,
+                 std::size_t expected);
 
 void checkArgsAtLeast(std::string_view name, ValuesSpan values,
                       std::size_t expected);
 
+void checkArgsAtLeast(std::string_view name, std::size_t actual,
+                      std::size_t expected);
+
 void checkArgsBetween(std::string_view name, ValuesSpan values,
+                      std::size_t expectedMin, std::size_t expectedMax);
+
+void checkArgsBetween(std::string_view name, std::size_t actual,
                       std::size_t expectedMin, std::size_t expectedMax);
 
 

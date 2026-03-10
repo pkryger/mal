@@ -31,9 +31,10 @@ namespace mal {
 
 static ReadLine coreReadLine{};
 
-void checkArgsIs(std::string_view name, ValuesSpan values, std::size_t expected) {
 
-  if (auto actual = values.size(); actual != expected) {
+void checkArgsIs(std::string_view name, std::size_t actual,
+                 std::size_t expected) {
+  if (actual != expected) {
     throw CoreException{
         std::format("wrong number of '{}' arguments: {}, expected: {}", name,
                     actual, expected)};
@@ -41,23 +42,37 @@ void checkArgsIs(std::string_view name, ValuesSpan values, std::size_t expected)
   }
 }
 
-void checkArgsAtLeast(std::string_view name, ValuesSpan values,
+void checkArgsIs(std::string_view name, ValuesSpan values,
+                 std::size_t expected) {
+  return checkArgsIs(name, values.size(), expected);
+}
+
+void checkArgsAtLeast(std::string_view name, std::size_t actual,
                       std::size_t expected) {
-  if (auto actual = values.size(); actual < expected) {
+  if (actual < expected) {
     throw CoreException{
         std::format("wrong number of '{}' arguments: {}, expected: ({} . many)",
                     name, actual, expected)};
   }
 }
 
-void checkArgsBetween(std::string_view name, ValuesSpan values,
+void checkArgsAtLeast(std::string_view name, ValuesSpan values,
+                      std::size_t expected) {
+  return checkArgsAtLeast(name, values.size(), expected);
+}
+
+void checkArgsBetween(std::string_view name, std::size_t actual,
                       std::size_t expectedMin, std::size_t expectedMax) {
-  if (auto actual = values.size();
-       expectedMax < actual || actual < expectedMin) {
+  if (expectedMax < actual || actual < expectedMin) {
     throw CoreException{
         std::format("wrong number of '{}' arguments: {}, expected: ({} . {})",
                     name, actual, expectedMin, expectedMax)};
   }
+}
+
+void checkArgsBetween(std::string_view name, ValuesSpan values,
+                      std::size_t expectedMin, std::size_t expectedMax) {
+  return checkArgsBetween(name, values.size(), expectedMin, expectedMax);
 }
 
 [[noreturn]]
