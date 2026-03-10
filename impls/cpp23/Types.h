@@ -416,14 +416,13 @@ protected:
   explicit Sequence(ValuesContainer data) noexcept
       : data{std::move(data)} {}
 
-  explicit Sequence(ValuesSpan data) noexcept
-      : data{data | std::ranges::to<ValuesContainer>()} {}
+  explicit Sequence(ValuesSpan data) noexcept : data{std::from_range, data} {}
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuePtr>
   explicit Sequence(RANGE &&range)
-      : data{std::forward<RANGE>(range) | std::ranges::to<ValuesContainer>()} {}
+      : data{std::from_range, std::forward<RANGE>(range)} {}
 
   ValuesContainer data;
 };
@@ -629,9 +628,9 @@ public:
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>, Symbol>
   explicit Lambda(RANGE &&params, ValuePtr body, EnvPtr env)
-      : FunctionBase{std::forward<RANGE>(params) |
-                         std::ranges::to<FunctionBase::Params>(),
-                     std::move(body), std::move(env)} {}
+      : FunctionBase{{std::from_range, std::forward<RANGE>(params)},
+                     std::move(body),
+                     std::move(env)} {}
 
   explicit Lambda(const Lambda &other, ValuePtr meta)
       : FunctionBase{other}, MetaMixIn{std::move(meta)} {}
