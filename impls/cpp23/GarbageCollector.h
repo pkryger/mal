@@ -14,17 +14,25 @@
 #include <utility>
 
 namespace mal {
-template <typename T>
+
+template <typename T, typename ALLOCATOR = std::allocator<T>>
   requires std::is_same_v<T, std::shared_ptr<typename T::element_type>>
 class SPSCList {
 public:
   class Node {
+  public:
+    Node(Node *next): next_{next} {};
+    ~Node() {};
+  private:
     friend class SPSCList;
-    explicit Node(Node *next, T value) noexcept
-        : next_{next}, value_{std::move(value)} {}
     Node *next_;
-    T value_;
+    union {
+      alignas(T) T value_;
+    };
   };
+
+  using NodeAllocator =
+      typename std::allocator_traits<ALLOCATOR>::template rebind_alloc<Node>;
 
   template <bool CONST> class Iterator {
   public:
@@ -85,25 +93,54 @@ public:
   auto end() const { return std::default_sentinel; }
 
   void push_front(T value) {
-    head_.setSync(new Node{head_.get(), std::move(value)});
+    head_.set_sync(new_node(head_.get(), std::move(value)));
   }
 
-  explicit SPSCList() : head_{new Node{nullptr, nullptr}} {}
+  explicit SPSCList(const ALLOCATOR &allocator = ALLOCATOR())
+      : node_allocator_(allocator), head_{new_node(nullptr, nullptr)} {}
 
   void erase_next(Iterator<false> it) {
     assert(it.current_);
     assert(it.current_->next_);
-    delete std::exchange(it.current_->next_, it.current_->next_->next_);
+    delete_node(std::exchange(it.current_->next_, it.current_->next_->next_));
   }
 
   ~SPSCList() {
     Node *current = head_.get();
     while (current) {
-      delete std::exchange(current, current->next_);
+      delete_node(std::exchange(current, current->next_));
     }
   }
 
 private:
+  template <typename... ARGS>
+  [[nodiscard]]
+  Node *new_node(Node *head, ARGS &&...args) {
+    Node *node =
+        std::allocator_traits<NodeAllocator>::allocate(node_allocator_, 1);
+    try {
+      std::construct_at(node, head);
+      std::uninitialized_construct_using_allocator(std::addressof(node->value_),
+                                                   node_allocator_,
+                                                   std::forward<ARGS>(args)...);
+      return node;
+    } catch (...) {
+      std::allocator_traits<NodeAllocator>::deallocate(node_allocator_, node,
+                                                       1);
+      throw;
+    }
+  }
+
+  void delete_node(Node *node) {
+    assert(node);
+    std::allocator_traits<NodeAllocator>::destroy(node_allocator_,
+                                                  std::addressof(node->value_));
+    std::allocator_traits<NodeAllocator>::deallocate(node_allocator_, node, 1);
+  }
+
+  [[no_unique_address]]
+  NodeAllocator node_allocator_;
+
   class Head {
   public:
     explicit Head(Node *ptr) noexcept : head_{ptr}, sync_{ptr} {}
@@ -116,7 +153,7 @@ private:
       return head_;
     }
 
-    void setSync(Node *ptr) noexcept {
+    void set_sync(Node *ptr) noexcept {
       head_ = ptr;
       sync_.store(ptr, std::memory_order::release);
     }
