@@ -18,3 +18,23 @@ a
 ;=>2
 a
 ;/.*'?a'? not found.*
+
+;; Testing DEBUG-EVAL propagation
+(def! f (fn* [a] (+ a a)))
+
+(def! DEBUG-EVAL true)
+;=>true
+
+(f 2)
+;/EVAL: \(\+ a a\).*\n4
+
+(def! DEBUG-EVAL false)
+;=>false
+
+(def! f (fn* [a] (+ a a)))
+
+(def! DEBUG-EVAL true)
+;=>true
+
+(f 3)
+;/EVAL: \(\+ a a\).*\n6
