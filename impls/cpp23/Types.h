@@ -31,15 +31,15 @@ using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
 class PrintType {
 public:
   enum class Type : signed char {
-    Simple = 0,
-    LegacyReadable = 1,
-    Readable = 2
+    Simply = 0,
+    MalReadably = 1,
+    Readably = 2
   };
 
   constexpr PrintType(Type type) noexcept : type_(type) {}
 
   constexpr explicit operator bool() const noexcept {
-    return type_ != Type::Simple;
+    return type_ != Type::Simply;
   }
 
   constexpr PrintType() noexcept = default;
@@ -51,8 +51,12 @@ public:
   constexpr auto operator<=>(const PrintType &) const noexcept = default;
   constexpr bool operator==(const PrintType &) const noexcept = default;
 
-  Type type_{Type::Simple};
+  Type type_{Type::Simply};
 };
+
+inline constexpr auto Simply{PrintType::Type::Simply};
+inline constexpr auto Readably{PrintType::Type::Readably};
+inline constexpr auto MalReadably{PrintType::Type::MalReadably};
 
 class Value : public GarbageCollectible, public std::enable_shared_from_this<Value> {
 public:
@@ -142,20 +146,19 @@ struct ParseValueMixin {
     auto it = ctx.begin();
     if (it != ctx.end()) {
       switch (*it) {
-        using enum PrintType::Type;
       case 'r':
-        printType = Readable;
+        printType = Readably;
         ++it;
         break;
       case 'l':
-        printType = LegacyReadable;
+        printType = MalReadably;
         ++it;
         break;
       }
     }
     return it;
   }
-  PrintType printType{PrintType::Type::Simple};
+  PrintType printType{Simply};
 };
 
 template <typename RANGE_FORMATTER>
@@ -166,14 +169,13 @@ constexpr auto RangeFormatterParse(RANGE_FORMATTER &rf,
   rf.set_separator(" ");
   auto it = ctx.begin();
   if (it != ctx.end()) {
-    using enum PrintType::Type;
     switch (*it) {
     case 'r':
-      rf.underlying().printType = Readable;
+      rf.underlying().printType = Readably;
       ++it;
       break;
     case 'l':
-      rf.underlying().printType = LegacyReadable;
+      rf.underlying().printType = MalReadably;
       ++it;
       break;
     }
@@ -198,14 +200,14 @@ struct formatter<mal::ValuesMap::value_type> : mal::ParseValueMixin {
   auto format(const mal::ValuesMap::value_type &val,
               FORMAT_CONTEXT &ctx) const {
     switch (printType.type_) {
-      using enum mal::PrintType::Type;
-    case Simple:
+    using enum mal::PrintType::Type;
+    case Simply:
       return format_to(ctx.out(), "{} {}", val.first, val.second);
       break;
-    case Readable:
+    case Readably:
       return format_to(ctx.out(), "{:r} {:r}", val.first, val.second);
       break;
-    case LegacyReadable:
+    case MalReadably:
       return format_to(ctx.out(), "{:l} {:l}", val.first, val.second);
       break;
     }
@@ -606,7 +608,7 @@ namespace std {
 template <> struct formatter<mal::Symbol> : mal::ParseValueMixin {
   template<typename FORMAT_CONTEXT>
   auto format(const mal::Symbol &val, FORMAT_CONTEXT &ctx) const {
-    return format_to(ctx.out(), "{}", val.print(mal::PrintType::Type::Simple));
+    return format_to(ctx.out(), "{}", val.print(mal::Simply));
   }
 };
 

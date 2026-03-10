@@ -171,7 +171,7 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
 }
 
 std::string List::print(PrintType readably) const {
-  if (readably == PrintType::Type::LegacyReadable) {
+  if (readably == MalReadably) {
     return std::format("({:l})", data);
   }
   if (auto fromMacro = [&]() -> std::optional<std::string> {
@@ -312,12 +312,11 @@ ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
 }
 
 EnvPtr FunctionBase::makeApplyEnv(ValuesSpan values, EnvPtr evalEnv) const {
-  using enum PrintType::Type;
   auto applyEnv = make<ApplyEnv>(std::move(evalEnv), capturedEnv);
   if (bindSize == params.size()) {
-    checkArgsIs(print(Simple), values, bindSize);
+    checkArgsIs(print(Simply), values, bindSize);
   } else {
-    checkArgsAtLeast(print(Simple), values, bindSize);
+    checkArgsAtLeast(print(Simply), values, bindSize);
     applyEnv->insert_or_assign(params.back().asKey(),
                                make<List>(values | std::views::drop(bindSize)));
   }
