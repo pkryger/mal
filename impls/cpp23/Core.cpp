@@ -16,6 +16,7 @@
 #include <format>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <print>
@@ -124,7 +125,7 @@ namespace detail {
 template <typename BINARY_OP, typename UNARY_OP>
 ValuePtr accumulateIntegers(std::string_view name, ValuesSpan values,
                             BINARY_OP &&binary_op, UNARY_OP &&unary_op,
-                            int minArgs = 1) {
+                            std::size_t minArgs = 1) {
   assert(minArgs > 0);
   checkArgsAtLeast(name, values, minArgs);
   if (auto init = to<Integer>(values.front())) {
@@ -278,21 +279,25 @@ InvocableResult not_(std::string_view name, ValuesSpan values, EnvPtr env) {
           std::move(env), false};
 }
 
-InvocableResult prn(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult prn(std::string_view /* name */, ValuesSpan values,
+                    EnvPtr env) {
   std::print("{:r}\n", values);
   return {Constant::nilValue(), std::move(env), false};
 }
 
-InvocableResult println(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult println(std::string_view /* name */, ValuesSpan values,
+                        EnvPtr env) {
   std::print("{}\n", values);
   return {Constant::nilValue(), std::move(env), false};
 }
 
-InvocableResult pr_str(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult pr_str(std::string_view /* name */, ValuesSpan values,
+                       EnvPtr env) {
   return {make<String>(std::format("{:r}", values)), std::move(env), false};
 }
 
-InvocableResult str(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult str(std::string_view /* name */, ValuesSpan values,
+                    EnvPtr env) {
   return {make<String>(values | std::views::transform([](auto &&elt) {
                          return std::format("{}", elt);
                        }) |
@@ -305,13 +310,18 @@ InvocableResult slurp(std::string_view name, ValuesSpan values, EnvPtr env) {
   if (auto string = to<String>(values[0])) {
     auto path = string->data();
     auto file_size = std::filesystem::file_size(path);
+    if (file_size >
+        static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max())) {
+      throw CoreException(
+          std::format("{}: file {} is too big", name, std::move(path)));
+    }
     std::ifstream file{path, std::ios::in | std::ios::binary};
     if (!file) {
       throw CoreException(std::format("{}: file {} open error",
                                       name, std::move(path)));
     }
     std::string content(file_size, '\0');
-    file.read(content.data(), file_size);
+    file.read(content.data(), static_cast<std::streamsize>(file_size));
     return {make<String>(std::move(content)), std::move(env), false};
   }
    throwWrongArgument(name, values[0]);
@@ -411,9 +421,11 @@ InvocableResult vec(std::string_view name, ValuesSpan values, EnvPtr env) {
 InvocableResult nth(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 2);
   if (auto integer = to<Integer>(values[1])) {
-    auto index = integer->value();
+    static_assert(sizeof(decltype(std::declval<Integer>().value())) >=
+                  sizeof(ValuesSpan::size_type));
+    auto index = static_cast<ValuesSpan::size_type>(integer->value());
     if (auto sequence = to<Sequence>(values[0])) {
-      auto values = sequence->values();
+      values = sequence->values();
       if (0 <= index && index < values.size()) {
         return {values[index], std::move(env), false};
       }
@@ -432,7 +444,7 @@ InvocableResult nth(std::string_view name, ValuesSpan values, EnvPtr env) {
 InvocableResult first(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
   if (auto sequence = to<Sequence>(values[0])) {
-    auto values = sequence->values();
+    values = sequence->values();
     if (!values.empty()) {
       return {values[0], std::move(env), false};
     }
@@ -448,7 +460,7 @@ InvocableResult first(std::string_view name, ValuesSpan values, EnvPtr env) {
 InvocableResult rest(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
   if (auto sequence = to<Sequence>(values[0])) {
-    auto values = sequence->values();
+    values = sequence->values();
     if (!values.empty()) {
       return {make<List>(values.subspan(1)), std::move(env), false};
     }
@@ -462,7 +474,8 @@ InvocableResult rest(std::string_view name, ValuesSpan values, EnvPtr env) {
 }
 
 [[noreturn]]
-InvocableResult throw_(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult throw_(std::string_view name, ValuesSpan values,
+                       EnvPtr /* env */) {
   checkArgsIs(name, values, 1);
   throw MalException{std::format("Exception: {:r}", values[0]), values[0]};
 }

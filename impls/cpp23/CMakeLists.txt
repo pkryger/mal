@@ -55,7 +55,14 @@ target_include_directories(mal PUBLIC ${READLINE_INCLUDE_DIRS})
 target_link_libraries(mal INTERFACE ${READLINE_LIBRARIES})
 target_link_directories(mal INTERFACE ${READLINE_LIBRARY_DIRS})
 target_compile_features(mal PUBLIC cxx_std_23)
-target_compile_options(mal PRIVATE -Wall)
+target_compile_options(mal PRIVATE
+  $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:
+    -Wall -Wextra -Wconversion -Wshadow
+   >
+  $<$<CXX_COMPILER_ID:MSVC>:
+    /W4
+   >
+)
 set_target_properties(mal
   PROPERTIES VERIFY_INTERFACE_HEADER_SETS ON)
 

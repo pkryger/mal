@@ -286,7 +286,7 @@ FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
             throw EvalException{
                 "there must be exactly one parameter after the &"};
           }
-          return i - params.begin();
+          return static_cast<std::size_t>(i - params.begin());
         }
         return params.size();
       }()},

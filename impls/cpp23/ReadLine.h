@@ -19,7 +19,7 @@ namespace detail {
 
 class ReadLineHistoryInit {
 public:
-  explicit ReadLineHistoryInit(std::size_t size) noexcept;
+  explicit ReadLineHistoryInit(int size) noexcept;
 };
 
 template <typename VALUE>

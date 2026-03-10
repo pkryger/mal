@@ -6,6 +6,7 @@
 #include <array>
 #include <cassert>
 #include <format>
+#include <limits>
 // IWYU pragma: no_include <ranges>
 #ifdef __cpp_lib_ranges_stride
 #include <ranges>
@@ -64,7 +65,17 @@ public:
   }
 
 private:
-  bool match(const std::regex& regex);
+  bool match(const std::regex &regex);
+
+  auto tokenSize() const {
+    auto size = token.size();
+    if (size > static_cast<decltype(size)>(
+                   std::numeric_limits<std::string::difference_type>::max())) {
+      throw ReaderException(
+          std::format("token at pos {} too big {}", pos - str.begin(), size));
+    }
+    return static_cast<std::string::difference_type>(size);
+  }
 
   const std::string &str;
   std::string::const_iterator pos;
@@ -88,10 +99,10 @@ bool Tokeniser::match(const std::regex &regex) {
 }
 
 void Tokeniser::nextToken() {
-  pos += token.size();
+  pos += tokenSize();
   // Skip white spaces and comments
   while (match(std::regex{"[\\s,]+|;.*"})) {
-    pos += token.size();
+    pos += tokenSize();
   }
 
   if (eoi())

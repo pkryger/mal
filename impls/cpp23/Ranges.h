@@ -117,7 +117,8 @@ public:
     if constexpr (std::ranges::sized_range<VIEW>) {
       auto end = std::ranges::end(base_);
       auto n = std::ranges::size(base_);
-      auto reminder = static_cast<ReminderType>(n - ((n / count_) * count_));
+      auto count = static_cast<decltype(n)>(count_);
+      auto reminder = static_cast<ReminderType>(n - ((n / count) * count));
       return iterator<false>{this, end, end, end, reminder};
     } else {
       return std::default_sentinel;
@@ -131,7 +132,8 @@ public:
     if constexpr (std::ranges::sized_range<const VIEW>) {
       auto end = std::ranges::end(base_);
       auto n = std::ranges::size(base_);
-      auto reminder = static_cast<ReminderType>(n - ((n / count_) * count_));
+      auto count = static_cast<decltype(n)>(count_);
+      auto reminder = static_cast<ReminderType>(n - ((n / count) * count));
       return iterator<true>{this, end, end, end, reminder};
     } else {
       return std::default_sentinel;

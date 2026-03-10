@@ -19,7 +19,7 @@ namespace mal {
 
 namespace detail {
 
-ReadLineHistoryInit::ReadLineHistoryInit(std::size_t size) noexcept {
+ReadLineHistoryInit::ReadLineHistoryInit(int size) noexcept {
   [[maybe_unused]]
   static bool initialised = [&]() {
     using_history();
@@ -30,7 +30,7 @@ ReadLineHistoryInit::ReadLineHistoryInit(std::size_t size) noexcept {
 
 } // namespace detail
 
-static const std::size_t ReadLineHistorySize{100};
+static const int ReadLineHistorySize{100};
 
 ReadLine::ReadLine() noexcept
     : detail::ReadLineHistoryInit{ReadLineHistorySize},
