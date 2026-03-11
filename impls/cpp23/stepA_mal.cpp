@@ -27,7 +27,7 @@ namespace mal {
 
 static ReadLine rl("~/.mal_history");
 
-ValuePtr READ(std::string str) { return readStr(std::move(str)); }
+ValuePtr READ(const std::string &str) { return readStr(str); }
 
 using Special = const std::pair<std::string, SpecialForm>;
 static const std::array specials{
@@ -143,10 +143,10 @@ EnvPtr repEnv(std::span<const char *> args) {
   return envPtr;
 }
 
-std::string rep(std::string str, EnvPtr envPtr) {
+std::string rep(const std::string &str, EnvPtr envPtr) {
   std::string out;
   try {
-    out = PRINT(EVAL(READ(std::move(str)), envPtr));
+    out = PRINT(EVAL(READ(str), std::move(envPtr)));
   } catch (mal::MalException ex) {
     out = std::string{"[mal] "} + ex.what();
   } catch (mal::ReaderException ex) {
@@ -170,6 +170,6 @@ int main(int argc, const char *argv[]) {
   }
   mal::rep("(println (str \"Mal [\" *host-language* \"]\"))", envPtr);
   while (auto line = mal::rl.get("user> ")) {
-    std::print("{}\n", mal::rep(std::move(line.value()), envPtr));
+    std::print("{}\n", mal::rep(line.value(), envPtr));
   }
 }

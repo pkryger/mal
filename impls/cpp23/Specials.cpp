@@ -44,7 +44,7 @@ InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
       throw EvalException{
           std::format("odd number of let* bindings: {:r}", values[0])};
     }
-    auto letEnv = make<Env>(env);
+    auto letEnv = make<Env>(std::move(env));
     auto &evalFn = EvalFnStack::top();
     for (auto &&[key, value] :
          bindings | std::views::chunk(2) |

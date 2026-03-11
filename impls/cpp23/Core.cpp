@@ -136,7 +136,7 @@ ValuePtr accumulateIntegers(std::string_view name, ValuesSpan values,
           std::forward<UNARY_OP>(unary_op)(init->value()));
     }
     return make<Integer>(std::ranges::fold_left(
-        values.subspan(1) | std::views::transform([&](auto elt) {
+        values.subspan(1) | std::views::transform([&](auto &&elt) {
           if (auto integer = to<Integer>(elt)) {
             return integer->value();
           }
@@ -241,25 +241,25 @@ InvocableResult compareIntegers(std::string_view name, ValuesSpan values,
 
 InvocableResult lt(std::string_view name, ValuesSpan values, EnvPtr env) {
   return compareIntegers(
-      name, values, env,
+      name, values, std::move(env),
       [](auto &&lhs, auto &&rhs) noexcept { return lhs < rhs; });
 }
 
 InvocableResult lte(std::string_view name, ValuesSpan values, EnvPtr env) {
   return compareIntegers(
-      name, values, env,
+      name, values, std::move(env),
       [](auto &&lhs, auto &&rhs) noexcept { return lhs <= rhs; });
 }
 
 InvocableResult gt(std::string_view name, ValuesSpan values, EnvPtr env) {
   return compareIntegers(
-      name, values, env,
+      name, values, std::move(env),
       [](auto &&lhs, auto &&rhs) noexcept { return lhs > rhs; });
 }
 
 InvocableResult gte(std::string_view name, ValuesSpan values, EnvPtr env) {
   return compareIntegers(
-      name, values, env,
+      name, values, std::move(env),
       [](auto &&lhs, auto &&rhs) noexcept { return lhs >= rhs; });
 }
 
@@ -399,7 +399,7 @@ InvocableResult cons(std::string_view name, ValuesSpan values, EnvPtr env) {
 }
 
 InvocableResult concat(std::string_view name, ValuesSpan values, EnvPtr env) {
-  return {make<List>(values | std::views::transform([&](auto elt) {
+  return {make<List>(values | std::views::transform([&](auto &&elt) {
                        if (auto sequence = to<Sequence>(elt)) {
                          return sequence->values();
                        }
@@ -477,6 +477,7 @@ InvocableResult rest(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 [[noreturn]]
 InvocableResult throw_(std::string_view name, ValuesSpan values,
+// NOLINTNEXTLINE(performance-unnecessary-value-param)
                        EnvPtr /* env */) {
   checkArgsIs(name, values, 1);
   throw MalException{std::format("Exception: {:r}", values[0]), values[0]};
@@ -525,7 +526,7 @@ InvocableResult apply(std::string_view name, ValuesSpan values, EnvPtr env) {
       }
       return values.subspan(1);
     }();
-    return invocable->apply(true, args, env);
+    return invocable->apply(true, args, std::move(env));
   }
   throwWrongArgument(name, values[0]);
 }
@@ -533,7 +534,7 @@ InvocableResult apply(std::string_view name, ValuesSpan values, EnvPtr env) {
 namespace detail {
 
 InvocableResult constantQuestion(std::string_view name, ValuesSpan values,
-                                 EnvPtr env, ValuePtr constant) {
+                                 EnvPtr env, const ValuePtr &constant) {
   checkArgsIs(name, values, 1);
   return {constant->isEqualTo(values[0]), std::move(env), false};
 }
@@ -584,7 +585,7 @@ InvocableResult vector(std::string_view /*name*/, ValuesSpan values,
 InvocableResult hash_map(std::string_view name, ValuesSpan values,
                   EnvPtr env) {
   if (values.size() % 2 == 0) {
-    for (auto key : values | std::views::stride(2)) {
+    for (auto &&key : values | std::views::stride(2)) {
       if (!to<StringBase>(key)) {
         mal::throwWrongArgument(name, key);
       }
@@ -599,7 +600,7 @@ InvocableResult assoc(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(name, values, 1);
   if (values.size() % 2 == 1) {
     if (auto hash = to<Hash>(values[0])) {
-      for (auto key : values.subspan(1) | std::views::stride(2)) {
+      for (auto &&key : values.subspan(1) | std::views::stride(2)) {
         if (!to<StringBase>(key)) {
           mal::throwWrongArgument(name, key);
         }
@@ -680,7 +681,7 @@ InvocableResult dissoc(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(name, values, 1);
   if (auto hash = to<Hash>(values[0])) {
     values = values.subspan(1);
-    for (auto key : values) {
+    for (auto &&key : values) {
       if (!to<StringBase>(key)) {
         throwWrongArgument(name, key);
       }

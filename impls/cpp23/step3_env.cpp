@@ -24,7 +24,7 @@ namespace mal {
 
 static ReadLine rl("~/.mal_history");
 
-ValuePtr READ(std::string str) { return readStr(std::move(str)); }
+ValuePtr READ(const std::string &str) { return readStr(str); }
 
 using Special = const std::pair<std::string, SpecialForm>;
 static const std::array specials{
@@ -68,7 +68,7 @@ std::string PRINT(ValuePtr ast) {
   return std::format("{:r}", ast);
 }
 
-std::string rep(std::string str) {
+std::string rep(const std::string &str) {
   static GarbageCollector<GarbageCollectiblePtr> gc;
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
     gc.registerValue(std::move(value));
@@ -83,7 +83,7 @@ std::string rep(std::string str) {
   }();
   static EnvPtr envPtr =
     std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
-  return PRINT(EVAL(READ(std::move(str)), envPtr));
+  return PRINT(EVAL(READ(str), std::move(envPtr)));
 }
 
 } // namespace mal
@@ -92,7 +92,7 @@ int main() {
   while (auto line = mal::rl.get("user> ")) {
     std::string out;
     try {
-      out = mal::rep(std::move(line.value()));
+      out = mal::rep(line.value());
     } catch (mal::ReaderException ex) {
       out = std::string{"[reader] "} + ex.what();
     } catch (mal::CoreException ex) {

@@ -67,6 +67,7 @@ public:
               return obj(std::forward<ARGS>(args)...);
             }} {}
 
+  // NOLINTNEXTLINE(performance-unnecessary-value-param)
   RET operator()(ARGS ...args) const noexcept(NOEX) {
     return callback_(storage_, std::forward<ARGS>(args)...);
   }

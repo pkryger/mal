@@ -8,7 +8,7 @@
 
 namespace mal {
 
-ValuePtr readStr(std::string str);
+ValuePtr readStr(const std::string &str);
 
 class ReaderException : public std::runtime_error {
 public:

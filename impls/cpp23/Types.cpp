@@ -280,7 +280,7 @@ Hash::Hash(const Hash &other, ValuesSpan values) : data{other.data} {
     data.insert_or_assign(key, value);
   }}
 
-ValuePtr Hash::find(ValuePtr key) const {
+ValuePtr Hash::find(const ValuePtr &key) const {
   if (auto res = data.find(key); res != data.end()) {
     return res->second;
   }
@@ -326,7 +326,7 @@ FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
 }
 
 template <typename TYPE>
-ValuePtr FunctionBase::isEqualTo(ValuePtr rhs) const {
+ValuePtr FunctionBase::isEqualTo(const ValuePtr &rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }

@@ -143,7 +143,7 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   tokeniser.nextToken();
 
   if (token[0] == '"') {
-    return make<String>(String::unescape(std::move(token)));
+    return make<String>(String::unescape(token));
   }
 
   if (token[0] == ':') {
@@ -157,7 +157,7 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   }
 
   if (std::regex_match(token, std::regex{"^[-+]?\\d+$"})) {
-    return make<Integer>(std::stol(std::move(token)));
+    return make<Integer>(std::stol(token));
   }
 
   auto first = [](auto &&elt) noexcept { return elt.first; };
@@ -211,7 +211,7 @@ ValuePtr readForm(Tokeniser &tokeniser) {
 
 namespace mal {
 
-ValuePtr readStr(std::string str) {
+ValuePtr readStr(const std::string &str) {
   Tokeniser tokeniser(str);
   if (tokeniser.eoi()) {
     throw ReaderException{"EOI"};

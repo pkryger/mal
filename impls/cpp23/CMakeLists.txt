@@ -4,7 +4,11 @@ project(mal LANGUAGES CXX)
 find_program(IWYU include-what-you-use)
 if(IWYU)
   set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE
-    ${IWYU};-Xiwyu;--cxx17ns;--quoted_includes_first)
+    ${IWYU};
+    -Xiwyu;
+    --cxx17ns;
+    --quoted_includes_first
+  )
 endif()
 
 if(APPLE)
@@ -17,6 +21,24 @@ if(APPLE)
   if(READLINE_PREFIX)
     list(APPEND CMAKE_PREFIX_PATH "${READLINE_PREFIX}")
   endif()
+  execute_process(
+    COMMAND brew --prefix llvm
+    OUTPUT_VARIABLE LLVM_PREFIX
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+  if(LLVM_PREFIX)
+    list(APPEND CMAKE_PREFIX_PATH "${LLVM_PREFIX}")
+  endif()
+endif()
+
+find_program(CLANG_TIDY clang-tidy)
+if(CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY
+    ${CLANG_TIDY};
+    -header-filter=${CMAKE_CURRENT_SOURCE_DIR}/.*;
+    -checks=-*,performance-*
+  )
 endif()
 
 find_package(PkgConfig REQUIRED)

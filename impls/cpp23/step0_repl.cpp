@@ -17,12 +17,12 @@ std::string EVAL(std::string str) { return str; }
 std::string PRINT(std::string str) { return str; }
 
 
-std::string rep(std::string str) { return PRINT(EVAL(READ(std::move(str)))); }
+std::string rep(const std::string& str) { return PRINT(EVAL(READ(str))); }
 
 } // namespace mal
 
 int main() {
   std::string line;
   while (auto line = mal::rl.get("user> "))
-    std::print("{}\n", mal::rep(std::move(line.value())));
+    std::print("{}\n", mal::rep(line.value()));
 }

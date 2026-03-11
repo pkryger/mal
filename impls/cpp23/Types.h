@@ -63,7 +63,9 @@ inline constexpr auto MalReadably{PrintType::Type::MalReadably};
 class Value : public GarbageCollectible, public std::enable_shared_from_this<Value> {
 public:
   virtual std::string print(PrintType readably) const = 0;
-  virtual  ValuePtr eval(EnvPtr) const { return shared_from_this(); }
+
+  // NOLINTNEXTLINE(performance-unnecessary-value-param)
+  virtual ValuePtr eval(EnvPtr) const { return shared_from_this(); }
 
   bool isTrue() const noexcept;
 
@@ -520,7 +522,7 @@ public:
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  ValuePtr find(ValuePtr key) const;
+  ValuePtr find(const ValuePtr &key) const;
 
   auto begin() const { return data.begin(); }
 
@@ -590,7 +592,7 @@ public:
         body{std::move(other.body)}, capturedEnv{std::move(other.capturedEnv)} {}
 
 protected:
-  template <typename TYPE> ValuePtr isEqualTo(ValuePtr rhs) const;
+  template <typename TYPE> ValuePtr isEqualTo(const ValuePtr &rhs) const;
 
   template <typename VALUES>
   EnvPtr makeApplyEnv(VALUES &&values, EnvPtr evalEnv) const;

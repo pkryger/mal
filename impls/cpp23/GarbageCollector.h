@@ -92,6 +92,7 @@ public:
 
   auto end() const { return std::default_sentinel; }
 
+  // NOLINTNEXTLINE(performance-unnecessary-value-param)
   void push_front(T value) {
     head_.set_sync(new_node(head_.get(), std::move(value)));
   }

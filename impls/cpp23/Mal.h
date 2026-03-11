@@ -67,7 +67,7 @@ template <typename TYPE, typename... ARGS>
 }
 
 template <typename TYPE>
-[[nodiscard]] const std::decay_t<TYPE> *to(ValuePtr ptr) noexcept {
+[[nodiscard]] const std::decay_t<TYPE> *to(const ValuePtr &ptr) noexcept {
   return dynamic_cast<const std::decay_t<TYPE> *>(ptr.get());
 }
 
