@@ -30,6 +30,9 @@ public:
       stack.emplace(std::forward<FUNC>(func));
     }
 
+    Guard(const Guard &) = delete;
+    Guard &operator=(const Guard &) = delete;
+
     ~Guard() {
       stack.pop();
     }

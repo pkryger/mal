@@ -44,6 +44,10 @@ public:
     return type_ != Type::Simply;
   }
 
+  constexpr Type type() const noexcept {
+    return type_;
+  }
+
   constexpr PrintType() noexcept = default;
   constexpr PrintType(const PrintType &) noexcept = default;
   constexpr PrintType &operator=(const PrintType &) noexcept = default;
@@ -53,6 +57,7 @@ public:
   constexpr auto operator<=>(const PrintType &) const noexcept = default;
   constexpr bool operator==(const PrintType &) const noexcept = default;
 
+private:
   Type type_{Type::Simply};
 };
 
@@ -203,7 +208,7 @@ struct formatter<mal::ValuesMap::value_type> : mal::ParseValueMixin {
   template <typename FORMAT_CONTEXT>
   auto format(const mal::ValuesMap::value_type &val,
               FORMAT_CONTEXT &ctx) const {
-    switch (printType.type_) {
+    switch (printType.type()) {
     using enum mal::PrintType::Type;
     case Simply:
       return format_to(ctx.out(), "{} {}", val.first, val.second);
@@ -331,23 +336,21 @@ public:
 
 class Constant : public StringBase {
 public:
-  static ValuePtr nilValue() {
-    static Constant val{"nil"};
-    static ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
-
+  static const ValuePtr &nilValue() {
+    static const Constant val{"nil"};
+    static const ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
     return ptr;
   }
 
-  static ValuePtr trueValue() {
-    static Constant val{"true"};
-    static ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
-
+  static const ValuePtr &trueValue() {
+    static const Constant val{"true"};
+    static const ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
     return ptr;
   }
 
-  static ValuePtr falseValue() {
-    static Constant val{"false"};
-    static ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
+  static const ValuePtr &falseValue() {
+    static const Constant val{"false"};
+    static const ValuePtr ptr{std::addressof(val), [](auto &&) noexcept {}};
     return ptr;
   }
 
@@ -592,7 +595,8 @@ public:
         body{std::move(other.body)}, capturedEnv{std::move(other.capturedEnv)} {}
 
 protected:
-  template <typename TYPE> ValuePtr isEqualTo(const ValuePtr &rhs) const;
+  template <typename TYPE>
+  ValuePtr isEqualToFunctionBase(const ValuePtr &rhs) const;
 
   template <typename VALUES>
   EnvPtr makeApplyEnv(VALUES &&values, EnvPtr evalEnv) const;
@@ -653,7 +657,7 @@ public:
 
 class Macro : public FunctionBase {
 public:
-  explicit Macro(const Lambda &other) noexcept : FunctionBase{other} {}
+  explicit Macro(const Lambda &other) : FunctionBase{other} {}
 
   explicit Macro(Lambda &&other) noexcept : FunctionBase{std::move(other)} {}
 

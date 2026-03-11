@@ -32,7 +32,7 @@ public:
   };
 
   using NodeAllocator =
-      typename std::allocator_traits<ALLOCATOR>::template rebind_alloc<Node>;
+      std::allocator_traits<ALLOCATOR>::template rebind_alloc<Node>;
 
   template <bool CONST> class Iterator {
   public:
@@ -224,10 +224,8 @@ public:
               return;
             }
             std::unique_lock guard{mtx_};
-            bool stopRequested =
-                cv_.wait_for(guard, stoken, std::chrono::seconds(1),
-                             [&]() { return stoken.stop_requested(); });
-            if (stopRequested) {
+            if (cv_.wait_for(guard, stoken, std::chrono::seconds(1),
+                             [&]() { return stoken.stop_requested(); })) {
               return;
             }
           }

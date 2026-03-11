@@ -118,7 +118,7 @@ private:
 
 class ReadLine : detail::ReadLineHistoryInit{
 public:
-  explicit ReadLine() noexcept;
+  explicit ReadLine();
   explicit ReadLine(const std::string &file);
 
   std::optional<std::string> get(const std::string &prompt);

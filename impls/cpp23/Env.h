@@ -132,7 +132,7 @@ public:
 
     friend constexpr bool operator==(const Iterator &lhs,
                                      std::default_sentinel_t) noexcept {
-      return !lhs.current;
+      return lhs.current == nullptr;
     }
 
   private:

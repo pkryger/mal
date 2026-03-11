@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace {
@@ -21,7 +22,7 @@ namespace detail {
 
 ReadLineHistoryInit::ReadLineHistoryInit(int size) noexcept {
   [[maybe_unused]]
-  static bool initialised = [&]() {
+  static const bool initialised = [&]() {
     using_history();
     stifle_history(size);
     return true;
@@ -32,7 +33,7 @@ ReadLineHistoryInit::ReadLineHistoryInit(int size) noexcept {
 
 static const int ReadLineHistorySize{100};
 
-ReadLine::ReadLine() noexcept
+ReadLine::ReadLine()
     : detail::ReadLineHistoryInit{ReadLineHistorySize},
       lines{ReadLineHistorySize}, historyFile{nullptr} {}
 

@@ -1,8 +1,11 @@
 #include "Env.h" // IWYU pragma: associated
+#include "Mal.h"
 #include "Types.h"
 
 #include <algorithm> // IWYU pragma: keep
 #include <cassert>
+#include <cstddef>
+#include <functional>
 #include <memory>
 #include <ranges>
 #include <utility>

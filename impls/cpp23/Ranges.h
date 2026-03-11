@@ -42,7 +42,7 @@ struct Pipeable
 template <typename FN> Pipeable(FN &&) -> Pipeable<FN>;
 
 constexpr std::size_t divCeil(std::size_t n, std::size_t denominator) {
-  return n / denominator + (n % denominator ? 1 : 0);
+  return (n / denominator) + ((n % denominator) != 0u ? 1u : 0u);
 }
 
 } // namespace detail

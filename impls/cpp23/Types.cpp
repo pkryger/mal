@@ -326,7 +326,7 @@ FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
 }
 
 template <typename TYPE>
-ValuePtr FunctionBase::isEqualTo(const ValuePtr &rhs) const {
+ValuePtr FunctionBase::isEqualToFunctionBase(const ValuePtr &rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
@@ -376,7 +376,7 @@ std::string Lambda::print(PrintType readable) const {
 }
 
 ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
-  return FunctionBase::template isEqualTo<Lambda>(rhs);
+  return FunctionBase::template isEqualToFunctionBase<Lambda>(rhs);
 }
 
 InvocableResult Lambda::apply(bool evaled, ValuesSpan values,
@@ -400,7 +400,7 @@ std::string Macro::print(PrintType readable) const {
 }
 
 ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
-  return FunctionBase::template isEqualTo<Macro>(rhs);
+  return FunctionBase::template isEqualToFunctionBase<Macro>(rhs);
 }
 
 InvocableResult Macro::apply(bool /* evaled */, ValuesSpan values,

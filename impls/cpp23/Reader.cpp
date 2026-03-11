@@ -1,4 +1,5 @@
 #include "Reader.h" // IWYU pragma: associated
+#include "Mal.h"
 #if !defined(__cpp_lib_ranges_stride)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_stride
@@ -107,28 +108,32 @@ void Tokeniser::nextToken() {
     pos += tokenSize();
   }
 
-  if (eoi())
+  if (eoi()) {
     return;
+  }
 
   for (const auto &regex : tokenRegexes) {
-    if (match(regex))
+    if (match(regex)) {
       return;
+    }
   }
 
   std::string mismatch{pos, str.end()};
-  if (mismatch[0] == '"')
+  if (mismatch[0] == '"') {
     throw ReaderException{"unbalanced \""};
+  }
   throw ReaderException{std::format("mismatch from: {}", std::move(mismatch))};
 }
 
-ValuePtr readForm(Tokeniser&);
+ValuePtr readForm(Tokeniser & /* tokeniser */);
 
 ValuesContainer readSequence(Tokeniser &tokeniser, const std::string &end) {
   assert(!tokeniser.eoi());
   ValuesContainer items;
   while ([&]() {
-    if (tokeniser.eoi())
+    if (tokeniser.eoi()) {
       throw ReaderException{"unbalanced " + end};
+    }
     return true; }()
     && tokeniser.peek() != end) {
     items.emplace_back(readForm(tokeniser));
@@ -195,9 +200,9 @@ ValuePtr readForm(Tokeniser &tokeniser) {
                                  std::to_string(items.size())};
     }
     for (auto key : items | std::views::stride(2)) {
-      if (!(to<String>(key) ||
-            to<Symbol>(key) ||
-            to<Keyword>(key))) {
+      if (!(to<String>(key) != nullptr ||
+            to<Symbol>(key) != nullptr ||
+            to<Keyword>(key) != nullptr)) {
         throw ReaderException{std::format("unexpected key '{:r}'", key)};
       }
     }

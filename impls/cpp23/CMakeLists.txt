@@ -37,7 +37,7 @@ if(CLANG_TIDY)
   set(CMAKE_CXX_CLANG_TIDY
     ${CLANG_TIDY};
     -header-filter=${CMAKE_CURRENT_SOURCE_DIR}/.*;
-    -checks=-*,performance-*
+    -checks=-*,performance-*,clang-analyzer-*,concurrency-*,portability-*
   )
 endif()
 
