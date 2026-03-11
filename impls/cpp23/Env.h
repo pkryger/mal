@@ -2,13 +2,11 @@
 #define INCLUDE_ENV
 
 #include "Mal.h"
-#include "BloomFilter.h"
 
 #include <concepts>
 #include <cstddef>
 #include <functional> // IWYU pragma: keep
 #include <iterator>
-#include <ranges>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -158,8 +156,6 @@ public:
 
   virtual std::size_t mapsSize() const = 0;
 
-  virtual std::vector<Key> keys() const = 0;
-
   auto begin() noexcept {
     return Iterator<false>{this};
   }
@@ -197,25 +193,13 @@ public:
 
   ValuePtr findLocal(FindLocalKey phk) const override;
 
-  std::vector<Key> keys() const override {
-    return std::views::keys(map_) | std::ranges::to<std::vector>();
-  }
-
   std::size_t mapsSize() const override { return map_.size(); }
 
 private:
   Map map_;
 };
 
-
 class ApplyEnv : public EnvBase {
-  auto capturedEnvKeys() const {
-    return *capturedEnv_ |
-           std::views::transform([&](auto &&env) { return env.keys(); }) |
-           std::views::join;
-  }
-  std::vector<Key> keys() const override;
-
 public:
   explicit ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept;
 
@@ -226,12 +210,6 @@ public:
   std::size_t mapsSize() const override;
 
 private:
-
-  BloomFilter<Key, std::size_t{1} << 13, // 8192 bits = 1KiB
-              std::size_t{1} << 10,      // 1024 keys -> 5 iterations for 1% of
-                                         // false positive probability
-              Hash>
-      filter_;
   Map map_;
   EnvPtr capturedEnv_;
 };

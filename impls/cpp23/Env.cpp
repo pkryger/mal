@@ -64,37 +64,16 @@ void Env::insert_or_assign(Key key, ValuePtr value) {
   map_.insert_or_assign(std::move(key), std::move(value));
 }
 
-std::vector<EnvBase::Key> ApplyEnv::keys() const {
-  std::vector<Key> res;
-  res.reserve(mapsSize());
-  for (auto &&key : std::views::keys(map_)) {
-    res.push_back(key);
-  }
-  for (auto &&key : capturedEnvKeys()) {
-    res.emplace_back(std::move(key));
-  }
-  return res;
-}
-
 ApplyEnv::ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept
-    : EnvBase{std::move(evalEnv)}, capturedEnv_{std::move(capturedEnv)} {
-  for (auto &&key : capturedEnvKeys()) {
-    filter_.insert(key);
-  }
-}
+    : EnvBase{std::move(evalEnv)}, capturedEnv_{std::move(capturedEnv)} {}
 
 void ApplyEnv::insert_or_assign(Key key, ValuePtr value) {
   assert(value);
   registerDebugEval(key, value);
-  filter_.insert(key);
   map_.insert_or_assign(std::move(key), std::move(value));
 }
 
-
 ValuePtr ApplyEnv::findLocal(FindLocalKey phk) const {
-  if (!filter_.possiblyContains(phk)) {
-    return nullptr;
-  }
   if (auto it = map_.find(phk); it != map_.end()) {
     return it->second;
   }

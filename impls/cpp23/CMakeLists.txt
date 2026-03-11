@@ -32,7 +32,6 @@ target_sources(mal
   PUBLIC
     FILE_SET HEADERS
     FILES
-      BloomFilter.h
       Core.h
       Env.h
       FunctionRef.h
