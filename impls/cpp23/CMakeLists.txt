@@ -36,6 +36,7 @@ target_sources(mal
       Env.h
       FunctionRef.h
       GarbageCollector.h
+      InPlaceAllocator.h
       Mal.h
       Ranges.h
       Reader.h

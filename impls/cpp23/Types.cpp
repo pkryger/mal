@@ -1,6 +1,7 @@
 #include "Types.h" // IWYU pragma: associated
 #include "Core.h"
 #include "FunctionRef.h"
+#include "InPlaceAllocator.h"
 #include "Mal.h"
 #include "Ranges.h"
 
@@ -8,6 +9,7 @@
 #include <cassert>
 #include <format>
 #include <ranges>
+#include <span>
 #include <tuple>
 #include <typeinfo>
 #include <utility>
@@ -16,6 +18,8 @@ namespace {
 
 using mal::EnvPtr;
 using mal::EvalFnStack;
+using mal::InPlaceAllocator;
+using mal::ValuePtr;
 using mal::ValuesContainer;
 using mal::ValuesSpan;
 
@@ -27,7 +31,32 @@ auto evalValues(VALUES &&values, EnvPtr evalEnv)  {
          std::views::transform([&](auto &&v) { return evalFn(v, evalEnv); });
 }
 
-}
+class WithEvaledValues {
+public:
+  inline static constexpr std::size_t InPlaceLimit = 32;
+  using Allocator = InPlaceAllocator<ValuePtr, InPlaceLimit>;
+
+  explicit WithEvaledValues(ValuesSpan values, EnvPtr evalEnv)
+      : values_{values}, evalEnv_{std::move(evalEnv)} {}
+
+  template <typename FUNC> auto operator()(FUNC &&func) {
+    auto view = evalValues(values_, evalEnv_);
+    if (InPlaceLimit < values_.size()) [[unlikely]] {
+      return std::forward<FUNC>(func)(view |
+                                      std::ranges::to<ValuesContainer>());
+    }
+
+    return std::forward<FUNC>(func)(std::vector<ValuePtr, Allocator>{
+        std::from_range, view, Allocator{storage_}});
+  }
+
+private:
+  ValuesSpan values_;
+  EnvPtr evalEnv_;
+  Allocator::Storage storage_;
+};
+
+} // namespace
 
 namespace mal {
 
@@ -261,9 +290,9 @@ InvocableResult BuiltIn::apply(bool evaled, ValuesSpan values,
   if (evaled) {
     return handler(name, values, std::move(evalEnv));
   }
-  return handler(
-      name, evalValues(values, evalEnv) | std::ranges::to<ValuesContainer>(),
-      std::move(evalEnv));
+  return WithEvaledValues{values, evalEnv}([&](auto &&values) {
+    return handler(name, std::forward<decltype(values)>(values), std::move(evalEnv));
+  });
 }
 
 ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
