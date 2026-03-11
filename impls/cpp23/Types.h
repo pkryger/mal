@@ -1,7 +1,9 @@
 #ifndef INCLUDE_TYPES_H
 #define INCLUDE_TYPES_H
 
+#if !defined(__cpp_lib_ranges_chunk)
 #include "Ranges.h"
+#endif // __cpp_lib_ranges_chunk
 #include "Env.h"
 #include "Mal.h"
 

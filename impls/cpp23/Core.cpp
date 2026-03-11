@@ -1,7 +1,9 @@
 #include "Core.h" // IWYU pragma: associated
 #include "Env.h"
 #include "Mal.h"
+#if !defined(__cpp_lib_ranges_stride)
 #include "Ranges.h"
+#endif // __cpp_lib_ranges_stride
 #include "ReadLine.h"
 #include "Reader.h"
 #include "Types.h"
@@ -24,9 +26,9 @@
 #include <string>
 #include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 // IWYU pragma: no_include <__vector/vector.h>
-// IWYU pragma: no_include <type_traits>
 
 namespace mal {
 

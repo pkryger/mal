@@ -292,7 +292,7 @@ inline constexpr auto Chunk = chunk_fn::ChunkFn{};
 } // namespace views
 } // namespace mal
 
-#ifndef __cpp_lib_ranges_chunk
+#if !defined(__cpp_lib_ranges_chunk)
 namespace std {
 namespace ranges {
 template <std::ranges::input_range VIEW>
@@ -503,7 +503,7 @@ inline constexpr auto Stride = stride_fn::StrideFn{};
 } // namespace views
 } // namespace mal
 
-#ifndef __cpp_lib_ranges_stride
+#if !defined(__cpp_lib_ranges_stride)
 namespace std {
 namespace ranges {
 template <std::ranges::input_range VIEW>

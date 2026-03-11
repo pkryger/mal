@@ -3,7 +3,9 @@
 #include "Env.h"
 #include "FunctionRef.h"
 #include "Mal.h"
+#if !defined(__cpp_lib_ranges_chunk)
 #include "Ranges.h"
+#endif // __cpp_lib_ranges_chunk
 #include "Types.h"
 
 #include <algorithm> // IWYU pragma: keep
@@ -13,10 +15,10 @@
 #include <ranges>
 #include <string_view>
 #include <utility>
-// IWYU pragma: no_include <span>
-// IWYU pragma: no_include <string>
+#include <span>
+#include <string>
+#include <type_traits>
 // IWYU pragma: no_include <tuple>
-// IWYU pragma: no_include <type_traits>
 
 namespace mal {
 InvocableResult specialDefBang(std::string_view name, ValuesSpan values,

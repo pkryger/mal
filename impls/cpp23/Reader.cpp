@@ -1,5 +1,7 @@
 #include "Reader.h" // IWYU pragma: associated
+#if !defined(__cpp_lib_ranges_stride)
 #include "Ranges.h"
+#endif // __cpp_lib_ranges_stride
 #include "Types.h"
 
 #include <algorithm>
@@ -7,13 +9,13 @@
 #include <cassert>
 #include <format>
 #include <limits>
-// IWYU pragma: no_include <ranges>
-#ifdef __cpp_lib_ranges_stride
+#if defined(__cpp_lib_ranges_stride)
 #include <ranges>
-#endif
+#endif // __cpp_lib_ranges_stride
 #include <regex>
 #include <string>
 #include <utility>
+// IWYU pragma: no_include <ranges>
 // IWYU pragma: no_include <memory>
 
 namespace {

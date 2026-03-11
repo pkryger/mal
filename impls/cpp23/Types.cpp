@@ -3,7 +3,9 @@
 #include "FunctionRef.h"
 #include "InPlaceAllocator.h"
 #include "Mal.h"
+#if !defined(__cpp_lib_ranges_chunk)
 #include "Ranges.h"
+#endif // __cpp_lib_ranges_chunk
 
 #include <algorithm>
 #include <cassert>
