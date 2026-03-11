@@ -88,7 +88,7 @@ protected:
 };
 
 
-class Integer : public Value {
+class Integer final : public Value {
 public:
   explicit Integer(std::int64_t value) noexcept : data{value} {}
 
@@ -292,7 +292,8 @@ private:
 
 } // namespace detail
 
-class Symbol : public StringBase, public detail::Intern<Env::Key, Symbol> {
+class Symbol final : public StringBase,
+                     public detail::Intern<Env::Key, Symbol> {
 public:
   explicit Symbol(std::string value, std::optional<std::string> fromMacro = {})
       : StringBase{std::move(value)}, Intern{data},
@@ -329,7 +330,7 @@ private:
 
 inline static Symbol debugEval{"DEBUG-EVAL"};
 
-class Keyword : public StringBase {
+class Keyword final : public StringBase {
 public:
   explicit Keyword(std::string value) noexcept : StringBase{std::move(value)} {}
 };
@@ -362,7 +363,7 @@ private:
 
 };
 
-class String : public StringBase {
+class String final : public StringBase {
 public:
   explicit String(std::string v) noexcept : StringBase{std::move(v)} {}
 
@@ -374,7 +375,7 @@ public:
   static std::string escape(const std::string &in);
 };
 
-class Atom : public Value {
+class Atom final : public Value {
 public:
   explicit Atom(ValuePtr value) noexcept : data{std::move(value)} {}
 
@@ -434,7 +435,7 @@ protected:
   ValuesContainer data;
 };
 
-class List : public Sequence, public MetaMixIn {
+class List final : public Sequence, public MetaMixIn {
 public:
   explicit List(ValuesContainer values) noexcept
       : Sequence{std::move(values)} {}
@@ -461,7 +462,7 @@ public:
   }
 };
 
-class Vector : public Sequence, public MetaMixIn {
+class Vector final : public Sequence, public MetaMixIn {
 public:
   explicit Vector(ValuesContainer values) noexcept
       : Sequence{std::move(values)} {}
@@ -486,7 +487,7 @@ public:
 
 };
 
-class Hash : public Value, public MetaMixIn {
+class Hash final : public Value, public MetaMixIn {
 public:
   // To ensure that the last element that with a given key takes a precedence
   // over previous elements with the same key, use std::views::reverse to
@@ -545,7 +546,7 @@ public:
                                 EnvPtr evalEnv) const = 0;
 };
 
-class BuiltIn : public Invocable, public MetaMixIn {
+class BuiltIn final : public Invocable, public MetaMixIn {
 public:
   using HandlerFn = InvocableResult(std::string_view name, ValuesSpan value,
                                     EnvPtr Env);
@@ -631,7 +632,7 @@ struct std::formatter<mal::FunctionBase::Params>
 
 namespace mal {
 
-class Lambda : public FunctionBase, public MetaMixIn {
+class Lambda final : public FunctionBase, public MetaMixIn {
 public:
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>, Symbol>
@@ -655,7 +656,7 @@ public:
   }
 };
 
-class Macro : public FunctionBase {
+class Macro final : public FunctionBase {
 public:
   explicit Macro(const Lambda &other) : FunctionBase{other} {}
 
@@ -670,7 +671,7 @@ public:
 
 };
 
-class Eval : public Invocable, public MetaMixIn {
+class Eval final : public Invocable, public MetaMixIn {
 public:
   explicit Eval(EnvPtr env) : env{std::move(env)} {}
 
