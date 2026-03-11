@@ -264,11 +264,11 @@ template <typename UINT, typename BASE>
 class Intern<UINT, BASE> {
 public:
   explicit Intern(const std::string &name)
-      : intern{[&]() {
-          auto newIntern = ++counter;
-          auto it = interns.emplace(name, newIntern);
+      : intern_{[&]() {
+          auto newIntern = ++counter_;
+          auto it = interns_.emplace(name, newIntern);
           if (!it.second) {
-            --counter;
+            --counter_;
             return it.first->second;
           }
           return newIntern;
@@ -280,13 +280,12 @@ public:
 
 protected:
   template <typename KEY_VIEW>
-  KEY_VIEW asKey() const { return intern; }
+  KEY_VIEW asKey() const { return intern_; }
 
 private:
-  std::uint64_t intern{0};
-
-  inline static std::uint64_t counter{0};
-  inline static std::unordered_map<std::string, std::uint64_t> interns;
+  UINT intern_{0};
+  inline static UINT counter_{0};
+  inline static std::unordered_map<std::string, UINT> interns_;
 };
 
 
