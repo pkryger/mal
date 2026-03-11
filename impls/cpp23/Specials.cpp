@@ -55,7 +55,14 @@ InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
                throw EvalException{
                    std::format("invalid let* binding '({:r}'", chunk)};
              })) {
-      letEnv->insert_or_assign(std::move(key), std::move(value));
+      if constexpr (std::is_trivially_copyable_v<decltype(key)>) {
+        letEnv->insert_or_assign(key, std::move(value));
+      } else {
+        letEnv->insert_or_assign(
+            // NOLINTNEXTLINE(performance-move-const-arg)
+            std::move(key),
+            std::move(value));
+      }
     }
     return {values[1], std::move(letEnv), true};
   }

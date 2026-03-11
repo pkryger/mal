@@ -5,6 +5,7 @@
 
 #include <concepts>
 #include <cstddef>
+#include <cstdint> // IWYU pragma: keep
 #include <functional> // IWYU pragma: keep
 #include <iterator>
 #include <string>
@@ -32,9 +33,9 @@ class EnvBase : public GarbageCollectible {
 public:
   // using Key = std::uint32_t;
   // xor
-  // using Key = std::uint64_t;
+  using Key = std::uint64_t;
   // xor
-  using Key = std::string;
+  // using Key = std::string;
   using KeyView = std::conditional_t<std::is_trivially_copyable_v<Key> &&
                                          sizeof(Key) <= 2 * sizeof(void *),
                                      Key, const Key &>;

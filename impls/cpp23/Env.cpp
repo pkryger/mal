@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <ranges>
+#include <type_traits>
 #include <utility>
 
 namespace mal {
@@ -64,7 +65,15 @@ ValuePtr Env::findLocal(FindLocalKey phk) const {
 void Env::insert_or_assign(Key key, ValuePtr value) {
   assert(value);
   registerDebugEval(key, value);
-  map_.insert_or_assign(std::move(key), std::move(value));
+  if constexpr (std::is_trivially_copyable_v<Key>) {
+    map_.insert_or_assign(key, std::move(value));
+  } else {
+
+    map_.insert_or_assign(
+        // NOLINTNEXTLINE(performance-move-const-arg)
+        std::move(key),
+        std::move(value));
+  }
 }
 
 ApplyEnv::ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept
@@ -73,7 +82,14 @@ ApplyEnv::ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept
 void ApplyEnv::insert_or_assign(Key key, ValuePtr value) {
   assert(value);
   registerDebugEval(key, value);
-  map_.insert_or_assign(std::move(key), std::move(value));
+  if constexpr (std::is_trivially_copyable_v<Key>) {
+    map_.insert_or_assign(key, std::move(value));
+  } else {
+    map_.insert_or_assign(
+        // NOLINTNEXTLINE(performance-move-const-arg)
+        std::move(key),
+        std::move(value));
+  }
 }
 
 ValuePtr ApplyEnv::findLocal(FindLocalKey phk) const {
