@@ -50,6 +50,16 @@ if(NOT READLINE_FOUND)
     macOS: brew install readline")
 endif()
 
+
+add_library(project_sanitizers INTERFACE)
+target_compile_options(project_sanitizers INTERFACE
+  -fsanitize=address,undefined
+  -fno-omit-frame-pointer
+)
+target_link_options(project_sanitizers INTERFACE
+    -fsanitize=address,undefined
+)
+
 add_library(mal)
 target_sources(mal
   PUBLIC
@@ -75,7 +85,10 @@ target_sources(mal
     Types.cpp
 )
 target_include_directories(mal PUBLIC ${READLINE_INCLUDE_DIRS})
-target_link_libraries(mal INTERFACE ${READLINE_LIBRARIES})
+target_link_libraries(mal INTERFACE
+  ${READLINE_LIBRARIES}
+  $<$<CONFIG:Debug>:project_sanitizers>
+)
 target_link_directories(mal INTERFACE ${READLINE_LIBRARY_DIRS})
 target_compile_features(mal PUBLIC cxx_std_23)
 target_compile_options(mal PRIVATE
@@ -93,7 +106,10 @@ file(GLOB mains CONFIGURE_DEPENDS step*.cpp)
 foreach(main ${mains})
   get_filename_component(target ${main} NAME_WLE)
   add_executable(${target} ${main})
-  target_link_libraries(${target} PRIVATE mal)
+  target_link_libraries(${target} PRIVATE
+    mal
+    $<$<CONFIG:Debug>:project_sanitizers>
+  )
 endforeach()
 
 if(CMAKE_EXPORT_COMPILE_COMMANDS)
