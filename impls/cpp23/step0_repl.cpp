@@ -3,7 +3,6 @@
 #include <optional>
 #include <print>
 #include <string>
-#include <utility>
 
 namespace mal {
 static ReadLine rl("~/.mal_history");

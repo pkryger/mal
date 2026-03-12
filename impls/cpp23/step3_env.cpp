@@ -15,7 +15,6 @@
 #include <optional>
 #include <print>
 #include <string>
-#include <type_traits>
 #include <utility>
 // IWYU pragma: no_include <string_view>
 // IWYU pragma: no_include <tuple>
@@ -40,13 +39,13 @@ ValuePtr EVAL(ValuePtr ast,
   if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
     std::print("EVAL: {:l}\n", ast);
   }
-  if (auto list = to<List>(ast)) {
+  if (auto list = ast->dyncast<List>()) {
     auto&& values = list->values();
     if (values.empty()) {
       return ast->eval(env);
     }
     if (auto special = [&]() -> Special * {
-          if (auto symbol = to<Symbol>(values[0])) {
+          if (auto symbol = values[0]->dyncast<Symbol>()) {
             auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
               return *symbol == elt.first;
             });

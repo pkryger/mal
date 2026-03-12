@@ -69,6 +69,7 @@ target_sources(mal
       Env.h
       FunctionRef.h
       GarbageCollector.h
+      Hierarchy.h
       InPlaceAllocator.h
       Mal.h
       Ranges.h

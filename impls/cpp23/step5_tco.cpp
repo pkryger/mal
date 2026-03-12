@@ -16,7 +16,6 @@
 #include <print>
 #include <string>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 // IWYU pragma: no_include <string_view>
 
@@ -44,13 +43,13 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
       std::print("EVAL: {:l}\n", ast);
     }
 
-    if (auto list = to<List>(ast)) {
+    if (auto list = ast->dyncast<List>()) {
       auto&& values = list->values();
       if (values.empty()) {
         return ast->eval(env);
       }
       if (auto special = [&]() -> Special * {
-        if (auto symbol = to<Symbol>(values[0])) {
+        if (auto symbol = values[0]->dyncast<Symbol>()) {
           auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
             return *symbol == elt.first;
           });
@@ -64,7 +63,7 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
         std::tie(ast, env, needsEval) = [&]() {
           auto data = list->values();
           auto op = EVAL(data[0], env);
-          if (auto invocable = to<Invocable>(op)) {
+          if (auto invocable = op->dyncast<Invocable>()) {
             return invocable->apply(false, data.subspan(1), env);
           }
           throw EvalException{std::format("invalid function '{:r}'", op)};

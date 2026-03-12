@@ -200,9 +200,9 @@ ValuePtr readForm(Tokeniser &tokeniser) {
                                  std::to_string(items.size())};
     }
     for (auto key : items | std::views::stride(2)) {
-      if (!(to<String>(key) != nullptr ||
-            to<Symbol>(key) != nullptr ||
-            to<Keyword>(key) != nullptr)) {
+      if (!(key->isa<String>() ||
+            key->isa<Symbol>() ||
+            key->isa<Keyword>())) {
         throw ReaderException{std::format("unexpected key '{:r}'", key)};
       }
     }

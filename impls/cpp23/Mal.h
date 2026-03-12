@@ -69,11 +69,6 @@ template <typename TYPE, typename... ARGS>
   return res;
 }
 
-template <typename TYPE>
-[[nodiscard]] const std::decay_t<TYPE> *to(const ValuePtr &ptr) noexcept {
-  return dynamic_cast<const std::decay_t<TYPE> *>(ptr.get());
-}
-
 using EvalFn = ValuePtr(ValuePtr, EnvPtr);
 using EvalFnStack = detail::FnStack<EvalFn>;
 

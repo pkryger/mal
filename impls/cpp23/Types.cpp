@@ -75,7 +75,7 @@ ValuePtr Integer::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<Integer>(rhs);
+  if (auto other = rhs->dyncast<Integer>();
       other && data == other->data) {
     return Constant::trueValue();
   }
@@ -89,7 +89,7 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   if (auto other = [&]() noexcept -> const StringBase * {
         auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
         if (typeid(*this) == typeid(o)) {
-          return to<StringBase>(rhs);
+          return rhs->dyncast<StringBase>();
         }
         return nullptr;
       }();
@@ -110,7 +110,7 @@ ValuePtr Symbol::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<Symbol>(rhs); other && asKey() == other->asKey()) {
+  if (auto other = rhs->dyncast<Symbol>(); other && asKey() == other->asKey()) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -179,7 +179,7 @@ ValuePtr Atom::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto o = to<Atom>(rhs)) {
+  if (auto o = rhs->dyncast<Atom>()) {
     return data->isEqualTo(o->data);
   }
   return Constant::falseValue();
@@ -189,7 +189,7 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<Sequence>(rhs);
+  if (auto other = rhs->dyncast<Sequence>();
       other && data.size() == other->data.size()) {
     auto res =
         std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
@@ -208,7 +208,7 @@ std::string List::print(PrintType readably) const {
   }
   if (auto fromMacro = [&]() -> std::optional<std::string> {
         if (data.size() == 2) {
-          if (auto symbol = to<Symbol>(data[0])) {
+          if (auto symbol = data[0]->dyncast<Symbol>()) {
             return symbol->fromMacro;
           }
         }
@@ -239,7 +239,7 @@ ValuePtr List::eval(EnvPtr env) const {
   auto &evalFn = EvalFnStack::top();
   auto [ast, evalEnv, needsEval] = [&]() {
     auto op = evalFn(data[0], env);
-    if (auto invocable = to<Invocable>(op)) {
+    if (auto invocable = op->dyncast<Invocable>()) {
       return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
     }
     throw EvalException{std::format("invalid function '{:r}'", op)};
@@ -265,16 +265,17 @@ ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<Hash>(rhs)) {
+  if (auto other = rhs->dyncast<Hash>()) {
     return data == other->data ? Constant::trueValue() : Constant::falseValue();
   }
   return Constant::falseValue();
 }
 
-Hash::Hash(const Hash &other, ValuesSpan values) : data{other.data} {
+Hash::Hash(const Hash &other, ValuesSpan values)
+    : Value{typeInfo<Hash>.lo}, data{other.data} {
   for (auto [key, value] :
        values | std::views::chunk(2) | std::views::transform([](auto &&chunk) {
-         assert(to<StringBase>(chunk[0]));
+         assert(chunk[0]->template isa<StringBase>());
          return std::tie(chunk[0], chunk[1]);
        })) {
     data.insert_or_assign(key, value);
@@ -301,15 +302,16 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<BuiltIn>(rhs);
+  if (auto other = rhs->dyncast<BuiltIn>();
       other && handler == other->handler) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
 }
 
-FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
-    : bindSize{[&]() -> std::size_t {
+FunctionBase::FunctionBase(std::uint32_t loId, Params params, ValuePtr body,
+                           EnvPtr env)
+    : Invocable{loId}, bindSize{[&]() -> std::size_t {
         if (auto i = std::ranges::find_if(
                 params, [](auto &&elt) { return elt.name()[0] == '&'; });
             i != params.end()) {
@@ -322,16 +324,16 @@ FunctionBase::FunctionBase(Params params, ValuePtr body, EnvPtr env)
         return params.size();
       }()},
       params{std::move(params)}, body{std::move(body)},
-      capturedEnv{std::move(env)} {
-}
+      capturedEnv{std::move(env)} {}
 
 template <typename TYPE>
 ValuePtr FunctionBase::isEqualToFunctionBase(const ValuePtr &rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = to<TYPE>(rhs); other && bindSize == other->bindSize &&
-                                    params.size() == other->params.size()) {
+  if (auto other = rhs->dyncast<TYPE>();
+      other && bindSize == other->bindSize &&
+      params.size() == other->params.size()) {
     auto res = std::ranges::mismatch(params, other->params,
                                      [](auto &&lhs, auto &&rhs) noexcept {
                                        return lhs == rhs;

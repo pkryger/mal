@@ -26,7 +26,6 @@
 #include <string>
 #include <string_view>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 // IWYU pragma: no_include <__vector/vector.h>
 
@@ -108,7 +107,6 @@ using mal::Sequence;
 using mal::String;
 using mal::StringBase;
 using mal::Symbol;
-using mal::to;
 using mal::ValuePtr;
 using mal::ValuesContainer;
 using mal::ValuesSpan;
@@ -118,7 +116,7 @@ template <typename TYPE>
 InvocableResult typeQuestion(std::string_view name, ValuesSpan values,
                              EnvPtr env) {
   checkArgsIs(name, values, 1);
-  return {to<TYPE>(values[0]) ? Constant::trueValue() : Constant::falseValue(),
+  return {values[0]->isa<TYPE>() ? Constant::trueValue() : Constant::falseValue(),
           std::move(env), false};
 }
 
@@ -130,14 +128,14 @@ ValuePtr accumulateIntegers(std::string_view name, ValuesSpan values,
                             std::size_t minArgs = 1) {
   assert(minArgs > 0);
   checkArgsAtLeast(name, values, minArgs);
-  if (auto init = to<Integer>(values.front())) {
+  if (auto init = values.front()->dyncast<Integer>()) {
     if (values.size() == 1) {
       return make<Integer>(
           std::forward<UNARY_OP>(unary_op)(init->value()));
     }
     return make<Integer>(std::ranges::fold_left(
         values.subspan(1) | std::views::transform([&](auto &&elt) {
-          if (auto integer = to<Integer>(elt)) {
+          if (auto integer = elt->template dyncast<Integer>()) {
             return integer->value();
           }
           throwWrongArgument(name, elt);
@@ -198,7 +196,7 @@ InvocableResult list(std::string_view /* name */, ValuesSpan values,
 InvocableResult emptyQuestion(std::string_view name, ValuesSpan values,
                               EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto sequence = to<Sequence>(values.front())) {
+  if (auto sequence = values.front()->dyncast<Sequence>()) {
     return {sequence->values().empty() ? Constant::trueValue()
                                        : Constant::falseValue(),
             std::move(env), false};
@@ -212,7 +210,7 @@ InvocableResult count(std::string_view name, ValuesSpan values, EnvPtr env) {
   if (values.front().get() == Constant::nilValue().get()) {
     return {make<Integer>(0), std::move(env), false};
   }
-  if (auto sequence = to<Sequence>(values.front())) {
+  if (auto sequence = values.front()->dyncast<Sequence>()) {
     return {make<Integer>(sequence->values().size()), std::move(env), false};
   }
   throwWrongArgument(name, values.front());
@@ -228,7 +226,7 @@ InvocableResult compareIntegers(std::string_view name, ValuesSpan values,
         return !binary_op(lhs, rhs);
       },
       [name = name](auto &&elt) {
-        if (auto integer = to<Integer>(elt)) {
+        if (auto integer = elt->template dyncast<Integer>()) {
           return integer->value();
         }
         throwWrongArgument(name, elt);
@@ -309,7 +307,7 @@ InvocableResult str(std::string_view /* name */, ValuesSpan values,
 
 InvocableResult slurp(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto string = to<String>(values[0])) {
+  if (auto string = values[0]->dyncast<String>()) {
     auto path = string->data();
     auto file_size = std::filesystem::file_size(path);
     if (file_size >
@@ -332,7 +330,7 @@ InvocableResult slurp(std::string_view name, ValuesSpan values, EnvPtr env) {
 InvocableResult read_string(std::string_view name, ValuesSpan values,
                             EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (to<String>(values[0])) {
+  if (values[0]->isa<String>()) {
     return {readStr(std::format("{}", values[0])), std::move(env), false};
   }
   throwWrongArgument(name, values[0]);
@@ -345,7 +343,7 @@ InvocableResult atom(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult deref(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto atom = to<Atom>(values[0])) {
+  if (auto atom = values[0]->dyncast<Atom>()) {
     return {atom->value(), std::move(env), false};
   }
   throwWrongArgument(name, values[0]);
@@ -354,7 +352,7 @@ InvocableResult deref(std::string_view name, ValuesSpan values, EnvPtr env) {
 InvocableResult resetBang(std::string_view name, ValuesSpan values,
                           EnvPtr env) {
   checkArgsIs(name, values, 2);
-  if (auto atom = to<Atom>(values[0])) {
+  if (auto atom = values[0]->dyncast<Atom>()) {
     return {atom->reset(values[1]), std::move(env), false};
   }
   throwWrongArgument(name, values[0]);
@@ -375,8 +373,8 @@ ValuesContainer cons(ValuePtr value, ValuesSpan values) {
 InvocableResult swapBang(std::string_view name, ValuesSpan values, EnvPtr env) {
   assert(!EvalFnStack::empty());
   checkArgsAtLeast(name, values, 2);
-  if (auto atom = to<Atom>(values[0])) {
-    if (auto fn = to<Invocable>(values[1])) {
+  if (auto atom = values[0]->dyncast<Atom>()) {
+    if (auto fn = values[1]->dyncast<Invocable>()) {
       auto args = detail::cons(atom->value(), values.subspan(2));
       auto [ast, evalEnv, needsEval] = fn->apply(true, ValuesSpan{args}, env);
       if (needsEval) {
@@ -391,7 +389,7 @@ InvocableResult swapBang(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult cons(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 2);
-  if (auto sequence = to<Sequence>(values[1])) {
+  if (auto sequence = values[1]->dyncast<Sequence>()) {
     return {make<List>(detail::cons(values[0], sequence->values())),
             std::move(env), false};
   }
@@ -400,7 +398,7 @@ InvocableResult cons(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult concat(std::string_view name, ValuesSpan values, EnvPtr env) {
   return {make<List>(values | std::views::transform([&](auto &&elt) {
-                       if (auto sequence = to<Sequence>(elt)) {
+                       if (auto sequence = elt->template dyncast<Sequence>()) {
                          return sequence->values();
                        }
                        throwWrongArgument(name, elt);
@@ -411,10 +409,10 @@ InvocableResult concat(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult vec(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (to<Vector>(values[0])) {
+  if (values[0]->isa<Vector>()) {
     return {values[0], std::move(env), false};
   }
-  if (auto list = to<List>(values[0])) {
+  if (auto list = values[0]->dyncast<List>()) {
     return {make<Vector>(list->values()), std::move(env), false};
   }
   throwWrongArgument(name, values[0]);
@@ -422,11 +420,11 @@ InvocableResult vec(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult nth(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 2);
-  if (auto integer = to<Integer>(values[1])) {
+  if (auto integer = values[1]->dyncast<Integer>()) {
     static_assert(sizeof(decltype(std::declval<Integer>().value())) >=
                   sizeof(ValuesSpan::size_type));
     auto index = static_cast<ValuesSpan::size_type>(integer->value());
-    if (auto sequence = to<Sequence>(values[0])) {
+    if (auto sequence = values[0]->dyncast<Sequence>()) {
       values = sequence->values();
       if (0 <= index && index < values.size()) {
         return {values[index], std::move(env), false};
@@ -434,7 +432,7 @@ InvocableResult nth(std::string_view name, ValuesSpan values, EnvPtr env) {
       throw CoreException{std::format("index out of bounds {} for '{}'", index,
                                       name)};
     }
-    if (auto constant = to<Constant>(values[0]);
+    if (auto constant = values[0]->dyncast<Constant>();
         constant && index == 0 && Constant::nilValue()->isEqualTo(values[0])) {
       return {Constant::nilValue(), std::move(env), false};
     }
@@ -445,14 +443,14 @@ InvocableResult nth(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult first(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto sequence = to<Sequence>(values[0])) {
+  if (auto sequence = values[0]->dyncast<Sequence>()) {
     values = sequence->values();
     if (!values.empty()) {
       return {values[0], std::move(env), false};
     }
     return {Constant::nilValue(), std::move(env), false};
   }
-  if (auto constant = to<Constant>(values[0]);
+  if (auto constant = values[0]->dyncast<Constant>();
       constant && Constant::nilValue()->isEqualTo(values[0])) {
     return {Constant::nilValue(), std::move(env), false};
   }
@@ -461,14 +459,14 @@ InvocableResult first(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult rest(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto sequence = to<Sequence>(values[0])) {
+  if (auto sequence = values[0]->dyncast<Sequence>()) {
     values = sequence->values();
     if (!values.empty()) {
       return {make<List>(values.subspan(1)), std::move(env), false};
     }
     return {make<List>(), std::move(env), false};
   }
-  if (auto constant = to<Constant>(values[0]);
+  if (auto constant = values[0]->dyncast<Constant>();
       constant && Constant::nilValue()->isEqualTo(values[0])) {
     return {make<List>(), std::move(env), false};
   }
@@ -486,8 +484,8 @@ InvocableResult throw_(std::string_view name, ValuesSpan values,
 InvocableResult map(std::string_view name, ValuesSpan values, EnvPtr env) {
   assert(!EvalFnStack::empty());
   checkArgsIs(name, values, 2);
-  if (auto invocable = to<Invocable>(values[0])) {
-    if (auto sequence = to<Sequence>(values[1])) {
+  if (auto invocable = values[0]->dyncast<Invocable>()) {
+    if (auto sequence = values[1]->dyncast<Sequence>()) {
       return {
         make<List>(sequence->values() |
                    std::views::transform([&](auto &&value) {
@@ -507,10 +505,10 @@ InvocableResult map(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult apply(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(name, values, 2);
-  if (auto invocable = to<Invocable>(values[0])) {
+  if (auto invocable = values[0]->dyncast<Invocable>()) {
     ValuesContainer argsContainer;
     auto args = [&]() {
-      if (auto sequence = to<Sequence>(values.back())) {
+      if (auto sequence = values.back()->dyncast<Sequence>()) {
         auto backValues = sequence->values();
         if (backValues.size() == 0) {
           if (values.size() == 2) {
@@ -558,7 +556,7 @@ InvocableResult falseQuestion(std::string_view name, ValuesSpan values,
 
 InvocableResult symbol(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto string = to<String>(values[0])) {
+  if (auto string = values[0]->dyncast<String>()) {
     return {make<Symbol>(string->data()), std::move(env), false};
   }
   throwWrongArgument(name, values[0]);
@@ -566,10 +564,10 @@ InvocableResult symbol(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult keyword(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (to<Keyword>(values[0])) {
+  if (values[0]->isa<Keyword>()) {
     return {values[0], std::move(env), false};
   }
-  if (auto string = to<String>(values[0])) {
+  if (auto string = values[0]->dyncast<String>()) {
     return {make<Keyword>(std::format(":{}", string->data())), std::move(env),
             false};
   }
@@ -586,7 +584,7 @@ InvocableResult hash_map(std::string_view name, ValuesSpan values,
                   EnvPtr env) {
   if (values.size() % 2 == 0) {
     for (auto &&key : values | std::views::stride(2)) {
-      if (!to<StringBase>(key)) {
+      if (!key->isa<StringBase>()) {
         mal::throwWrongArgument(name, key);
       }
     }
@@ -599,9 +597,9 @@ InvocableResult hash_map(std::string_view name, ValuesSpan values,
 InvocableResult assoc(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(name, values, 1);
   if (values.size() % 2 == 1) {
-    if (auto hash = to<Hash>(values[0])) {
+    if (auto hash = values[0]->dyncast<Hash>()) {
       for (auto &&key : values.subspan(1) | std::views::stride(2)) {
-        if (!to<StringBase>(key)) {
+        if (!key->isa<StringBase>()) {
           mal::throwWrongArgument(name, key);
         }
       }
@@ -618,8 +616,8 @@ InvocableResult get(std::string_view name, ValuesSpan values, EnvPtr env) {
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
     return {Constant::nilValue(), std::move(env), false};
   }
-  if (auto hash = to<Hash>(values[0])) {
-    if (to<StringBase>(values[1])) {
+  if (auto hash = values[0]->dyncast<Hash>()) {
+    if (values[1]->isa<StringBase>()) {
       if (auto res = hash->find(values[1]))
         return {res, std::move(env), false};
       else {
@@ -638,8 +636,8 @@ InvocableResult containsQuestion(std::string_view name, ValuesSpan values,
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
     return {Constant::nilValue(), std::move(env), false};
   }
-  if (auto hash = to<Hash>(values[0])) {
-    if (to<StringBase>(values[1])) {
+  if (auto hash = values[0]->dyncast<Hash>()) {
+    if (values[1]->isa<StringBase>()) {
       if (hash->find(values[1]))
         return {Constant::trueValue(), std::move(env), false};
       else {
@@ -656,7 +654,7 @@ InvocableResult keys(std::string_view name, ValuesSpan values, EnvPtr env) {
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
     return {Constant::nilValue(), std::move(env), false};
   }
-  if (auto hash = to<Hash>(values[0])) {
+  if (auto hash = values[0]->dyncast<Hash>()) {
     return {make<List>(*hash | std::views::transform(
                                    [](auto &&elt) { return elt.first; })),
             std::move(env), false};
@@ -669,7 +667,7 @@ InvocableResult vals(std::string_view name, ValuesSpan values, EnvPtr env) {
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
     return {Constant::nilValue(), std::move(env), false};
   }
-  if (auto hash = to<Hash>(values[0])) {
+  if (auto hash = values[0]->dyncast<Hash>()) {
     return {make<List>(*hash | std::views::transform(
                                    [](auto &&elt) { return elt.second; })),
             std::move(env), false};
@@ -679,10 +677,10 @@ InvocableResult vals(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult dissoc(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(name, values, 1);
-  if (auto hash = to<Hash>(values[0])) {
+  if (auto hash = values[0]->dyncast<Hash>()) {
     values = values.subspan(1);
     for (auto &&key : values) {
-      if (!to<StringBase>(key)) {
+      if (!key->isa<StringBase>()) {
         throwWrongArgument(name, key);
       }
     }
@@ -696,7 +694,7 @@ InvocableResult dissoc(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult readline(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto prompt = to<String>(values[0])) {
+  if (auto prompt = values[0]->dyncast<String>()) {
     if (auto res = coreReadLine.get(prompt->data())) {
       return {make<String>(*res), std::move(env), false};
     }
@@ -715,22 +713,22 @@ InvocableResult time_ms(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult seq(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (to<Constant>(values[0])) {
+  if (values[0]->isa<Constant>()) {
     if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
       return {Constant::nilValue(), std::move(env), false};
     }
     throwWrongArgument(name, values[0]);
   }
-  if (auto sequence = to<Sequence>(values[0])) {
+  if (auto sequence = values[0]->dyncast<Sequence>()) {
     if (sequence->values().empty()) {
       return {Constant::nilValue(), std::move(env), false};
     }
-    if (auto vector = to<Vector>(values[0])) {
+    if (auto vector = values[0]->dyncast<Vector>()) {
       return {make<List>(vector->values()), std::move(env), false};
     }
     return {values[0], std::move(env), false};
   }
-  if (auto string = to<String>(values[0])) {
+  if (auto string = values[0]->dyncast<String>()) {
     if (string->data().empty()) {
       return {Constant::nilValue(), std::move(env), false};
     }
@@ -744,7 +742,7 @@ InvocableResult seq(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult conj(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsAtLeast(name, values, 2);
-  if (auto list = to<List>(values[0])) {
+  if (auto list = values[0]->dyncast<List>()) {
     values = values.subspan(1);
     auto res =
         values | std::views::reverse | std::ranges::to<ValuesContainer>();
@@ -752,7 +750,7 @@ InvocableResult conj(std::string_view name, ValuesSpan values, EnvPtr env) {
     std::ranges::copy(list->values(), std::back_inserter(res));
     return {make<List>(std::move(res)), std::move(env), false};
   }
-  if (auto vector = to<Vector>(values[0])) {
+  if (auto vector = values[0]->dyncast<Vector>()) {
     values = values.subspan(1);
     auto res = vector->values() | std::ranges::to<ValuesContainer>();
     res.reserve(res.size() + values.size());
@@ -764,7 +762,7 @@ InvocableResult conj(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult meta(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  if (auto metaMixIn = to<MetaMixIn>(values[0])) {
+  if (auto metaMixIn = dynamic_cast<const MetaMixIn *>(values[0].get())) {
     return {metaMixIn->meta(), std::move(env), false};
   }
   throwWrongArgument(name, values[0]);
@@ -772,7 +770,7 @@ InvocableResult meta(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 InvocableResult with_meta(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 2);
-  if (auto metaMixIn = to<MetaMixIn>(values[0])) {
+  if (auto metaMixIn = dynamic_cast<const MetaMixIn *>(values[0].get())) {
     return {metaMixIn->cloneWithMeta(values[1]), std::move(env), false};
   }
   throwWrongArgument(name, values[0]);
@@ -780,7 +778,7 @@ InvocableResult with_meta(std::string_view name, ValuesSpan values, EnvPtr env) 
 
 InvocableResult fnQuestion(std::string_view name, ValuesSpan values, EnvPtr env) {
   checkArgsIs(name, values, 1);
-  return {to<Invocable>(values[0]) && !to<Macro>(values[0])
+  return {values[0]->isa<Invocable>() && !values[0]->isa<Macro>()
               ? Constant::trueValue()
               : Constant::falseValue(),
           std::move(env), false};
