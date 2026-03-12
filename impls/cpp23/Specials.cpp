@@ -193,7 +193,7 @@ InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
     auto res = evalFn(values[1], env);
     if (auto lambda = res->dyncast<Lambda>()) {
       res = make<Macro>(std::move(const_cast<Lambda&>(*lambda)));
-      dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), res);
+      env->insert_or_assign(symbol->asKey(), res);
       return {res, std::move(env), false};
     }
     throwWrongArgument(name, values[1]);

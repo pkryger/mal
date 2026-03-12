@@ -1,0 +1,6 @@
+;; Testing macros defined in functions
+((fn* [] (do (defmacro! one (fn* [] 1)) (one))))
+;=>1
+
+one
+;/.*'?one'? not found.*
