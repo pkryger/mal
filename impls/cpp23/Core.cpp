@@ -477,7 +477,7 @@ InvocableResult rest(std::string_view name, ValuesSpan values, EnvPtr env) {
 
 [[noreturn]]
 InvocableResult throw_(std::string_view name, ValuesSpan values,
-// NOLINTNEXTLINE(performance-unnecessary-value-param)
+                       // NOLINTNEXTLINE(performance-unnecessary-value-param) - interface
                        EnvPtr /* env */) {
   checkArgsIs(name, values, 1);
   throw MalException{std::format("Exception: {:r}", values[0]), values[0]};

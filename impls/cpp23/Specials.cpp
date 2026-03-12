@@ -59,8 +59,7 @@ InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
         letEnv->insert_or_assign(key, std::move(value));
       } else {
         letEnv->insert_or_assign(
-            // NOLINTNEXTLINE(performance-move-const-arg)
-            std::move(key),
+            std::move(key), // NOLINT(performance-move-const-arg) - false positive
             std::move(value));
       }
     }

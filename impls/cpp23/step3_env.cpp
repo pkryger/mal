@@ -32,7 +32,9 @@ static const std::array specials{
   Special{"let*", specialLetStar},
 };
 
-ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
+ValuePtr EVAL(ValuePtr ast,
+              // NOLINTNEXTLINE(performance-unnecessary-value-param) - interface
+              EnvPtr env) {
   assert(ast);
   assert(env);
   if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {

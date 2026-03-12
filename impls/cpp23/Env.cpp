@@ -70,8 +70,7 @@ void Env::insert_or_assign(Key key, ValuePtr value) {
   } else {
 
     map_.insert_or_assign(
-        // NOLINTNEXTLINE(performance-move-const-arg)
-        std::move(key),
+        std::move(key), // NOLINT(performance-move-const-arg) - false positive
         std::move(value));
   }
 }
@@ -86,8 +85,7 @@ void ApplyEnv::insert_or_assign(Key key, ValuePtr value) {
     map_.insert_or_assign(key, std::move(value));
   } else {
     map_.insert_or_assign(
-        // NOLINTNEXTLINE(performance-move-const-arg)
-        std::move(key),
+        std::move(key), // NOLINT(performance-move-const-arg) - false positive
         std::move(value));
   }
 }

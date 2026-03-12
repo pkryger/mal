@@ -69,8 +69,8 @@ class Value : public GarbageCollectible, public std::enable_shared_from_this<Val
 public:
   virtual std::string print(PrintType readably) const = 0;
 
-  // NOLINTNEXTLINE(performance-unnecessary-value-param)
-  virtual ValuePtr eval(EnvPtr) const { return shared_from_this(); }
+  virtual ValuePtr eval(EnvPtr) const // NOLINT(performance-unnecessary-value-param) - interface
+  { return shared_from_this(); }
 
   bool isTrue() const noexcept;
 

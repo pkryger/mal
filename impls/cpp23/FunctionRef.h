@@ -67,6 +67,9 @@ public:
               return obj(std::forward<ARGS>(args)...);
             }} {}
 
+  // Following implementations:
+  // libc++: https://github.com/xiaoyang-sde/llvm-project/blob/0390be2/libcxx/include/__functional/function_ref_impl.h#L160-L161
+  // libstdc++: https://github.com/gcc-mirror/gcc/blob/e397f25/libstdc%2B%2B-v3/include/bits/funcref_impl.h#L197-L198
   // NOLINTNEXTLINE(performance-unnecessary-value-param)
   RET operator()(ARGS ...args) const noexcept(NOEX) {
     return callback_(storage_, std::forward<ARGS>(args)...);
