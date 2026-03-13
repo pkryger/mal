@@ -4,3 +4,13 @@
 
 one
 ;/.*'?one'? not found.*
+
+;; Testing macros and functions sharing a body
+(def! f (fn* [a] `(+ ~a ~a)))
+(defmacro! m f)
+
+(f 2)
+;=>(+ 2 2)
+
+(m 3)
+;=>6
