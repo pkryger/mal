@@ -11,9 +11,7 @@
 #include <cassert>
 #include <format>
 #include <ranges>
-#include <span>
 #include <tuple>
-#include <typeinfo>
 #include <utility>
 
 namespace {
@@ -86,14 +84,8 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = [&]() noexcept -> const StringBase * {
-        auto&& o = *rhs; // suppress -Wpotentially-evaluated-expression
-        if (typeid(*this) == typeid(o)) {
-          return rhs->dyncast<StringBase>();
-        }
-        return nullptr;
-      }();
-      other && data == other->data) {
+  if (auto other = rhs->dyncast<StringBase>();
+      other && other->loId_ == this->loId_ && data == other->data) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
