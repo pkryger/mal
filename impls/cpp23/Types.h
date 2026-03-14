@@ -70,7 +70,7 @@ class Value : public RttiBase, public GarbageCollectible, public std::enable_sha
 public:
   virtual std::string print(PrintType readably) const = 0;
 
-  virtual ValuePtr eval(EnvPtr) const // NOLINT(performance-unnecessary-value-param) - interface
+  virtual ValuePtr eval(const EnvPtr & /* env */) const
   { return shared_from_this(); }
 
   bool isTrue() const noexcept;
@@ -316,7 +316,7 @@ public:
       : StringBase{typeInfo<Symbol>.lo, std::move(other.data)},
         Intern{std::move(other)}, fromMacro{std::move(other.fromMacro)} {}
 
-  ValuePtr eval(EnvPtr env) const override;
+  ValuePtr eval(const EnvPtr &env) const override;
 
   Env::KeyView asKey() const { return Intern::asKey<Env::KeyView>(); }
 
@@ -473,7 +473,7 @@ public:
 
   std::string print(PrintType readably) const override;
 
-  ValuePtr eval(EnvPtr env) const override;
+  ValuePtr eval(const EnvPtr &env) const override;
 
   ValuePtr cloneWithMeta(ValuePtr meta) const override {
     return make<List>(values(), std::move(meta));
@@ -498,7 +498,7 @@ public:
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
   }
 
-  ValuePtr eval(EnvPtr env) const override;
+  ValuePtr eval(const EnvPtr &env) const override;
 
   ValuePtr cloneWithMeta(ValuePtr meta) const override {
     return make<Vector>(values(), std::move(meta));
@@ -544,7 +544,7 @@ public:
 
   std::string print(PrintType readably) const override;
 
-  ValuePtr eval(EnvPtr env) const override;
+  ValuePtr eval(const EnvPtr &env) const override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 

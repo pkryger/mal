@@ -91,7 +91,7 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
-ValuePtr Symbol::eval(EnvPtr env) const {
+ValuePtr Symbol::eval(const EnvPtr &env) const {
   assert(env);
   if (auto value = env->find(asKey()))
     return value;
@@ -213,7 +213,7 @@ std::string List::print(PrintType readably) const {
   return readably ? std::format("({:r})", data) : std::format("({})", data);
 }
 
-ValuePtr Vector::eval(EnvPtr env) const {
+ValuePtr Vector::eval(const EnvPtr &env) const {
   assert(env);
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
@@ -222,7 +222,7 @@ ValuePtr Vector::eval(EnvPtr env) const {
                       }));
 }
 
-ValuePtr List::eval(EnvPtr env) const {
+ValuePtr List::eval(const EnvPtr &env) const {
   assert(env);
     assert(!EvalFnStack::empty());
   if (data.empty()) {
@@ -244,7 +244,7 @@ std::string Hash::print(PrintType readably) const {
   return readably ? std::format("{{{:r}}}", data) : std::format("{{{}}}", data);
 }
 
-ValuePtr Hash::eval(EnvPtr env) const {
+ValuePtr Hash::eval(const EnvPtr &env) const {
   assert(env);
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
