@@ -39,19 +39,20 @@ static const std::array specials{
   Special{"quasiquote", specialQuasiquote},
 };
 
-ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
+ValuePtr EVAL(ValuePtr ast, const EnvPtr &evalEnv) {
   assert(ast);
-  assert(env);
-  bool needsEval{true};
-  while (needsEval) {
-    if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
+  assert(evalEnv);
+  std::optional<EnvPtr> env{evalEnv};
+
+  while (env) {
+    if (auto dbg = (*env)->find(debugEval.asKey()); dbg && dbg->isTrue()) {
       std::print("EVAL: {:l}\n", ast);
     }
 
     if (auto list = ast->dyncast<List>()) {
       auto&& values = list->values();
       if (values.empty()) {
-        return ast->eval(env);
+        return ast->eval(*env);
       }
       if (auto special = [&]() -> Special * {
         if (auto symbol = values[0]->dyncast<Symbol>()) {
@@ -62,20 +63,20 @@ ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
         }
         return nullptr;
       }()) {
-        std::tie(ast, env, needsEval) =
-            special->second(special->first, values.subspan(1), env);
+        std::tie(ast, env) =
+            special->second(special->first, values.subspan(1), *env);
       } else {
-        std::tie(ast, env, needsEval) = [&]() {
+        std::tie(ast, env) = [&]() {
           auto data = list->values();
-          auto op = EVAL(data[0], env);
+          auto op = EVAL(data[0], *env);
           if (auto invocable = op->dyncast<Invocable>()) {
-            return invocable->apply(false, data.subspan(1), env);
+            return invocable->apply(false, data.subspan(1), *env);
           }
           throw EvalException{std::format("invalid function '{:r}'", op)};
         }();
       }
     } else {
-      return ast->eval(env);
+      return ast->eval(*env);
     }
   }
   return ast;
@@ -129,10 +130,10 @@ EnvPtr repEnv(std::span<const char*> args) {
   return envPtr;
 }
 
-std::string rep(const std::string &str, EnvPtr envPtr) {
+std::string rep(const std::string &str, const EnvPtr &envPtr) {
   std::string out;
   try {
-    out = PRINT(EVAL(READ(str), std::move(envPtr)));
+    out = PRINT(EVAL(READ(str), envPtr));
   } catch (mal::ReaderException ex) {
     out = std::string{"[reader] "} + ex.what();
   } catch (mal::CoreException ex) {

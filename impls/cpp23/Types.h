@@ -565,7 +565,7 @@ private:
 class Invocable : public Value {
 public:
   virtual InvocableResult apply(bool evaled, ValuesSpan values,
-                                EnvPtr evalEnv) const = 0;
+                                const EnvPtr &evalEnv) const = 0;
 
 protected:
   explicit Invocable(std::uint32_t loId) : Value{loId} {}
@@ -578,7 +578,7 @@ private:
 class BuiltIn final : public Invocable, public MetaMixIn {
 public:
   using HandlerFn = InvocableResult(std::string_view name, ValuesSpan value,
-                                    EnvPtr Env);
+                                    const EnvPtr &Env);
 
   explicit BuiltIn(std::string name, HandlerFn &handler) noexcept
       : Invocable{typeInfo<BuiltIn>.lo}, name{std::move(name)},
@@ -589,7 +589,7 @@ public:
         name{other.name}, handler{other.handler} {}
 
   InvocableResult apply(bool evaled, ValuesSpan values,
-                        EnvPtr evalEnv) const override;
+                        const EnvPtr &evalEnv) const override;
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
@@ -685,7 +685,7 @@ public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   InvocableResult apply(bool evaled, ValuesSpan values,
-                        EnvPtr evalEnv) const override;
+                        const EnvPtr &evalEnv) const override;
 
   ValuePtr cloneWithMeta(ValuePtr meta) const override {
     return make<Lambda>(*this, std::move(meta));
@@ -705,7 +705,7 @@ public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   InvocableResult apply(bool /* evaled */, ValuesSpan values,
-                        EnvPtr evalEnv) const override;
+                        const EnvPtr &evalEnv) const override;
 
 };
 
@@ -725,7 +725,7 @@ public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   InvocableResult apply(bool evaled, ValuesSpan values,
-                        EnvPtr evalEnv) const override;
+                        const EnvPtr &evalEnv) const override;
 
   ValuePtr cloneWithMeta(ValuePtr meta) const override {
     return make<Eval>(*this, std::move(meta));

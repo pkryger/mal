@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <cassert>
 #include <format>
+#include <optional>
 #include <ranges>
+#include <span>
 #include <tuple>
 #include <utility>
 
@@ -24,7 +26,7 @@ using mal::ValuesContainer;
 using mal::ValuesSpan;
 
 template <typename VALUES>
-auto evalValues(VALUES &&values, EnvPtr evalEnv)  {
+auto evalValues(VALUES &&values, const EnvPtr &evalEnv)  {
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
   return std::forward<VALUES>(values) |
@@ -229,7 +231,7 @@ ValuePtr List::eval(const EnvPtr &env) const {
     return shared_from_this();
   }
   auto &evalFn = EvalFnStack::top();
-  auto [ast, evalEnv, needsEval] = [&]() {
+  auto [ast, evalEnv] = [&]() {
     auto op = evalFn(data[0], env);
     if (auto invocable = op->dyncast<Invocable>()) {
       return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
@@ -237,7 +239,7 @@ ValuePtr List::eval(const EnvPtr &env) const {
     throw EvalException{std::format("invalid function '{:r}'", op)};
   }();
 
-  return needsEval ? EvalFnStack::top()(ast, evalEnv) : ast;
+  return evalEnv ? EvalFnStack::top()(ast, *evalEnv) : ast;
 }
 
 std::string Hash::print(PrintType readably) const {
@@ -281,12 +283,12 @@ ValuePtr Hash::find(const ValuePtr &key) const {
 }
 
 InvocableResult BuiltIn::apply(bool evaled, ValuesSpan values,
-                               EnvPtr evalEnv) const {
+                               const EnvPtr &evalEnv) const {
   if (evaled) {
-    return handler(name, values, std::move(evalEnv));
+    return handler(name, values, evalEnv);
   }
   return WithEvaledValues{values, evalEnv}([&](auto &&values) {
-    return handler(name, std::forward<decltype(values)>(values), std::move(evalEnv));
+    return handler(name, std::forward<decltype(values)>(values), evalEnv);
   });
 }
 
@@ -374,15 +376,11 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
 }
 
 InvocableResult Lambda::apply(bool evaled, ValuesSpan values,
-                              EnvPtr evalEnv) const {
+                              const EnvPtr &evalEnv) const {
   if (evaled) {
-    return {body,
-            makeApplyEnv(values, std::move(evalEnv)), true};
+    return {body, makeApplyEnv(values, evalEnv)};
   }
-  return {body,
-          makeApplyEnv(evalValues(values, evalEnv),
-                       std::move(evalEnv)),
-          true};
+  return {body, makeApplyEnv(evalValues(values, evalEnv), evalEnv)};
 }
 
 std::string Macro::print(PrintType readable) const {
@@ -398,11 +396,11 @@ ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
 }
 
 InvocableResult Macro::apply(bool /* evaled */, ValuesSpan values,
-                             EnvPtr evalEnv) const {
+                             const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
-  auto applyEnv = FunctionBase::makeApplyEnv(values, std::move(evalEnv));
+  auto applyEnv = FunctionBase::makeApplyEnv(values, evalEnv);
   auto res = EvalFnStack::top()(body, applyEnv);
-  return {std::move(res), std::move(applyEnv), true};
+  return {std::move(res), std::move(applyEnv)};
 }
 
 ValuePtr Eval::isEqualTo(ValuePtr rhs) const {
@@ -413,11 +411,10 @@ ValuePtr Eval::isEqualTo(ValuePtr rhs) const {
 }
 
 InvocableResult Eval::apply(bool evaled, ValuesSpan values,
-                            EnvPtr evalEnv) const {
+                            const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
   checkArgsIs("eval", values, 1);
-  return {evaled ? values[0] : EvalFnStack::top()(values[0], evalEnv), env,
-          true};
+  return {evaled ? values[0] : EvalFnStack::top()(values[0], evalEnv), env};
 }
 
 } // namespace mal

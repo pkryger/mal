@@ -17,9 +17,7 @@ static ReadLine rl("~/.mal_history");
 
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
-ValuePtr EVAL(ValuePtr val,
-              // NOLINTNEXTLINE(performance-unnecessary-value-param) - interface
-              EnvPtr) {
+ValuePtr EVAL(ValuePtr val, const EnvPtr &/* envPtr */) {
   assert(val);
   return val;
 }

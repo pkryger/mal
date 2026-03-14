@@ -12,6 +12,7 @@
 #include <cassert>
 #include <format>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <string_view>
 #include <utility>
@@ -22,20 +23,20 @@
 
 namespace mal {
 InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
-                               EnvPtr env) {
+                               const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsIs(name, values, 2);
   if (auto symbol = values[0]->dyncast<Symbol>()) {
     auto val = EvalFnStack::top()(values[1], env);
     env->insert_or_assign(symbol->asKey(), val);
-    return {std::move(val), std::move(env), false};
+    return {val, {}};
   }
   throw EvalException{
       std::format("invalid '{}' argument {:r}", name, values[1])};
 }
 
 InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
-                               EnvPtr env) {
+                               const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsIs(name, values, 2);
   if (auto sequence = values[0]->dyncast<Sequence>()) {
@@ -44,7 +45,7 @@ InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
       throw EvalException{
           std::format("odd number of let* bindings: {:r}", values[0])};
     }
-    auto letEnv = make<Env>(std::move(env));
+    auto letEnv = make<Env>(env);
     auto &evalFn = EvalFnStack::top();
     for (auto &&[key, value] :
          bindings | std::views::chunk(2) |
@@ -63,26 +64,27 @@ InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
             std::move(value));
       }
     }
-    return {values[1], std::move(letEnv), true};
+    return {values[1], std::move(letEnv)};
   }
   throw EvalException{std::format("invalid let* bindings '{:r}'", values[0])};
 }
 
-InvocableResult specialIf(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult specialIf(std::string_view name, ValuesSpan values,
+                          const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsBetween(name, values, 2, 3);
   auto cond = EvalFnStack::top()(values[0], env);
   if (cond->isTrue()) {
-    return {values[1], std::move(env), true};
+    return {values[1], env};
   } else if (values.size() == 3) {
-    return {values[2], std::move(env), true};
+    return {values[2], env};
   } else {
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
 }
 
 InvocableResult specialFnStar(std::string_view name, ValuesSpan values,
-                              EnvPtr env) {
+                              const EnvPtr &env) {
   checkArgsIs(name, values, 2);
   if (auto sequence = values[0]->dyncast<Sequence>()) {
     return {make<Lambda>(sequence->values() |
@@ -93,30 +95,30 @@ InvocableResult specialFnStar(std::string_view name, ValuesSpan values,
                                throwWrongArgument(name, elt);
                              }) | std::views::as_rvalue,
                          values[1], env),
-            std::move(env), false};
+            {}};
   }
   throwWrongArgument(name, values[1]);
 }
 
 InvocableResult specialDo(std::string_view name, ValuesSpan values,
-                          EnvPtr env) {
+                          const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsAtLeast(name, values, 1);
   for (auto &&val :
        values | std::views::take(values.size() - 1)) {
     EvalFnStack::top()(val, env);
   }
-  return {values.back(), std::move(env), true};
+  return {values.back(), env};
 }
 
 InvocableResult specialQuote(std::string_view name, ValuesSpan values,
-                             EnvPtr env) {
+                             const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
-  return {values[0], std::move(env), false};
+  return {values[0], {}};
 }
 
 InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
-                                  EnvPtr env) {
+                                  const EnvPtr &env) {
   checkArgsIs(name, values, 1);
   static auto valuesIfSequence =
       []<typename SEQUENCE>(const ValuePtr &value) -> ValuesSpan {
@@ -140,7 +142,7 @@ InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
       !values.empty()) {
     if (auto unquoteArg = argIfStartsWith(unquote, values);
         unquoteArg && ast->isa<List>()) {
-      return {std::move(unquoteArg), std::move(env), true};
+      return {std::move(unquoteArg), env};
     }
     auto res = std::ranges::fold_left(
         values | std::views::reverse, make<List>(),
@@ -158,24 +160,24 @@ InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
               }()) {
             return make<List>(make<Symbol>("concat"), spliceUnquote, acc);
           }
-          auto [v, _, needsEval] = specialQuasiquote(
+          auto [v, newEnv] = specialQuasiquote(
               name, ValuesSpan{std::addressof(elt), 1}, env);
           return make<List>(
               make<Symbol>("cons"),
-              needsEval ? std::move(v)
-                        : make<List>(make<Symbol>("quote"), std::move(v)),
+              newEnv ? std::move(v)
+                     : make<List>(make<Symbol>("quote"), std::move(v)),
               acc);
         });
     if (ast->isa<Vector>()) {
       res = make<List>(make<Symbol>("vec"), std::move(res));
     }
-    return {std::move(res), std::move(env), true};
+    return {std::move(res), env};
   }
-  return {ast, std::move(env), false};
+  return {ast, {}};
 }
 
 InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
-                                    EnvPtr env) {
+                                    const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsIs(name, values, 2);
   auto &evalFn = EvalFnStack::top();
@@ -188,13 +190,13 @@ InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
     }()) {
       auto res = make<Macro>(*lambda);
       dynamic_cast<Env *>(env.get())->insert_or_assign(symbol->asKey(), res);
-      return {res, std::move(env), false};
+      return {res, {}};
     }
     auto res = evalFn(values[1], env);
     if (auto lambda = res->dyncast<Lambda>()) {
       res = make<Macro>(std::move(const_cast<Lambda&>(*lambda)));
       env->insert_or_assign(symbol->asKey(), res);
-      return {res, std::move(env), false};
+      return {res, {}};
     }
     throwWrongArgument(name, values[1]);
   }
@@ -202,11 +204,11 @@ InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
 }
 
 InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
-                               EnvPtr env) {
+                               const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsBetween(name, values, 1, 2);
   if (values.size() == 1) {
-    return {values[0], env, true};
+    return {values[0], env};
   }
 
   if (auto list = values[1]->dyncast<List>()) {
@@ -218,10 +220,10 @@ InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
         auto exceptionHandler = [&](auto &&value) -> InvocableResult {
           auto catchEnv = make<Env>(env);
           catchEnv->insert_or_assign(symbol->asKey(), value);
-          return {catchValues[2], catchEnv, true};
+          return {catchValues[2], std::move(catchEnv)};
         };
         try {
-          return {EvalFnStack::top()(values[0], env), env, false};
+          return {EvalFnStack::top()(values[0], env), {}};
         } catch (CoreException ex) {
           return exceptionHandler(make<String>(ex.what()));
         } catch (EvalException ex) {

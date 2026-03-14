@@ -31,9 +31,7 @@ static const std::array specials{
   Special{"let*", specialLetStar},
 };
 
-ValuePtr EVAL(ValuePtr ast,
-              // NOLINTNEXTLINE(performance-unnecessary-value-param) - interface
-              EnvPtr env) {
+ValuePtr EVAL(ValuePtr ast, const EnvPtr &env) {
   assert(ast);
   assert(env);
   if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
@@ -53,10 +51,10 @@ ValuePtr EVAL(ValuePtr ast,
           }
           return nullptr;
         }()) {
-      auto [ast, evalEnv, needsEval] =
+      auto [ast, evalEnv] =
           special->second(special->first, values.subspan(1), env);
-      if (needsEval) {
-        return EVAL(ast, evalEnv);
+      if (evalEnv) {
+        return EVAL(ast, *evalEnv);
       }
       return ast;
     }
@@ -84,7 +82,7 @@ std::string rep(const std::string &str) {
   }();
   static EnvPtr envPtr =
     std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
-  return PRINT(EVAL(READ(str), std::move(envPtr)));
+  return PRINT(EVAL(READ(str), envPtr));
 }
 
 } // namespace mal

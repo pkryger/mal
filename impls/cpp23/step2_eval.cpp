@@ -20,7 +20,7 @@ static ReadLine rl("~/.mal_history");
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
 // NOLINTNEXTLINE(performance-unnecessary-value-param) - interface
-ValuePtr EVAL(ValuePtr ast, EnvPtr env) {
+ValuePtr EVAL(ValuePtr ast, const EnvPtr &env) {
   assert(ast);
   assert(env);
   return ast->eval(env);
@@ -46,7 +46,7 @@ std::string rep(const std::string &str) {
   }();
   static EnvPtr envPtr =
     std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
-  return PRINT(EVAL(READ(str), std::move(envPtr)));
+  return PRINT(EVAL(READ(str), envPtr));
 }
 
 } // namespace mal

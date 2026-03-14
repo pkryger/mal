@@ -114,10 +114,11 @@ using mal::Vector;
 
 template <typename TYPE>
 InvocableResult typeQuestion(std::string_view name, ValuesSpan values,
-                             EnvPtr env) {
+                             const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
-  return {values[0]->isa<TYPE>() ? Constant::trueValue() : Constant::falseValue(),
-          std::move(env), false};
+  return {values[0]->isa<TYPE>() ? Constant::trueValue()
+                                 : Constant::falseValue(),
+          {}};
 }
 
 namespace detail {
@@ -147,31 +148,33 @@ ValuePtr accumulateIntegers(std::string_view name, ValuesSpan values,
 
 } // namespace detail
 
-InvocableResult addition(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult addition(std::string_view name, ValuesSpan values,
+                         const EnvPtr &/* env */) {
   return {detail::accumulateIntegers(
               name, values,
               [](auto &&acc, auto &&v) noexcept { return acc + v; },
               [](auto &&v) noexcept { return v; }),
-          std::move(env), false};
+          {}};
 }
 
 InvocableResult subtraction(std::string_view name, ValuesSpan values,
-                            EnvPtr env) {
+                            const EnvPtr &/* env */) {
   return {detail::accumulateIntegers(
               name, values, [](auto &&acc, auto &&v) { return acc - v; },
               [](auto &&v) noexcept { return -v; }),
-          std::move(env), false};
+          {}};
 }
 
 InvocableResult multiplication(std::string_view name, ValuesSpan values,
-                               EnvPtr env) {
+                               const EnvPtr &/* env */) {
   return {detail::accumulateIntegers(
               name, values, [](auto &&acc, auto &&v) { return acc * v; },
               [](auto &&v) noexcept { return v; }),
-          std::move(env), false};
+          {}};
 }
 
-InvocableResult division(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult division(std::string_view name, ValuesSpan values,
+                         const EnvPtr &/* env */) {
   return {detail::accumulateIntegers(
               name, values,
               [&](auto &&acc, auto &&v) {
@@ -185,40 +188,42 @@ InvocableResult division(std::string_view name, ValuesSpan values, EnvPtr env) {
                     name)};
               },
               2),
-          std::move(env), false};
+          {}};
 }
 
 InvocableResult list(std::string_view /* name */, ValuesSpan values,
-                     EnvPtr env) {
-  return {make<List>(values), std::move(env), false};
+                     const EnvPtr &/* env */) {
+  return {make<List>(values), {}};
 }
 
 InvocableResult emptyQuestion(std::string_view name, ValuesSpan values,
-                              EnvPtr env) {
+                              const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto sequence = values.front()->dyncast<Sequence>()) {
     return {sequence->values().empty() ? Constant::trueValue()
                                        : Constant::falseValue(),
-            std::move(env), false};
+            {}};
   }
   throwWrongArgument(name, values.front());
 
 }
 
-InvocableResult count(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult count(std::string_view name, ValuesSpan values,
+                      const EnvPtr &/* env */) {
   checkArgsAtLeast(name, values, 1);
   if (values.front().get() == Constant::nilValue().get()) {
-    return {make<Integer>(0), std::move(env), false};
+    return {make<Integer>(0), {}};
   }
   if (auto sequence = values.front()->dyncast<Sequence>()) {
-    return {make<Integer>(sequence->values().size()), std::move(env), false};
+    return {make<Integer>(sequence->values().size()), {}};
   }
   throwWrongArgument(name, values.front());
 }
 
 template <typename BINARY_OP>
 InvocableResult compareIntegers(std::string_view name, ValuesSpan values,
-                                EnvPtr env, BINARY_OP &&binary_op) {
+                                const EnvPtr & /* env */,
+                                BINARY_OP &&binary_op) {
   checkArgsAtLeast(name, values, 2);
   auto notMatching = std::ranges::adjacent_find(
       values,
@@ -233,35 +238,40 @@ InvocableResult compareIntegers(std::string_view name, ValuesSpan values,
       });
   return {notMatching == values.end() ? Constant::trueValue()
                                       : Constant::falseValue(),
-          std::move(env), false};
+          {}};
 
 }
 
-InvocableResult lt(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult lt(std::string_view name, ValuesSpan values,
+                   const EnvPtr &env) {
   return compareIntegers(
-      name, values, std::move(env),
+      name, values, env,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs < rhs; });
 }
 
-InvocableResult lte(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult lte(std::string_view name, ValuesSpan values,
+                    const EnvPtr &env) {
   return compareIntegers(
-      name, values, std::move(env),
+      name, values, env,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs <= rhs; });
 }
 
-InvocableResult gt(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult gt(std::string_view name, ValuesSpan values,
+                   const EnvPtr &env) {
   return compareIntegers(
-      name, values, std::move(env),
+      name, values, env,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs > rhs; });
 }
 
-InvocableResult gte(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult gte(std::string_view name, ValuesSpan values,
+                    const EnvPtr &env) {
   return compareIntegers(
-      name, values, std::move(env),
+      name, values, env,
       [](auto &&lhs, auto &&rhs) noexcept { return lhs >= rhs; });
 }
 
-InvocableResult equal(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult equal(std::string_view name, ValuesSpan values,
+                      const EnvPtr &/* env */) {
   checkArgsAtLeast(name, values, 2);
   auto notEqual =
       std::ranges::adjacent_find(values, [](auto &&lhs, auto &&rhs) {
@@ -269,43 +279,45 @@ InvocableResult equal(std::string_view name, ValuesSpan values, EnvPtr env) {
       });
   return {notEqual == values.end() ? Constant::trueValue()
                                    : Constant::falseValue(),
-          std::move(env), false};
+          {}};
 }
 
-InvocableResult not_(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult not_(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   return {values.front()->isTrue() ? Constant::falseValue()
                                    : Constant::trueValue(),
-          std::move(env), false};
+          {}};
 }
 
 InvocableResult prn(std::string_view /* name */, ValuesSpan values,
-                    EnvPtr env) {
+                    const EnvPtr &/* env */) {
   std::print("{:r}\n", values);
-  return {Constant::nilValue(), std::move(env), false};
+  return {Constant::nilValue(), {}};
 }
 
 InvocableResult println(std::string_view /* name */, ValuesSpan values,
-                        EnvPtr env) {
+                        const EnvPtr &/* env */) {
   std::print("{}\n", values);
-  return {Constant::nilValue(), std::move(env), false};
+  return {Constant::nilValue(), {}};
 }
 
 InvocableResult pr_str(std::string_view /* name */, ValuesSpan values,
-                       EnvPtr env) {
-  return {make<String>(std::format("{:r}", values)), std::move(env), false};
+                       const EnvPtr &/* env */) {
+  return {make<String>(std::format("{:r}", values)), {}};
 }
 
 InvocableResult str(std::string_view /* name */, ValuesSpan values,
-                    EnvPtr env) {
+                    const EnvPtr &/* env */) {
   return {make<String>(values | std::views::transform([](auto &&elt) {
                          return std::format("{}", elt);
                        }) |
                        std::views::join | std::ranges::to<std::string>()),
-          std::move(env), false};
+          {}};
 }
 
-InvocableResult slurp(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult slurp(std::string_view name, ValuesSpan values,
+                      const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto string = values[0]->dyncast<String>()) {
     auto path = string->data();
@@ -322,38 +334,40 @@ InvocableResult slurp(std::string_view name, ValuesSpan values, EnvPtr env) {
     }
     std::string content(file_size, '\0');
     file.read(content.data(), static_cast<std::streamsize>(file_size));
-    return {make<String>(std::move(content)), std::move(env), false};
+    return {make<String>(std::move(content)), {}};
   }
    throwWrongArgument(name, values[0]);
 }
 
 InvocableResult read_string(std::string_view name, ValuesSpan values,
-                            EnvPtr env) {
+                            const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (values[0]->isa<String>()) {
-    return {readStr(std::format("{}", values[0])), std::move(env), false};
+    return {readStr(std::format("{}", values[0])), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult atom(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult atom(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
-  return {make<Atom>(values[0]), std::move(env), false};
+  return {make<Atom>(values[0]), {}};
 }
 
-InvocableResult deref(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult deref(std::string_view name, ValuesSpan values,
+                      const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto atom = values[0]->dyncast<Atom>()) {
-    return {atom->value(), std::move(env), false};
+    return {atom->value(), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
 InvocableResult resetBang(std::string_view name, ValuesSpan values,
-                          EnvPtr env) {
+                          const EnvPtr &/* env */) {
   checkArgsIs(name, values, 2);
   if (auto atom = values[0]->dyncast<Atom>()) {
-    return {atom->reset(values[1]), std::move(env), false};
+    return {atom->reset(values[1]), {}};
   }
   throwWrongArgument(name, values[0]);
 }
@@ -370,33 +384,36 @@ ValuesContainer cons(ValuePtr value, ValuesSpan values) {
 
 } // namespace detail
 
-InvocableResult swapBang(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult swapBang(std::string_view name, ValuesSpan values,
+                         const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsAtLeast(name, values, 2);
   if (auto atom = values[0]->dyncast<Atom>()) {
     if (auto fn = values[1]->dyncast<Invocable>()) {
       auto args = detail::cons(atom->value(), values.subspan(2));
-      auto [ast, evalEnv, needsEval] = fn->apply(true, ValuesSpan{args}, env);
-      if (needsEval) {
-        ast = EvalFnStack::top()(ast, evalEnv);
+      auto [ast, evalEnv] = fn->apply(true, ValuesSpan{args}, env);
+      if (evalEnv) {
+        ast = EvalFnStack::top()(ast, *evalEnv);
       }
-      return {atom->reset(ast), std::move(env), false};
+      return {atom->reset(ast), {}};
     }
     throwWrongArgument(name, values[1]);
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult cons(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult cons(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsIs(name, values, 2);
   if (auto sequence = values[1]->dyncast<Sequence>()) {
     return {make<List>(detail::cons(values[0], sequence->values())),
-            std::move(env), false};
+            {}};
   }
-  return {make<List>(values), std::move(env), false};
+  return {make<List>(values), {}};
 }
 
-InvocableResult concat(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult concat(std::string_view name, ValuesSpan values,
+                       const EnvPtr &/* env */) {
   return {make<List>(values | std::views::transform([&](auto &&elt) {
                        if (auto sequence = elt->template dyncast<Sequence>()) {
                          return sequence->values();
@@ -404,21 +421,23 @@ InvocableResult concat(std::string_view name, ValuesSpan values, EnvPtr env) {
                        throwWrongArgument(name, elt);
                      }) |
                      std::views::join),
-          std::move(env), false};
+          {}};
 }
 
-InvocableResult vec(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult vec(std::string_view name, ValuesSpan values,
+                    const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (values[0]->isa<Vector>()) {
-    return {values[0], std::move(env), false};
+    return {values[0], {}};
   }
   if (auto list = values[0]->dyncast<List>()) {
-    return {make<Vector>(list->values()), std::move(env), false};
+    return {make<Vector>(list->values()), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult nth(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult nth(std::string_view name, ValuesSpan values,
+                    const EnvPtr &/* env */) {
   checkArgsIs(name, values, 2);
   if (auto integer = values[1]->dyncast<Integer>()) {
     static_assert(sizeof(decltype(std::declval<Integer>().value())) >=
@@ -427,61 +446,63 @@ InvocableResult nth(std::string_view name, ValuesSpan values, EnvPtr env) {
     if (auto sequence = values[0]->dyncast<Sequence>()) {
       values = sequence->values();
       if (0 <= index && index < values.size()) {
-        return {values[index], std::move(env), false};
+        return {values[index], {}};
       }
       throw CoreException{std::format("index out of bounds {} for '{}'", index,
                                       name)};
     }
     if (auto constant = values[0]->dyncast<Constant>();
         constant && index == 0 && Constant::nilValue()->isEqualTo(values[0])) {
-      return {Constant::nilValue(), std::move(env), false};
+      return {Constant::nilValue(), {}};
     }
     throwWrongArgument(name, values[0]);
   }
   throwWrongArgument(name, values[1]);
 }
 
-InvocableResult first(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult first(std::string_view name, ValuesSpan values,
+                      const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto sequence = values[0]->dyncast<Sequence>()) {
     values = sequence->values();
     if (!values.empty()) {
-      return {values[0], std::move(env), false};
+      return {values[0], {}};
     }
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
   if (auto constant = values[0]->dyncast<Constant>();
       constant && Constant::nilValue()->isEqualTo(values[0])) {
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult rest(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult rest(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto sequence = values[0]->dyncast<Sequence>()) {
     values = sequence->values();
     if (!values.empty()) {
-      return {make<List>(values.subspan(1)), std::move(env), false};
+      return {make<List>(values.subspan(1)), {}};
     }
-    return {make<List>(), std::move(env), false};
+    return {make<List>(), {}};
   }
   if (auto constant = values[0]->dyncast<Constant>();
       constant && Constant::nilValue()->isEqualTo(values[0])) {
-    return {make<List>(), std::move(env), false};
+    return {make<List>(), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
 [[noreturn]]
 InvocableResult throw_(std::string_view name, ValuesSpan values,
-                       // NOLINTNEXTLINE(performance-unnecessary-value-param) - interface
-                       EnvPtr /* env */) {
+                       const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   throw MalException{std::format("Exception: {:r}", values[0]), values[0]};
 }
 
-InvocableResult map(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult map(std::string_view name, ValuesSpan values,
+                    const EnvPtr &env) {
   assert(!EvalFnStack::empty());
   checkArgsIs(name, values, 2);
   if (auto invocable = values[0]->dyncast<Invocable>()) {
@@ -489,21 +510,22 @@ InvocableResult map(std::string_view name, ValuesSpan values, EnvPtr env) {
       return {
         make<List>(sequence->values() |
                    std::views::transform([&](auto &&value) {
-                     auto [ast, evalEnv, needsEval] = invocable->apply(
+                     auto [ast, evalEnv] = invocable->apply(
                          true, ValuesSpan{std::addressof(value), 1}, env);
-                if (needsEval) {
-                  return EvalFnStack::top()(std::move(ast), std::move(evalEnv));
+                if (evalEnv) {
+                  return EvalFnStack::top()(std::move(ast), *evalEnv);
                 }
                 return ast;
               })),
-          std::move(env), false};
+          {}};
     }
     throwWrongArgument(name, values[1]);
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult apply(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult apply(std::string_view name, ValuesSpan values,
+                      const EnvPtr &env) {
   checkArgsAtLeast(name, values, 2);
   if (auto invocable = values[0]->dyncast<Invocable>()) {
     ValuesContainer argsContainer;
@@ -524,7 +546,7 @@ InvocableResult apply(std::string_view name, ValuesSpan values, EnvPtr env) {
       }
       return values.subspan(1);
     }();
-    return invocable->apply(true, args, std::move(env));
+    return invocable->apply(true, args, env);
   }
   throwWrongArgument(name, values[0]);
 }
@@ -532,69 +554,71 @@ InvocableResult apply(std::string_view name, ValuesSpan values, EnvPtr env) {
 namespace detail {
 
 InvocableResult constantQuestion(std::string_view name, ValuesSpan values,
-                                 EnvPtr env, const ValuePtr &constant) {
+                                 const ValuePtr &constant) {
   checkArgsIs(name, values, 1);
-  return {constant->isEqualTo(values[0]), std::move(env), false};
+  return {constant->isEqualTo(values[0]), {}};
 }
 
 } // namespace detail
 
 InvocableResult nilQuestion(std::string_view name, ValuesSpan values,
-                     EnvPtr env) {
-  return detail::constantQuestion(name, values, std::move(env), Constant::nilValue());
+                     const EnvPtr &/* env */) {
+  return detail::constantQuestion(name, values, Constant::nilValue());
 }
 
 InvocableResult trueQuestion(std::string_view name, ValuesSpan values,
-                     EnvPtr env) {
-  return detail::constantQuestion(name, values, std::move(env), Constant::trueValue());
+                     const EnvPtr &/* env */) {
+  return detail::constantQuestion(name, values, Constant::trueValue());
 }
 
 InvocableResult falseQuestion(std::string_view name, ValuesSpan values,
-                     EnvPtr env) {
-  return detail::constantQuestion(name, values, std::move(env), Constant::falseValue());
+                     const EnvPtr &/* env */) {
+  return detail::constantQuestion(name, values, Constant::falseValue());
 }
 
-InvocableResult symbol(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult symbol(std::string_view name, ValuesSpan values,
+                       const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto string = values[0]->dyncast<String>()) {
-    return {make<Symbol>(string->data()), std::move(env), false};
+    return {make<Symbol>(string->data()), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult keyword(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult keyword(std::string_view name, ValuesSpan values,
+                        const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (values[0]->isa<Keyword>()) {
-    return {values[0], std::move(env), false};
+    return {values[0], {}};
   }
   if (auto string = values[0]->dyncast<String>()) {
-    return {make<Keyword>(std::format(":{}", string->data())), std::move(env),
-            false};
+    return {make<Keyword>(std::format(":{}", string->data())), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
 InvocableResult vector(std::string_view /*name*/, ValuesSpan values,
-                EnvPtr env) {
+                const EnvPtr &/* env */) {
 
-  return {make<Vector>(values), std::move(env), false};
+  return {make<Vector>(values), {}};
 }
 
 InvocableResult hash_map(std::string_view name, ValuesSpan values,
-                  EnvPtr env) {
+                  const EnvPtr &/* env */) {
   if (values.size() % 2 == 0) {
     for (auto &&key : values | std::views::stride(2)) {
       if (!key->isa<StringBase>()) {
         mal::throwWrongArgument(name, key);
       }
     }
-    return {make<Hash>(values), std::move(env), false};
+    return {make<Hash>(values), {}};
   }
   throw CoreException{
       std::format("odd number of arguments for '{}', {}", name, values.size())};
 }
 
-InvocableResult assoc(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult assoc(std::string_view name, ValuesSpan values,
+                      const EnvPtr &/* env */) {
   checkArgsAtLeast(name, values, 1);
   if (values.size() % 2 == 1) {
     if (auto hash = values[0]->dyncast<Hash>()) {
@@ -603,7 +627,7 @@ InvocableResult assoc(std::string_view name, ValuesSpan values, EnvPtr env) {
           mal::throwWrongArgument(name, key);
         }
       }
-      return {make<Hash>(*hash, values.subspan(1)), std::move(env), false};
+      return {make<Hash>(*hash, values.subspan(1)), {}};
     }
     throwWrongArgument(name, values[0]);
   }
@@ -611,17 +635,18 @@ InvocableResult assoc(std::string_view name, ValuesSpan values, EnvPtr env) {
                                   values.size() - 1)};
 }
 
-InvocableResult get(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult get(std::string_view name, ValuesSpan values,
+                    const EnvPtr &/* env */) {
   checkArgsIs(name, values, 2);
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
   if (auto hash = values[0]->dyncast<Hash>()) {
     if (values[1]->isa<StringBase>()) {
       if (auto res = hash->find(values[1]))
-        return {res, std::move(env), false};
+        return {res, {}};
       else {
-        return {Constant::nilValue(), std::move(env), false};
+        return {Constant::nilValue(), {}};
       }
     }
     throwWrongArgument(name, values[1]);
@@ -630,18 +655,17 @@ InvocableResult get(std::string_view name, ValuesSpan values, EnvPtr env) {
 }
 
 InvocableResult containsQuestion(std::string_view name, ValuesSpan values,
-                                 EnvPtr env) {
-
+                                 const EnvPtr &/* env */) {
   checkArgsIs(name, values, 2);
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
   if (auto hash = values[0]->dyncast<Hash>()) {
     if (values[1]->isa<StringBase>()) {
       if (hash->find(values[1]))
-        return {Constant::trueValue(), std::move(env), false};
+        return {Constant::trueValue(), {}};
       else {
-        return {Constant::falseValue(), std::move(env), false};
+        return {Constant::falseValue(), {}};
       }
     }
     throwWrongArgument(name, values[1]);
@@ -649,33 +673,36 @@ InvocableResult containsQuestion(std::string_view name, ValuesSpan values,
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult keys(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult keys(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
   if (auto hash = values[0]->dyncast<Hash>()) {
     return {make<List>(*hash | std::views::transform(
                                    [](auto &&elt) { return elt.first; })),
-            std::move(env), false};
+            {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult vals(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult vals(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
   if (auto hash = values[0]->dyncast<Hash>()) {
     return {make<List>(*hash | std::views::transform(
                                    [](auto &&elt) { return elt.second; })),
-            std::move(env), false};
+            {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult dissoc(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult dissoc(std::string_view name, ValuesSpan values,
+                       const EnvPtr &/* env */) {
   checkArgsAtLeast(name, values, 1);
   if (auto hash = values[0]->dyncast<Hash>()) {
     values = values.subspan(1);
@@ -687,60 +714,64 @@ InvocableResult dissoc(std::string_view name, ValuesSpan values, EnvPtr env) {
     return {make<Hash>(*hash | std::views::filter([&](auto &&elt) {
               return !std::ranges::contains(values, elt.first);
             })),
-            std::move(env), false};
+            {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult readline(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult readline(std::string_view name, ValuesSpan values,
+                         const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto prompt = values[0]->dyncast<String>()) {
     if (auto res = coreReadLine.get(prompt->data())) {
-      return {make<String>(*res), std::move(env), false};
+      return {make<String>(*res), {}};
     }
-    return {Constant::nilValue(), std::move(env), false};
+    return {Constant::nilValue(), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult time_ms(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult time_ms(std::string_view name, ValuesSpan values,
+                        const EnvPtr &/* env */) {
   checkArgsIs(name, values, 0);
   return {make<Integer>(std::chrono::duration_cast<std::chrono::milliseconds>(
                             std::chrono::steady_clock::now().time_since_epoch())
                             .count()),
-          std::move(env), false};
+          {}};
 }
 
-InvocableResult seq(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult seq(std::string_view name, ValuesSpan values,
+                    const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (values[0]->isa<Constant>()) {
     if (Constant::nilValue()->isEqualTo(values[0])->isTrue()) {
-      return {Constant::nilValue(), std::move(env), false};
+      return {Constant::nilValue(), {}};
     }
     throwWrongArgument(name, values[0]);
   }
   if (auto sequence = values[0]->dyncast<Sequence>()) {
     if (sequence->values().empty()) {
-      return {Constant::nilValue(), std::move(env), false};
+      return {Constant::nilValue(), {}};
     }
     if (auto vector = values[0]->dyncast<Vector>()) {
-      return {make<List>(vector->values()), std::move(env), false};
+      return {make<List>(vector->values()), {}};
     }
-    return {values[0], std::move(env), false};
+    return {values[0], {}};
   }
   if (auto string = values[0]->dyncast<String>()) {
     if (string->data().empty()) {
-      return {Constant::nilValue(), std::move(env), false};
+      return {Constant::nilValue(), {}};
     }
     return {make<List>(string->data() | std::views::transform([](auto &&c) {
                          return make<String>(std::string{c});
                        })),
-            std::move(env), false};
+            {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult conj(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult conj(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsAtLeast(name, values, 2);
   if (auto list = values[0]->dyncast<List>()) {
     values = values.subspan(1);
@@ -748,40 +779,42 @@ InvocableResult conj(std::string_view name, ValuesSpan values, EnvPtr env) {
         values | std::views::reverse | std::ranges::to<ValuesContainer>();
     res.reserve(res.size() + list->values().size());
     std::ranges::copy(list->values(), std::back_inserter(res));
-    return {make<List>(std::move(res)), std::move(env), false};
+    return {make<List>(std::move(res)), {}};
   }
   if (auto vector = values[0]->dyncast<Vector>()) {
     values = values.subspan(1);
     auto res = vector->values() | std::ranges::to<ValuesContainer>();
     res.reserve(res.size() + values.size());
     std::ranges::copy(values, std::back_inserter(res));
-    return {make<Vector>(std::move(res)), std::move(env), false};
+    return {make<Vector>(std::move(res)), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult meta(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult meta(std::string_view name, ValuesSpan values,
+                     const EnvPtr &/* env */) {
   checkArgsIs(name, values, 1);
   if (auto metaMixIn = dynamic_cast<const MetaMixIn *>(values[0].get())) {
-    return {metaMixIn->meta(), std::move(env), false};
+    return {metaMixIn->meta(), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult with_meta(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult with_meta(std::string_view name, ValuesSpan values,
+                          const EnvPtr &/* env */) {
   checkArgsIs(name, values, 2);
   if (auto metaMixIn = dynamic_cast<const MetaMixIn *>(values[0].get())) {
-    return {metaMixIn->cloneWithMeta(values[1]), std::move(env), false};
+    return {metaMixIn->cloneWithMeta(values[1]), {}};
   }
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult fnQuestion(std::string_view name, ValuesSpan values, EnvPtr env) {
+InvocableResult fnQuestion(std::string_view name, ValuesSpan values, const EnvPtr & /* env */) {
   checkArgsIs(name, values, 1);
   return {values[0]->isa<Invocable>() && !values[0]->isa<Macro>()
               ? Constant::trueValue()
               : Constant::falseValue(),
-          std::move(env), false};
+          {}};
 }
 
 } // namespace

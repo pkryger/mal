@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <memory>
+#include <optional>
 #include <span>
 #include <stack>
 #include <tuple>
@@ -69,10 +70,10 @@ template <typename TYPE, typename... ARGS>
   return res;
 }
 
-using EvalFn = ValuePtr(ValuePtr, EnvPtr);
+using EvalFn = ValuePtr(ValuePtr, const EnvPtr &);
 using EvalFnStack = detail::FnStack<EvalFn>;
 
-using InvocableResult = std::tuple<ValuePtr, EnvPtr, bool>;
+using InvocableResult = std::tuple<ValuePtr, std::optional<EnvPtr>>;
 
 } // namespace mal
 

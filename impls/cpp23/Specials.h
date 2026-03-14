@@ -7,32 +7,35 @@
 
 namespace mal {
 
-using SpecialForm = InvocableResult (&)(std::string_view, ValuesSpan, EnvPtr);
+using SpecialForm = InvocableResult (&)(std::string_view, ValuesSpan,
+                                        const EnvPtr &);
 
 InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
-                               EnvPtr env);
+                               const EnvPtr &env);
 
 InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
-                               EnvPtr env);
+                               const EnvPtr &env);
 
-InvocableResult specialIf(std::string_view name, ValuesSpan values, EnvPtr env);
+InvocableResult specialIf(std::string_view name, ValuesSpan values,
+                          const EnvPtr &env);
 
 InvocableResult specialFnStar(std::string_view name, ValuesSpan values,
-                              EnvPtr env);
+                              const EnvPtr &env);
 
-InvocableResult specialDo(std::string_view name, ValuesSpan values, EnvPtr env);
+InvocableResult specialDo(std::string_view name, ValuesSpan values,
+                          const EnvPtr &env);
 
 InvocableResult specialQuote(std::string_view name, ValuesSpan values,
-                             EnvPtr env);
+                             const EnvPtr &env);
 
 InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
-                                  EnvPtr env);
+                                  const EnvPtr &env);
 
 InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
-                                    EnvPtr env);
+                                    const EnvPtr &env);
 
 InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
-                               EnvPtr env);
+                               const EnvPtr &env);
 
 
 } // namespace mal
