@@ -148,6 +148,7 @@ def main(args: list[str] | None = None) -> None:
     index = get_index(parsed.llvm_prefix)
     nodes : dict[str, set[str]] = {parsed.root_class : set()}
     declarations : list[str] = []
+    order : dict[str, int] = {parsed.root_class : 0}
 
     def update_nodes(tu : cindex.TranslationUnit) -> None:
         nonlocal declarations
@@ -162,6 +163,7 @@ def main(args: list[str] | None = None) -> None:
                            and child.spelling in nodes:
                             nodes[cursor.spelling] = set()
                             nodes[child.spelling].add(cursor.spelling)
+                            order[cursor.spelling] = max(order.values()) + 1
                 declaration = \
                     f"{"class" if cursor.kind == cindex.CursorKind.CLASS_DECL
                     else "struct"} {cursor.spelling};"
@@ -200,8 +202,8 @@ def main(args: list[str] | None = None) -> None:
             update_nodes(tu)
 
     def emit(name: str, indent: int = 1) -> str:
-        children = nodes[name]
         prefix = "  " * indent + parsed.prefix_class
+        children = sorted(nodes[name], key=lambda child: order[child])
         if not children:
             return f"{prefix}<{name}>"
         inner = ",\n".join(emit(child, indent + 1) for child in children)
