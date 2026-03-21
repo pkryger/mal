@@ -1,29 +1,57 @@
 #!/usr/bin/env python
 
+"""Build class hierarchy to be used in Hierarchy.h.
+
+Most likely call it with:
+  build_hierarchy.py --mode file Types.h
+or:
+  build_hierarchy.py --mode build build
+
+The latter is slower, but more thorough when it comes to determining a class hierarchy.
+It also may pick up some compiler flags that were not hard coded in this script.
+"""
+
+import argparse
+import logging
+import pathlib
+import shutil
 import subprocess
 import sys
-import shutil
-import textwrap
-import argparse
-import pathlib
-from clang import cindex
 from functools import cache
 
+from clang import cindex
+
+
 @cache
-def get_top_level () -> pathlib.PurePath:
+def get_top_level() -> pathlib.PurePath:
+    """Return top level directory of current git repository."""
     return pathlib.PurePath(
         subprocess.check_output(
-            ["git", "rev-parse", "--show-toplevel"]
-        ).decode().strip()
+            [  # noqa: S607
+                "git",
+                "rev-parse",
+                "--show-toplevel",
+            ],
+        )
+        .decode()
+        .strip(),
     )
+
 
 @cache
 def get_llvm_prefix() -> pathlib.PurePath:
+    """Return LLVM prefix."""
     if sys.platform == "darwin":
         return pathlib.PurePath(
             subprocess.check_output(
-                ["brew", "--prefix", "llvm"]
-            ).decode().strip()
+                [  # noqa: S607
+                    "brew",
+                    "--prefix",
+                    "llvm",
+                ],
+            )
+            .decode()
+            .strip(),
         )
     llvm_config = shutil.which("llvm-config")
     if llvm_config is None:
@@ -32,73 +60,96 @@ def get_llvm_prefix() -> pathlib.PurePath:
             if llvm_config:
                 break
         if llvm_config is None:
-            raise RuntimeError("Cannot find llvm-config")
+            msg = "Cannot find llvm-config"
+            raise RuntimeError(msg)
         return pathlib.PurePath(
-            subprocess.check_output(
-                [llvm_config, "--prefix"]
-            ).decode().strip()
+            subprocess.check_output(  # noqa: S603
+                [llvm_config, "--prefix"],
+            )
+            .decode()
+            .strip(),
         )
+    return None
+
 
 @cache
-def get_clang_flags(llvm_prefix : pathlib.PurePath) -> list[str]:
+def get_clang_flags(llvm_prefix: pathlib.PurePath) -> list[str]:
+    """Return extra flags for clang."""
     if sys.platform != "darwin":
         return []
 
     sysroot = pathlib.PurePath(
         subprocess.check_output(
-            ["xcrun", "--show-sdk-path"]
-        ).decode().strip()
+            [  # noqa: S607
+                "xcrun",
+                "--show-sdk-path",
+            ],
+        )
+        .decode()
+        .strip(),
     )
     resource_dir = pathlib.PurePath(
-        subprocess.check_output(
-            [llvm_prefix.joinpath("bin", "clang++"), "-print-resource-dir"]
-        ).decode().strip()
+        subprocess.check_output(  # noqa: S603
+            [llvm_prefix.joinpath("bin", "clang++"), "-print-resource-dir"],
+        )
+        .decode()
+        .strip(),
     )
     return [
         f"--sysroot={sysroot}",
         f"-resource-dir={resource_dir}",
     ]
 
+
 @cache
 def get_readline_prefix() -> pathlib.PurePath:
+    """Return readline library prefix."""
     if sys.platform == "darwin":
         return pathlib.PurePath(
             subprocess.check_output(
-                ["brew", "--prefix", "readline"]
-            ).decode().strip()
+                [  # noqa: S607
+                    "brew",
+                    "--prefix",
+                    "readline",
+                ],
+            )
+            .decode()
+            .strip(),
         )
     return pathlib.PurePath(
         subprocess.check_output(
-            ["pkg-config", "--variable=prefix", "readline"]
-        ).decode().strip()
+            [  # noqa: S607
+                "pkg-config--variable=prefix",
+                "readline",
+            ],
+        )
+        .decode()
+        .strip(),
     )
 
+
 @cache
-def get_index(llvm_prefix : pathlib.PurePath) -> cindex.Index:
+def get_index(llvm_prefix: pathlib.PurePath) -> cindex.Index:
+    """Return a clang index configured for current LLVM prefix."""
     if sys.platform == "darwin":
         library_file = llvm_prefix.joinpath("lib", "libclang.dylib")
         if library_file.as_posix() != cindex.Config.library_file:
             cindex.Config.set_library_file(library_file.as_posix())
     return cindex.Index.create()
 
-class UltimateHelpFormatter(
-    argparse.RawTextHelpFormatter, argparse.ArgumentDefaultsHelpFormatter
-):
-    pass
 
-def parse_args(args: list[str] | None) -> argparse.Namespace:
+class UltimateHelpFormatter(
+    argparse.RawTextHelpFormatter,
+    argparse.ArgumentDefaultsHelpFormatter,
+):
+    """Combine RawTextHelpFormatter and ArgumentDefaultHelpFormatter."""
+
+
+def _parse_args(args: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="build_hierarchy.py",
         formatter_class=UltimateHelpFormatter,
-        description=textwrap.dedent("""\
-        Build class hierarchy to be used in Hierarchy.h.  Most likely call it with:
-          build_hierarchy.py --mode file Types.h
-        or:
-          build_hierarchy.py --mode build build
-
-        The latter is slower, but more thorough and may pick up some compiler that
-        were not hardcoded in this script.
-        """)
+        description=sys.modules[__name__].__doc__,
     )
     parser.add_argument(
         "--mode",
@@ -114,8 +165,7 @@ def parse_args(args: list[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--sources-dir",
         default=get_top_level().joinpath("impls", "cpp23"),
-        help="directory where sources are; --file and --build are relative "
-        "to this",
+        help="directory where sources are; --file and --build are relative to this",
     )
     parser.add_argument(
         "--prefix-class",
@@ -127,6 +177,12 @@ def parse_args(args: list[str] | None) -> argparse.Namespace:
         "--root-class",
         default="Value",
         help="the root class where the hierarchy starts",
+    )
+    parser.add_argument(
+        "--root-key",
+        choices=["class", "struct"],
+        default="class",
+        help="the root class key",
     )
     parser.add_argument(
         "--llvm-prefix",
@@ -142,79 +198,127 @@ def parse_args(args: list[str] | None) -> argparse.Namespace:
     )
     return parser.parse_args(args)
 
-def main(args: list[str] | None = None) -> None:
-    parsed = parse_args(args)
 
-    index = get_index(parsed.llvm_prefix)
-    nodes : dict[str, set[str]] = {parsed.root_class : set()}
-    declarations : list[str] = []
-    order : dict[str, int] = {parsed.root_class : 0}
+logger = logging.getLogger(__name__)
 
-    def update_nodes(tu : cindex.TranslationUnit) -> None:
-        nonlocal declarations
+
+class HierarchyParser:
+    """Parse C++ code and emit class hierarchy."""
+
+    def __init__(
+        self,
+        index: cindex.Index,
+        llvm_prefix: str | None,
+        root_key: str,
+        root_class: str,
+        prefix_class: str,
+    ) -> None:
+        """Initialise a parser.
+
+        Use the LLVM prefix and index to parse starting from root class and emit
+        hierarchy with a prefix class.
+        """
+        self._index = index
+        self._llvm_prefix = llvm_prefix
+        self._prefix_class = prefix_class
+        self._nodes: dict[str, set[str]] = {root_class: set()}
+        self._order: dict[str, int] = {root_class: 0}
+        self.declarations: list[str] = [f"{root_key} {root_class};"]
+
+    def _update_nodes(self, tu: cindex.TranslationUnit) -> None:
         for cursor in tu.cursor.walk_preorder():
-            if cursor.kind in (
+            if (
+                cursor.kind
+                in (
                     cindex.CursorKind.CLASS_DECL,
                     cindex.CursorKind.STRUCT_DECL,
+                )
+                and cursor.spelling not in self._nodes
             ):
-                if cursor.spelling not in nodes:
-                    for child in cursor.get_children():
-                        if child.kind == cindex.CursorKind.CXX_BASE_SPECIFIER \
-                           and child.spelling in nodes:
-                            nodes[cursor.spelling] = set()
-                            nodes[child.spelling].add(cursor.spelling)
-                            order[cursor.spelling] = max(order.values()) + 1
-                declaration = \
-                    f"{"class" if cursor.kind == cindex.CursorKind.CLASS_DECL
-                    else "struct"} {cursor.spelling};"
-                if declaration not in declarations \
-                   and cursor.spelling in nodes:
-                    declarations += [declaration]
+                for child in cursor.get_children():
+                    if (
+                        child.kind == cindex.CursorKind.CXX_BASE_SPECIFIER
+                        and child.spelling in self._nodes
+                    ):
+                        self._nodes[cursor.spelling] = set()
+                        self._nodes[child.spelling].add(cursor.spelling)
+                        self._order[cursor.spelling] = max(self._order.values()) + 1
+                declaration = f"{
+                    'class' if cursor.kind == cindex.CursorKind.CLASS_DECL else 'struct'
+                } {cursor.spelling};"
+                if (
+                    declaration not in self.declarations
+                    and cursor.spelling in self._nodes
+                ):
+                    self.declarations += [declaration]
 
-    options = cindex.TranslationUnit.PARSE_INCOMPLETE \
-        | cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
-
-    if parsed.mode == "file":
-        tu = index.parse(
-            parsed.sources_dir.joinpath(parsed.path),
-            get_clang_flags(parsed.llvm_prefix) + [
-                "-x", "c++", "-std=gnu++2b",
-                f"-I{parsed.sources_dir}",
-                f"-I{parsed.readline_prefix.joinpath("include")}",
-            ],
+    def parse(self, path: pathlib.PurePath, extra_args: list[str]) -> None:
+        """Parse file at path with extra clang args."""
+        tu = self._index.parse(
+            path,
+            get_clang_flags(self._llvm_prefix) + extra_args,
             None,
-            options,
+            cindex.TranslationUnit.PARSE_INCOMPLETE
+            | cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES,
         )
         for diag in tu.diagnostics:
-            print(f"[{diag.severity}]: {diag.spelling}", file=sys.stderr)
-        update_nodes(tu)
-    else:
-        db = cindex.CompilationDatabase.fromDirectory(parsed.sources_dir.joinpath(parsed.path))
-        for cmd in db.getAllCompileCommands():
-            tu = index.parse(
-                cmd.filename,
-                get_clang_flags(parsed.llvm_prefix) + list(cmd.arguments)[2:-2],
-                None,
-                options,
-            )
-            for diag in tu.diagnostics:
-                print(f"[{diag.severity}]: {diag.spelling}", file=sys.stderr)
-            update_nodes(tu)
+            logger.warning("[SEVERITY: %s]: %s", diag.severity, diag.spelling)
+        self._update_nodes(tu)
 
-    def emit(name: str, indent: int = 1) -> str:
-        prefix = "  " * indent + parsed.prefix_class
-        children = sorted(nodes[name], key=lambda child: order[child])
+    def emit(self, name: str, indent: int = 1) -> str:
+        """Emit parsed hierarchy."""
+        prefix = "  " * indent + self._prefix_class
+        children = sorted(self._nodes[name], key=lambda child: self._order[child])
         if not children:
             return f"{prefix}<{name}>"
-        inner = ",\n".join(emit(child, indent + 1) for child in children)
+        inner = ",\n".join(self.emit(child, indent + 1) for child in children)
         return f"{prefix}<{name},\n{inner}>"
 
-    print("\n".join(declarations))
-    print(f"\nusing ValueHierarchy = \n{emit(parsed.root_class)}")
+
+def main(raw_args: list[str] | None = None) -> None:
+    """Parse C++ code with command line arguments and print class hierarchy."""
+    args = _parse_args(raw_args)
+    logging.basicConfig(level=logging.INFO)
+    index = get_index(args.llvm_prefix)
+    hierarchy_parser = HierarchyParser(
+        index,
+        args.llvm_prefix,
+        args.root_key,
+        args.root_class,
+        args.prefix_class,
+    )
+
+    if args.mode == "file":
+        hierarchy_parser.parse(
+            args.sources_dir.joinpath(args.path),
+            [
+                "-x",
+                "c++",
+                "-std=gnu++2b",
+                f"-I{args.sources_dir}",
+                f"-I{args.readline_prefix.joinpath('include')}",
+            ],
+        )
+    else:
+        db = cindex.CompilationDatabase.fromDirectory(
+            args.sources_dir.joinpath(args.path),
+        )
+        for cmd in db.getAllCompileCommands():
+            hierarchy_parser.parse(
+                cmd.filename,
+                list(cmd.arguments)[2:-2],
+            )
+
+    print("\n".join(hierarchy_parser.declarations))  # noqa: T201
+    print(  # noqa: T201
+        f"\nusing {args.root_class}Hierarchy = "
+        f"\n{hierarchy_parser.emit(args.root_class)}",
+    )
+
 
 if __name__ == "__main__":
     main()
 
 # Test cases:
-# main(["--mode", "build", "build"])
-# main(["--mode", "file", "Types.h"])
+# main(["--mode", "build", "build"]) # noqa: ERA001
+# main(["--mode", "file", "Types.h"]) # noqa: ERA001
