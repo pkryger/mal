@@ -147,8 +147,10 @@ def main(args: list[str] | None = None) -> None:
 
     index = get_index(parsed.llvm_prefix)
     nodes : dict[str, set[str]] = {parsed.root_class : set()}
+    declarations : list[str] = []
 
     def update_nodes(tu : cindex.TranslationUnit) -> None:
+        nonlocal declarations
         for cursor in tu.cursor.walk_preorder():
             if cursor.kind in (
                     cindex.CursorKind.CLASS_DECL,
@@ -160,6 +162,12 @@ def main(args: list[str] | None = None) -> None:
                            and child.spelling in nodes:
                             nodes[cursor.spelling] = set()
                             nodes[child.spelling].add(cursor.spelling)
+                declaration = \
+                    f"{"class" if cursor.kind == cindex.CursorKind.CLASS_DECL
+                    else "struct"} {cursor.spelling};"
+                if declaration not in declarations \
+                   and cursor.spelling in nodes:
+                    declarations += [declaration]
 
     options = cindex.TranslationUnit.PARSE_INCOMPLETE \
         | cindex.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
@@ -199,7 +207,8 @@ def main(args: list[str] | None = None) -> None:
         inner = ",\n".join(emit(child, indent + 1) for child in children)
         return f"{prefix}<{name},\n{inner}>"
 
-    print(f"using ValueHierarchy = \n{emit(parsed.root_class)}")
+    print("\n".join(declarations))
+    print(f"\nusing ValueHierarchy = \n{emit(parsed.root_class)}")
 
 if __name__ == "__main__":
     main()
