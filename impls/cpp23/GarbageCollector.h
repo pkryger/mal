@@ -71,7 +71,7 @@ public:
     }
 
     friend bool operator==(const Iterator &lhs, std::default_sentinel_t) {
-      return lhs.current_ != nullptr;
+      return lhs.current_ == nullptr;
     }
 
   private:
@@ -81,11 +81,11 @@ public:
   };
 
   auto begin() {
-    return Iterator<false>{head_.getSync()};
+    return Iterator<false>{head_.get_sync()};
   }
 
   auto begin() const {
-    return Iterator<true>{head_.getSync()};
+    return Iterator<true>{head_.get_sync()};
   }
 
   auto end() { return std::default_sentinel; }
@@ -144,23 +144,23 @@ private:
 
   class Head {
   public:
-    explicit Head(Node *ptr) noexcept : head_{ptr}, sync_{ptr} {}
+    explicit Head(Node *ptr) noexcept : async_{ptr}, sync_{ptr} {}
 
-    Node *getSync() const noexcept {
+    Node *get_sync() const noexcept {
       return sync_.load(std::memory_order::acquire);
     }
 
     Node *get() const noexcept {
-      return head_;
+      return async_;
     }
 
     void set_sync(Node *ptr) noexcept {
-      head_ = ptr;
+      async_ = ptr;
       sync_.store(ptr, std::memory_order::release);
     }
 
   private:
-    Node *head_;
+    Node *async_;
     std::atomic<Node *> sync_;
   } head_;
 };
@@ -190,7 +190,7 @@ private:
   [[nodiscard]]
   bool eraseEmptyNodes(ITERATOR it, FUNC &&yieldAndStopRequested) {
     std::size_t counter = 0;
-    for (; it != list_.end(); ++it) {
+    while (it != list_.end()) {
       // skipping the head_ [sic!]
       auto next = [&]() {
         auto res = it;
@@ -198,6 +198,8 @@ private:
       }();
       if (next != list_.end() && !*next) {
         list_.erase_next(it);
+      } else {
+        ++it;
       }
       if (yieldAndStopRequested(&counter)) {
         return true;
