@@ -632,7 +632,7 @@ protected:
   ValuePtr isEqualToFunctionBase(const ValuePtr &rhs) const;
 
   template <typename VALUES>
-  EnvPtr makeApplyEnv(VALUES &&values, EnvPtr evalEnv) const;
+  EnvPtr makeApplyEnv(VALUES &&values, const EnvPtr &evalEnv) const;
 
   std::size_t bindSize;
   Params params;

@@ -75,9 +75,6 @@ void Env::insert_or_assign(Key key, ValuePtr value) {
   }
 }
 
-ApplyEnv::ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept
-    : EnvBase{std::move(evalEnv)}, capturedEnv_{std::move(capturedEnv)} {}
-
 void ApplyEnv::insert_or_assign(Key key, ValuePtr value) {
   assert(value);
   registerDebugEval(key, value);

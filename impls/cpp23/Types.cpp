@@ -341,8 +341,13 @@ ValuePtr FunctionBase::isEqualToFunctionBase(const ValuePtr &rhs) const {
 }
 
 template <typename VALUES>
-EnvPtr FunctionBase::makeApplyEnv(VALUES &&values, EnvPtr evalEnv) const {
-  auto applyEnv = make<ApplyEnv>(std::move(evalEnv), capturedEnv);
+EnvPtr FunctionBase::makeApplyEnv(VALUES &&values, const EnvPtr &evalEnv) const {
+  auto applyEnv = make<ApplyEnv>(
+      evalEnv, capturedEnv,
+      std::views::zip(
+          params | std::views::take(bindSize) |
+              std::views::transform([](auto &&param) { return param.asKey(); }),
+          std::forward<VALUES>(values)));
   if (bindSize == params.size()) {
     checkArgsIs(print(Simply), values.size(), bindSize);
   } else {
@@ -350,14 +355,6 @@ EnvPtr FunctionBase::makeApplyEnv(VALUES &&values, EnvPtr evalEnv) const {
     applyEnv->insert_or_assign(
         params.back().asKey(),
         make<List>(std::forward<VALUES>(values) | std::views::drop(bindSize)));
-  }
-  for (auto &&[key, value] :
-       std::views::zip(params | std::views::take(bindSize) |
-                           std::views::transform([](auto &&param) {
-                             return param.asKey();
-                           }),
-                       std::forward<VALUES>(values))) {
-    applyEnv->insert_or_assign(key, std::forward<decltype(value)>(value));
   }
   return applyEnv;
 }

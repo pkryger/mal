@@ -8,6 +8,7 @@
 #include <cstdint> // IWYU pragma: keep
 #include <functional> // IWYU pragma: keep
 #include <iterator>
+#include <ranges>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -202,7 +203,11 @@ private:
 
 class ApplyEnv : public EnvBase {
 public:
-  explicit ApplyEnv(EnvPtr evalEnv, EnvPtr capturedEnv) noexcept;
+  template <std::ranges::input_range RANGE>
+  explicit ApplyEnv(const EnvPtr &evalEnv, const EnvPtr &capturedEnv,
+                    RANGE &&range)
+      : EnvBase{evalEnv}, map_{std::from_range, std::forward<RANGE>(range)},
+        capturedEnv_{capturedEnv} {}
 
   void insert_or_assign(Key key, ValuePtr value) override;
 
