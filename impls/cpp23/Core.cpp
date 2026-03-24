@@ -11,9 +11,11 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstring>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -303,7 +305,13 @@ InvocableResult println(std::string_view /* name */, ValuesSpan values,
 }
 
 InvocableResult pr_str(std::string_view /* name */, ValuesSpan values,
-                       const EnvPtr &/* env */) {
+                       const EnvPtr & /* env */) {
+  if (auto malImpl =
+          // NOLINTNEXTLINE(concurrency-mt-unsafe) - single threaded
+      std::getenv("MAL_IMPL");
+      malImpl && std::strncmp(malImpl, "cpp23", 5) == 0) {
+    return {make<String>(std::format("{:l}", values)), {}};
+  }
   return {make<String>(std::format("{:r}", values)), {}};
 }
 
