@@ -226,7 +226,7 @@ ValuePtr Vector::eval(const EnvPtr &env) const {
 
 ValuePtr List::eval(const EnvPtr &env) const {
   assert(env);
-    assert(!EvalFnStack::empty());
+  assert(!EvalFnStack::empty());
   if (data.empty()) {
     return shared_from_this();
   }
@@ -273,7 +273,8 @@ Hash::Hash(const Hash &other, ValuesSpan values)
          return std::tie(chunk[0], chunk[1]);
        })) {
     data.insert_or_assign(key, value);
-  }}
+  }
+}
 
 ValuePtr Hash::find(const ValuePtr &key) const {
   if (auto res = data.find(key); res != data.end()) {
