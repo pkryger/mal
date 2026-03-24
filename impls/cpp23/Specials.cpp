@@ -6,6 +6,7 @@
 #if !defined(__cpp_lib_ranges_chunk)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_chunk
+#include "Reader.h"
 #include "Types.h"
 
 #include <algorithm> // IWYU pragma: keep
@@ -227,6 +228,8 @@ InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
         } catch (CoreException ex) {
           return exceptionHandler(make<String>(ex.what()));
         } catch (EvalException ex) {
+          return exceptionHandler(make<String>(ex.what()));
+        } catch (ReaderException ex) {
           return exceptionHandler(make<String>(ex.what()));
         } catch (MalException ex) {
           return exceptionHandler(ex.value);
