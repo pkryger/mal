@@ -523,11 +523,17 @@ public:
   explicit Hash(RANGE &&range)
       : Value{typeInfo<Hash>.lo},
         data{std::from_range, std::forward<RANGE>(range) |
-                                  std::views::chunk(2) | std::views::reverse |
+#ifdef __cpp_lib_ranges_chunk
+                                  std::views::chunk(2)
+#else
+                                  mal::views::Chunk(2)
+#endif //__cpp_lib_ranges_chunk
+                                  | std::views::reverse |
                                   std::views::transform([](auto &&chunk) {
                                     assert(chunk[0]->template isa<StringBase>());
                                     return std::tie(chunk[0], chunk[1]);
-                                  })} {}
+                                  })} {
+  }
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,

@@ -267,11 +267,16 @@ ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
 
 Hash::Hash(const Hash &other, ValuesSpan values)
     : Value{typeInfo<Hash>.lo}, data{other.data} {
-  for (auto [key, value] :
-       values | std::views::chunk(2) | std::views::transform([](auto &&chunk) {
-         assert(chunk[0]->template isa<StringBase>());
-         return std::tie(chunk[0], chunk[1]);
-       })) {
+  for (auto [key, value] : values |
+#ifdef __cpp_lib_ranges_chunk
+                               std::views::chunk(2)
+#else
+                               mal::views::Chunk(2)
+#endif // __cpp_lib_ranges_chunk
+                               | std::views::transform([](auto &&chunk) {
+                                   assert(chunk[0]->template isa<StringBase>());
+                                   return std::tie(chunk[0], chunk[1]);
+                                 })) {
     data.insert_or_assign(key, value);
   }
 }

@@ -49,7 +49,13 @@ InvocableResult specialLetStar(std::string_view name, ValuesSpan values,
     auto letEnv = make<Env>(env);
     auto &evalFn = EvalFnStack::top();
     for (auto &&[key, value] :
-         bindings | std::views::chunk(2) |
+         bindings |
+#ifdef __cpp_lib_ranges_chunk
+             std::views::chunk(2)
+#else
+             mal::views::Chunk(2)
+#endif // __cpp_lib_ranges_chunk
+             |
              std::views::transform([&](auto &&chunk) {
                if (auto symbol = chunk[0]->template dyncast<Symbol>()) {
                  return std::pair{symbol->asKey(), evalFn(chunk[1], letEnv)};

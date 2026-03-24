@@ -289,25 +289,6 @@ struct ChunkFn : std::ranges::range_adaptor_closure<ChunkFn> {
 
 inline constexpr auto Chunk = chunk_fn::ChunkFn{};
 
-} // namespace views
-} // namespace mal
-
-#if !defined(__cpp_lib_ranges_chunk)
-namespace std {
-namespace ranges {
-template <std::ranges::input_range VIEW>
-  requires std::ranges::view<VIEW>
-using chunk_view = mal::views::ChunkView<VIEW>;
-namespace views {
-inline constexpr auto chunk = mal::views::chunk_fn::ChunkFn{};
-} // namespace views
-} // namespace ranges
-} // namespace std
-#endif // __cpp_lib_ranges_chunk
-
-namespace mal {
-namespace views {
-
 template <std::ranges::input_range VIEW>
   requires std::ranges::view<VIEW>
 class StrideView : public std::ranges::view_interface<StrideView<VIEW>> {
@@ -502,19 +483,5 @@ inline constexpr auto Stride = stride_fn::StrideFn{};
 
 } // namespace views
 } // namespace mal
-
-#if !defined(__cpp_lib_ranges_stride)
-namespace std {
-namespace ranges {
-template <std::ranges::input_range VIEW>
-  requires std::ranges::view<VIEW>
-using stride_view = mal::views::StrideView<VIEW>;
-namespace views {
-inline constexpr auto stride = mal::views::stride_fn::StrideFn{};
-} // namespace views
-} // namespace ranges
-} // namespace std
-#endif // __cpp_lib_ranges_stride
-
 
 #endif // INCLUDE_RANGES_H

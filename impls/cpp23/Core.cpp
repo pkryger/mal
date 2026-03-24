@@ -614,7 +614,13 @@ InvocableResult vector(std::string_view /*name*/, ValuesSpan values,
 InvocableResult hash_map(std::string_view name, ValuesSpan values,
                   const EnvPtr &/* env */) {
   if (values.size() % 2 == 0) {
-    for (auto &&key : values | std::views::stride(2)) {
+    for (auto &&key : values |
+#ifdef __cpp_lib_ranges_stride
+                          std::views::stride(2)
+#else
+                          mal::views::Stride(2)
+#endif // __cpp_lib_ranges_stride
+    ) {
       if (!key->isa<StringBase>()) {
         mal::throwWrongArgument(name, key);
       }
@@ -630,7 +636,13 @@ InvocableResult assoc(std::string_view name, ValuesSpan values,
   checkArgsAtLeast(name, values, 1);
   if (values.size() % 2 == 1) {
     if (auto hash = values[0]->dyncast<Hash>()) {
-      for (auto &&key : values.subspan(1) | std::views::stride(2)) {
+      for (auto &&key : values.subspan(1) |
+#ifdef __cpp_lib_ranges_stride
+                            std::views::stride(2)
+#else
+                            mal::views::Stride(2)
+#endif // __cpp_lib_ranges_stride
+        ) {
         if (!key->isa<StringBase>()) {
           mal::throwWrongArgument(name, key);
         }

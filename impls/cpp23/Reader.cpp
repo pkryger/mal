@@ -199,7 +199,13 @@ ValuePtr readForm(Tokeniser &tokeniser) {
       throw ReaderException{"odd number of items: " +
                                  std::to_string(items.size())};
     }
-    for (auto key : items | std::views::stride(2)) {
+    for (auto key : items |
+#ifdef __cpp_lib_ranges_stride
+                        std::views::stride(2)
+#else
+                        mal::views::Stride(2)
+#endif // __cpp_lib_ranges_stride
+    ) {
       if (!(key->isa<String>() ||
             key->isa<Symbol>() ||
             key->isa<Keyword>())) {
