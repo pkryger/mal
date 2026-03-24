@@ -396,9 +396,8 @@ ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
 InvocableResult Macro::apply(bool /* evaled */, ValuesSpan values,
                              const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
-  auto applyEnv = FunctionBase::makeApplyEnv(values, evalEnv);
-  auto res = EvalFnStack::top()(body, applyEnv);
-  return {std::move(res), std::move(applyEnv)};
+  return {EvalFnStack::top()(body, FunctionBase::makeApplyEnv(values, evalEnv)),
+          evalEnv};
 }
 
 ValuePtr Eval::isEqualTo(ValuePtr rhs) const {
