@@ -8,6 +8,10 @@
 #endif // __cpp_lib_ranges_chunk
 
 #include <algorithm>
+#if defined(__aarch64__) || defined(_M_ARM64)
+#include <arm_neon.h>
+#include <bit>
+#endif // defined(__aarch64__) || defined(_M_ARM64)
 #include <cassert>
 #include <format>
 #include <optional>
@@ -117,6 +121,145 @@ ValuePtr Constant::isEqualTo(ValuePtr rhs) const {
   return Constant::falseValue();
 }
 
+} // namespace mal
+
+namespace {
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+
+// This is modified from simdjson library:
+// https://github.com/simdjson/simdjson/blob/45caa86/include/simdjson/generic/builder/json_string_builder-inl.h#L224-L260
+
+std::pair<std::size_t, std::optional<char>>
+find_next_character_to_unescape(std::string_view view,
+                                std::size_t location) noexcept {
+
+  const std::size_t len = view.size();
+  const uint8_t *ptr =
+      reinterpret_cast<const uint8_t *>(view.data()) + location;
+  std::size_t remaining = len - location;
+  auto unescaped_after_pos = [&](std::size_t pos) -> std::optional<char> {
+    if (++pos < view.size()) {
+      switch (view[pos]) {
+      case '\\':
+        return '\\';
+      case 'n':
+        return '\n';
+      default:
+        return view[pos];
+      }
+    }
+    return {};
+  };
+
+  {
+    // SIMD constants for characters requiring escape
+    static const uint8x16_t v92 = vdupq_n_u8(92);  // '\\'
+
+    while (remaining >= 16) {
+      const uint8x16_t word = vld1q_u8(ptr);
+      const uint8x16_t needs_unescape = vceqq_u8(word, v92);
+
+      const uint8x8_t res = vshrn_n_u16(vreinterpretq_u16_u8(needs_unescape), 4);
+      const std::uint64_t mask = vget_lane_u64(vreinterpret_u64_u8(res), 0);
+      if (mask != 0) {
+        const auto offset = static_cast<std::size_t>(
+            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto trailing_zeros =
+            static_cast<std::size_t>(std::countr_zero(mask));
+        const auto pos = offset + (trailing_zeros >> 2);
+        auto unescaped = unescaped_after_pos(pos);
+        if (unescaped) {
+          return {pos, unescaped};
+        }
+      }
+      ptr += 16;
+      remaining -= 16;
+    }
+  }
+  {
+    // SIMD constants for characters requiring escape
+    static const uint8x8_t v92 = vdup_n_u8(92);  // '\\'
+
+    if (remaining >= 8) {
+      const uint8x8_t word = vld1_u8(ptr);
+      const uint8x8_t needs_unescape = vceq_u8(word, v92);
+
+      const std::uint64_t mask =
+          vget_lane_u64(vreinterpret_u64_u8(needs_unescape), 0);
+      if (mask != 0) {
+        const auto offset = static_cast<std::size_t>(
+            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto trailing_zeros =
+            static_cast<std::size_t>(std::countr_zero(mask));
+        const auto pos = offset + (trailing_zeros >> 3);
+        auto unescaped = unescaped_after_pos(pos);
+        if (unescaped) {
+          return {pos, unescaped};
+        }
+      }
+      ptr += 8;
+      remaining -= 8;
+    }
+  }
+  {
+    // scalar constants for characters requiring escape
+    static const std::uint8_t v92 = 92;  // '\\'
+
+    while (remaining > 0) {
+      const std::uint8_t word = *ptr;
+      const bool needs_unescape = word == v92;
+
+      if (needs_unescape) {
+        const auto offset = static_cast<std::size_t>(
+            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        auto unescaped = unescaped_after_pos(offset);
+        if (unescaped) {
+          return {offset, unescaped};
+        }
+      }
+      ++ptr;
+      --remaining;
+    }
+  }
+  return {std::size_t(view.size()), {}};
+}
+
+#endif // defined(__aarch64__) || defined(_M_ARM64)
+
+} // namespace
+
+namespace mal {
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+
+std::string String::unescape(const std::string &in) {
+  std::string_view view{in.begin() + 1, in.end() - 1};
+  auto [location, unescaped] = find_next_character_to_unescape(view, 0);
+  if (location == view.size()) [[likely]] {
+    assert(!unescaped);
+    return std::string{view};
+  }
+
+  std::string out;
+  const auto size = view.size();
+  out.reserve(size - 1);
+
+  std::size_t pos = 0;
+  while (location < size) {
+    assert(unescaped);
+    out.append(view.data() + pos, location - pos);
+    out += *unescaped;
+    pos = location + 2;
+    std::tie(location, unescaped) = find_next_character_to_unescape(view, pos);
+  }
+  out.append(view.data() + pos, location - pos);
+  out.shrink_to_fit();
+  return out;
+}
+
+#else
+
 std::string String::unescape(const std::string& in) {
   std::string out;
   out.reserve(in.size() - 2);
@@ -143,27 +286,163 @@ std::string String::unescape(const std::string& in) {
   return out;
 }
 
+#endif // defined(__aarch64__) || defined(_M_ARM64)
+
+} // namespace mal
+
+namespace {
+
+void maybe_escape_and_append_character(char c, std::string &out) {
+  switch (c) {
+  case '\\':
+    out += "\\\\";
+    break;
+  case '\n':
+    out += "\\n";
+    break;
+  case '"':
+    out += "\\\"";
+    break;
+  default:
+    out += c;
+  }
+}
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+
+// This is modified from simdjson library:
+// https://github.com/simdjson/simdjson/blob/45caa86/include/simdjson/generic/builder/json_string_builder-inl.h#L224-L260
+
+std::size_t find_next_character_to_escape(std::string_view view,
+                                          std::size_t location) noexcept {
+  const std::size_t len = view.size();
+  const uint8_t *ptr =
+      reinterpret_cast<const uint8_t *>(view.data()) + location;
+  std::size_t remaining = len - location;
+  {
+    // SIMD constants for characters requiring escape
+    static const uint8x16_t v10 = vdupq_n_u8(10);  // '\n'
+    static const uint8x16_t v34 = vdupq_n_u8(34);  // '"'
+    static const uint8x16_t v92 = vdupq_n_u8(92);  // '\\'
+
+    while (remaining >= 16) {
+      const uint8x16_t word = vld1q_u8(ptr);
+
+      uint8x16_t needs_escape = vceqq_u8(word, v10);
+      needs_escape = vorrq_u8(needs_escape, vceqq_u8(word, v34));
+      needs_escape = vorrq_u8(needs_escape, vceqq_u8(word, v92));
+
+      const uint8x8_t res = vshrn_n_u16(vreinterpretq_u16_u8(needs_escape), 4);
+      const std::uint64_t mask = vget_lane_u64(vreinterpret_u64_u8(res), 0);
+      if (mask != 0) {
+        const auto offset = static_cast<std::size_t>(
+            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto trailing_zeros =
+            static_cast<std::size_t>(std::countr_zero(mask));
+        return offset + (trailing_zeros >> 2);
+      }
+      ptr += 16;
+      remaining -= 16;
+    }
+  }
+  {
+    // SIMD constants for characters requiring escape
+    static const uint8x8_t v10 = vdup_n_u8(10);  // '\n'
+    static const uint8x8_t v34 = vdup_n_u8(34);  // '"'
+    static const uint8x8_t v92 = vdup_n_u8(92);  // '\\'
+
+    if (remaining >= 8) {
+      const uint8x8_t word = vld1_u8(ptr);
+
+      uint8x8_t needs_escape = vceq_u8(word, v10);
+      needs_escape = vorr_u8(needs_escape, vceq_u8(word, v34));
+      needs_escape = vorr_u8(needs_escape, vceq_u8(word, v92));
+
+      const std::uint64_t mask =
+          vget_lane_u64(vreinterpret_u64_u8(needs_escape), 0);
+      if (mask != 0) {
+        const auto offset = static_cast<std::size_t>(
+            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto trailing_zeros =
+            static_cast<std::size_t>(std::countr_zero(mask));
+        return offset + (trailing_zeros >> 3);
+      }
+      ptr += 8;
+      remaining -= 8;
+    }
+  }
+  {
+    // scalar constants for characters requiring escape
+    static const std::uint8_t v10 = 10;  // '\n'
+    static const std::uint8_t v34 = 34;  // '"'
+    static const std::uint8_t v92 = 92;  // '\\'
+
+    while (remaining > 0) {
+      const std::uint8_t word = *ptr;
+
+      bool needs_escape = word == v10;
+      needs_escape |= word == v34;
+      needs_escape |= word == v92;
+
+      if (needs_escape) {
+        const auto offset = static_cast<std::size_t>(
+            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        return offset;
+      }
+      ++ptr;
+      --remaining;
+    }
+  }
+
+  return std::size_t(view.size());
+}
+#endif // defined(__aarch64__) || defined(_M_ARM64)
+
+} // namespace
+
+namespace mal {
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+
+std::string String::escape(const std::string &in) {
+  std::string out{'"'};
+  const auto size = in.size();
+  auto location = find_next_character_to_escape(in, 0);
+  if (location == size) [[likely]] {
+    out.reserve(size + 2);
+    out.append(in.data(), size);
+    out += '"';
+    return out;
+  }
+
+  out.reserve(size * 2 + 2);
+  std::size_t pos = 0;
+  while (location < size) {
+    out.append(in.data() + pos, location - pos);
+    maybe_escape_and_append_character(in[location], out);
+    pos = location + 1;
+    location = find_next_character_to_escape(in, pos);
+  }
+  out.append(in.data() + pos, location - pos);
+
+  out += '"';
+  out.shrink_to_fit();
+  return out;
+}
+
+#else // defined(__aarch64__) || defined(_M_ARM64)
+
 std::string String::escape(const std::string& in) {
   std::string out{'"'};
   out.reserve(in.size() + 2);
   for (auto&& c : in) {
-    switch (c) {
-    case '\\':
-      out += "\\\\";
-      break;
-    case '\n':
-      out += "\\n";
-      break;
-    case '"':
-      out += "\\\"";
-      break;
-    default:
-      out += c;
-    }
+    maybe_escape_and_append_character(c, out);
   }
   out += '"';
   return out;
 }
+
+#endif // !(defined(__aarch64__) || defined(_M_ARM64))
 
 std::string String::print(PrintType readably) const {
   return readably ? escape(StringBase::data) : StringBase::data;
