@@ -1,6 +1,7 @@
 #ifndef INCLUDE_ENV
 #define INCLUDE_ENV
 
+#include "GarbageCollector.h"
 #include "Mal.h"
 
 #include <concepts>

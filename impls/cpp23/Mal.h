@@ -2,6 +2,7 @@
 #define INCLUDE_MAL
 
 #include "FunctionRef.h"
+#include "GarbageCollector.h"
 
 #include <cassert>
 #include <memory>
@@ -45,13 +46,9 @@ private:
 
 } // namespace detail
 
-class GarbageCollectible {
-public:
-  virtual ~GarbageCollectible() = default;
-};
 using GarbageCollectiblePtr = std::shared_ptr<GarbageCollectible>;
 
-using GarbageCollectFn = void(GarbageCollectiblePtr);
+using GarbageCollectFn = void(NodeBuffer &nodeBuffer);
 using GarbageCollectStack = detail::FnStack<GarbageCollectFn>;
 
 class EnvBase;
@@ -64,9 +61,10 @@ using ValuesSpan = std::span<const ValuePtr>;
 
 template <typename TYPE, typename... ARGS>
 [[nodiscard]] std::shared_ptr<std::decay_t<TYPE>> make(ARGS &&...args) {
-  auto res = std::make_shared<std::decay_t<TYPE>>(std::forward<ARGS>(args)...);
+  std::shared_ptr<std::decay_t<TYPE>> res;
+  NodeBuffer nodeBuffer(res, std::forward<ARGS>(args)...);
   assert(!GarbageCollectStack::empty());
-  GarbageCollectStack::top()(res);
+  GarbageCollectStack::top()(nodeBuffer);
   return res;
 }
 

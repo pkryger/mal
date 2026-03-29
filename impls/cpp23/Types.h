@@ -5,6 +5,7 @@
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_chunk
 #include "Env.h"
+#include "GarbageCollector.h"
 #include "Hierarchy.h"
 #include "Mal.h"
 
