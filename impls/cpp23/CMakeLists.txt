@@ -80,7 +80,6 @@ target_sources(mal
   PRIVATE
     Core.cpp
     Env.cpp
-    GarbageCollector.cpp
     ReadLine.cpp
     Reader.cpp
     Specials.cpp

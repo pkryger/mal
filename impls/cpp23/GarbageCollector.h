@@ -2,12 +2,9 @@
 #define INCLUDE_GARBAGE_COLLECTOR
 
 #include <atomic>
-#include <algorithm>
-#include <cassert>
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
-#include <cstdlib>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -15,159 +12,31 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
-// IWYU pragma: no_include <__cstddef/byte.h>
-// IWYU pragma: no_include <malloc/_malloc.h>
 
 namespace mal {
 
-class GarbageCollectible {
-public:
-  virtual ~GarbageCollectible() = default;
-};
-
-namespace detail {
-
-struct Node {
-  Node *next_;
-    std::shared_ptr<GarbageCollectible> value_;
-    bool owned_;
-    explicit Node(Node *next, const std::shared_ptr<GarbageCollectible> &value) noexcept
-        : next_{next}, value_{value}, owned_{false} {}
-};
-
-struct NodeBufferMixin {
-  std::byte *buffer_;
-};
-
-std::size_t sharedPtrControlSize();
-std::size_t sharedPtrControlAlign();
-
-constexpr std::size_t align_up(std::size_t value, std::size_t alignment) {
-    return (value + alignment - 1) & ~(alignment - 1);
-}
-
-struct Layout {
-  constexpr Layout(std::size_t nodeSize, std::size_t nodeAlign,
-                   std::size_t controlSize, std::size_t controlAlign,
-                   std::size_t tSize, std::size_t tAlign) noexcept
-      : maxAlign{std::max({nodeAlign, controlAlign, tAlign})}, offsetNode{0},
-        offsetControl{align_up(offsetNode + nodeSize, controlAlign)},
-        offsetT{align_up(offsetControl + controlSize, tAlign)},
-        totalSize{align_up(offsetT + tSize, maxAlign)} {}
-
-  constexpr Layout(const Layout &) noexcept = default;
-  constexpr Layout(Layout &&) noexcept = default;
-  constexpr Layout& operator=(const Layout &) noexcept = default;
-  constexpr Layout& operator=(Layout &&) noexcept = default;
-
-  std::size_t maxAlign;
-  std::size_t offsetNode;
-  std::size_t offsetControl;
-  std::size_t offsetT;
-  std::size_t totalSize;
-};
-
-template <typename T> static Layout layout_of() {
-  static const Layout layout_{sizeof(Node),
-                              alignof(Node),
-                              sharedPtrControlSize(),
-                              sharedPtrControlAlign(),
-                              sizeof(T),
-                              alignof(T)};
-
-  return layout_;
-}
-
-
-template <typename T, typename ORIG_T = T>
-struct NodeValueAllocator : public NodeBufferMixin {
-  using value_type = T;
-
-  explicit NodeValueAllocator(std::byte *buffer) : NodeBufferMixin{buffer} {}
-
-  template <typename U> struct rebind {
-    using other = NodeValueAllocator<U, ORIG_T>;
-  };
-
-  template <typename U>
-  explicit NodeValueAllocator(
-      const NodeValueAllocator<U, ORIG_T> &other) noexcept
-      : NodeBufferMixin{other.buffer_} {}
-
-  T *allocate(std::size_t n) noexcept {
-    assert(n == 1);
-    return reinterpret_cast<T *>(buffer_  + layout_of<ORIG_T>().offsetControl);
-  }
-
-  void deallocate(T * ptr, std::size_t n) noexcept {
-    assert(n == 1);
-    assert(reinterpret_cast<void *>(ptr) ==
-           reinterpret_cast<void *>(buffer_ + layout_of<ORIG_T>().offsetControl));
-    auto node = reinterpret_cast<Node *>(buffer_);
-    if (node ->owned_) {
-      std::free(buffer_);
-    }
-  }
-};
-
-} // namespace detail
-
-struct NodeBuffer {
-  std::unique_ptr<std::byte, void(*)(void *)> buffer_;
-
-  detail::Node *node() {
-    assert(buffer_);
-    return reinterpret_cast<detail::Node *>(buffer_.get());
-  }
-
-  template <typename T, typename... ARGS>
-  explicit NodeBuffer(std::shared_ptr<T> &out, ARGS &&...args)
-      : buffer_{static_cast<std::byte *>(
-                    std::aligned_alloc(detail::layout_of<T>().maxAlign,
-                                       detail::layout_of<T>().totalSize)),
-                &std::free} {
-    assert(detail::sharedPtrControlSize() > 0);
-    assert(detail::sharedPtrControlAlign() > 0);
-    std::construct_at(
-        node(), nullptr,
-        std::allocate_shared<T>(detail::NodeValueAllocator<T>{buffer_.get()},
-                                std::forward<ARGS>(args)...));
-    out = std::static_pointer_cast<T>(node()->value_);
-  }
-
-  ~NodeBuffer() {
-    if (buffer_) {
-      auto n = node();
-      if (n->value_.use_count() == 1) {
-        std::destroy_at(n);
-      } else {
-        n->value_.reset();
-        std::destroy_at(std::addressof(n->value_));
-        n->owned_ = true;
-        auto _ = buffer_.release();
-        (void)_;
-      }
-    }
-  }
-
-  [[nodiscard]]
-  detail::Node *release(detail::Node *head) {
-    auto n = node();
-    n->next_ = head;
-    return reinterpret_cast<detail::Node *>(buffer_.release());
-  }
-};
-
-namespace deatil {
-
+template <typename T, typename ALLOCATOR = std::allocator<T>>
+  requires std::is_same_v<T, std::shared_ptr<typename T::element_type>>
 class SPSCList {
 public:
+  class Node {
+  public:
+    Node(Node *next): next_{next} {};
+    ~Node() {};
+  private:
+    friend class SPSCList;
+    Node *next_;
+    union {
+      alignas(T) T value_;
+    };
+  };
+
+  using NodeAllocator =
+      std::allocator_traits<ALLOCATOR>::template rebind_alloc<Node>;
 
   template <bool CONST> class Iterator {
   public:
-    using value_type =
-        std::shared_ptr<std::conditional_t<CONST, const GarbageCollectible,
-                                           GarbageCollectible>>;
+    using value_type = std::conditional_t<CONST, const T, T>;
     using difference_type = std::ptrdiff_t;
     using iterator_category = std::input_iterator_tag;
     using iterator_concept = std::forward_iterator_tag;
@@ -198,7 +67,7 @@ public:
     void operator++(int) { ++*this; }
 
     friend bool operator==(const Iterator &lhs, const Iterator &rhs) {
-      return lhs.current_ == rhs.current_;
+      return lhs.current_ = rhs.current_;
     }
 
     friend bool operator==(const Iterator &lhs, std::default_sentinel_t) {
@@ -207,8 +76,8 @@ public:
 
   private:
     friend class SPSCList;
-    Iterator(detail::Node *current) : current_{current} {}
-    detail::Node *current_;
+    Iterator(Node *current) : current_{current} {}
+    Node *current_;
   };
 
   auto begin() {
@@ -223,64 +92,83 @@ public:
 
   auto end() const { return std::default_sentinel; }
 
-  void push_front(NodeBuffer &nodeBuffer) {
-    head_.set_sync(nodeBuffer.release(head_.get()));
+  // NOLINTNEXTLINE(performance-unnecessary-value-param) - move to storage in Node
+  void push_front(T value) {
+    head_.set_sync(new_node(head_.get(), std::move(value)));
   }
 
-  explicit SPSCList() : head_ {
-    []() {
-      std::shared_ptr<GarbageCollectible> res;
-      NodeBuffer nodeBuffer(res);
-      return nodeBuffer.release(nullptr);
-    }()} {}
+  explicit SPSCList(const ALLOCATOR &allocator = ALLOCATOR())
+      : node_allocator_(allocator), head_{new_node(nullptr, nullptr)} {}
 
   void erase_next(Iterator<false> it) {
     assert(it.current_);
     assert(it.current_->next_);
-    std::free(std::exchange(it.current_->next_, it.current_->next_->next_));
+    delete_node(std::exchange(it.current_->next_, it.current_->next_->next_));
   }
 
   ~SPSCList() {
-    detail::Node *current = head_.get();
+    Node *current = head_.get();
     while (current) {
-      const bool last = current->value_.use_count() == 1;
-      std::destroy_at(std::addressof(current->value_));
-      auto n = std::exchange(current, current->next_);
-      if (last) {
-        std::free(n);
-      }
+      delete_node(std::exchange(current, current->next_));
     }
   }
 
 private:
+  template <typename... ARGS>
+  [[nodiscard]]
+  Node *new_node(Node *head, ARGS &&...args) {
+    Node *node =
+        std::allocator_traits<NodeAllocator>::allocate(node_allocator_, 1);
+    try {
+      std::construct_at(node, head);
+      std::uninitialized_construct_using_allocator(std::addressof(node->value_),
+                                                   node_allocator_,
+                                                   std::forward<ARGS>(args)...);
+      return node;
+    } catch (...) {
+      std::allocator_traits<NodeAllocator>::deallocate(node_allocator_, node,
+                                                       1);
+      throw;
+    }
+  }
+
+  void delete_node(Node *node) {
+    assert(node);
+    std::allocator_traits<NodeAllocator>::destroy(node_allocator_,
+                                                  std::addressof(node->value_));
+    std::allocator_traits<NodeAllocator>::deallocate(node_allocator_, node, 1);
+  }
+
+  [[no_unique_address]]
+  NodeAllocator node_allocator_;
 
   class Head {
   public:
-    explicit Head(detail::Node *ptr) noexcept : async_{ptr}, sync_{ptr} {}
+    explicit Head(Node *ptr) noexcept : async_{ptr}, sync_{ptr} {}
 
-    detail::Node *get_sync() const noexcept {
+    Node *get_sync() const noexcept {
       return sync_.load(std::memory_order::acquire);
     }
 
-    detail::Node *get() const noexcept {
+    Node *get() const noexcept {
       return async_;
     }
 
-    void set_sync(detail::Node *ptr) noexcept {
+    void set_sync(Node *ptr) noexcept {
       async_ = ptr;
       sync_.store(ptr, std::memory_order::release);
     }
 
   private:
-    detail::Node *async_;
-    std::atomic<detail::Node *> sync_;
+    Node *async_;
+    std::atomic<Node *> sync_;
   } head_;
 };
 
-} // namespace detail
-
 inline static std::size_t ChunkSize = 16;
 
+template <typename T>
+  requires std::is_same_v<T, std::shared_ptr<typename T::element_type>>
 class GarbageCollector {
 private:
   template <typename ITERATOR, typename FUNC>
@@ -350,12 +238,12 @@ public:
     cv_.notify_all();
   }
 
-  void registerValue(NodeBuffer &nodeBuffer) {
-    list_.push_front(nodeBuffer);
+  void registerValue(T value) {
+    list_.push_front(std::move(value));
   }
 
 private:
-  deatil::SPSCList list_;
+  SPSCList<T> list_;
   std::condition_variable_any cv_;
   std::mutex mtx_;
   std::jthread thread_;

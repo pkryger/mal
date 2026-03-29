@@ -90,9 +90,9 @@ std::string PRINT(ValuePtr ast) {
 }
 
 EnvPtr repEnv(std::span<const char *> args) {
-  static GarbageCollector gc;
-  static auto gcRegister = [&](NodeBuffer& nodeBuffer) {
-    gc.registerValue(nodeBuffer);
+  static GarbageCollector<GarbageCollectiblePtr> gc;
+  static auto gcRegister = [&](GarbageCollectiblePtr value) {
+    gc.registerValue(std::move(value));
   };
   static GarbageCollectStack::Guard gcGuard{gcRegister};
   static EvalFnStack::Guard evalGuard{EVAL};
