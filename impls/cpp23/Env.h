@@ -79,7 +79,7 @@ public:
                 std::same_as<T, std::string_view>)
     bool operator()(KeyView lhs, T&& rhs) const
     {
-      return lhs == rhs;
+      return lhs == std::forward<T>(rhs);
     }
 
     bool operator()(KeyView lhs, KeyView rhs) const {
@@ -143,10 +143,7 @@ public:
 
   explicit EnvBase(EnvPtr outer) noexcept
       : debugEval_{outer ? outer->debugEval_ : nullptr},
-        outer_{std::move(outer)},
-        size_{outer_ ? outer_->size() + 1 : 1} {}
-
-  virtual ~EnvBase() = default;
+        outer_{std::move(outer)}, size_{outer_ ? outer_->size() + 1 : 1} {}
 
   ValuePtr find(KeyView key) const;
 

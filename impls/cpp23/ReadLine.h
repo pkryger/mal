@@ -33,29 +33,48 @@ public:
     using iterator_concept = std::forward_iterator_tag;
 
     explicit Iterator(CyclicBuffer *buffer, std::size_t current)
-        : buffer{buffer}, current{current}, end{buffer->head} {
-      assert(buffer);
+        : buffer_{buffer}, current_{current}, end_{buffer->head_} {
+      assert(buffer_);
+      assert(current_ < buffer_->data_.size());
     }
 
-    value_type &operator*() noexcept { return buffer->data[current]; }
-    value_type &operator*() const noexcept { return buffer->data[current]; }
-
-    value_type *operator->() noexcept {
-      return std::addressof(buffer->data[current]);
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+    // access buffer is UB when not checked against END
+    value_type &operator*() noexcept
+      requires(!CONST)
+    {
+      assert(current_ < buffer_->data_.size());
+      return buffer_->data_[current_];
     }
+
+    value_type &operator*() const noexcept {
+      assert(current_ < buffer_->data_.size());
+      return buffer_->data_[current_];
+    }
+
+    value_type *operator->() noexcept
+      requires(!CONST)
+    {
+      assert(current_ < buffer_->data_.size());
+      return std::addressof(buffer_->data_[current_]);
+    }
+
     value_type *operator->() const noexcept {
-      return std::addressof(buffer->data[current]);
+      assert(current_ < buffer_->data_.size());
+      return std::addressof(buffer_->data_[current_]);
     }
+    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     Iterator &operator++() {
-      if (buffer->empty()) {
+      if (buffer_->empty()) {
         return *this;
       }
-      if (buffer->full && current < buffer->capacity) {
-        current = (current + 1) % buffer->capacity;
-      } else if (current < end) {
-        current++;
+      if (buffer_->full_ && current_ < buffer_->capacity_) {
+        current_ = (current_ + 1) % buffer_->capacity_;
+      } else if (current_ < end_) {
+        current_++;
       }
+      assert(current_ < buffer_->data_.size());
       return *this;
     }
 
@@ -66,50 +85,53 @@ public:
     }
 
     friend bool operator==(const Iterator &lhs, const Iterator &rhs) {
-      return lhs.buffer == rhs.buffer && lhs.current == rhs.current &&
-             lhs.end == rhs.end;
+      return lhs.buffer_ == rhs.buffer_ && lhs.current_ == rhs.current_ &&
+             lhs.end_ == rhs.end_;
     }
 
   private:
-    CyclicBuffer *buffer;
-    std::size_t current;
-    const std::size_t end;
+    CyclicBuffer *buffer_;
+    std::size_t current_;
+    std::size_t end_;
   };
 
-  auto begin() noexcept { return Iterator<false>{this, tail}; }
-  auto begin() const noexcept { return Iterator<true>{this, tail}; }
+  auto begin() noexcept { return Iterator<false>{this, tail_}; }
+  auto begin() const noexcept { return Iterator<true>{this, tail_}; }
 
-  auto end() noexcept { return Iterator<false>{this, head}; }
-  auto end() const noexcept { return Iterator<true>{this, head}; }
+  auto end() noexcept { return Iterator<false>{this, head_}; }
+  auto end() const noexcept { return Iterator<true>{this, head_}; }
 
   explicit CyclicBuffer(std::size_t capacity)
-      : data(capacity), capacity{capacity} {}
+      : data_(capacity), capacity_{capacity} {}
 
   template <typename T>
     requires std::convertible_to<T, VALUE>
   void push(T &&elt) {
-    data[head] = std::forward<T>(elt);
+    data_.at(head_) = std::forward<T>(elt);
 
-    if (full) {
-      tail = (tail + 1) % capacity;
+    if (full_) {
+      tail_ = (tail_ + 1) % capacity_;
     }
-    head = (head + 1) % capacity;
-    full = head == tail;
+    head_ = (head_ + 1) % capacity_;
+    full_ = head_ == tail_;
   }
 
-  bool empty() const noexcept { return !full && (head == tail); }
+  bool empty() const noexcept { return !full_ && (head_ == tail_); }
 
   size_t size() const noexcept {
-    if (full) return capacity;
-    return head - tail;
+    if (full_) {
+      return capacity_;
+    }
+    assert(head_ >= tail_);
+    return head_ - tail_;
   }
 
 private:
-  std::vector<VALUE> data;
-  std::size_t head{0};
-  std::size_t tail{0};
-  const std::size_t capacity;
-  bool full{false};
+  std::vector<VALUE> data_;
+  std::size_t head_{0};
+  std::size_t tail_{0};
+  std::size_t capacity_;
+  bool full_{false};
 };
 
 
@@ -124,11 +146,11 @@ public:
   std::optional<std::string> get(const std::string &prompt);
 
 private:
-  inline static std::size_t counter{};
-  inline static std::size_t last{};
-  detail::CyclicBuffer<std::string> lines;
-  const std::shared_ptr<const char> historyFile;
-  std::size_t id{++counter};
+  inline static std::size_t counter_{};
+  inline static std::size_t last_{};
+  detail::CyclicBuffer<std::string> lines_;
+  std::shared_ptr<const char> historyFile_;
+  std::size_t id{++counter_};
 };
 
 } // namespace mal

@@ -20,6 +20,19 @@
 #include <tuple>
 #include <utility>
 
+namespace std {
+
+std::size_t hash<mal::ValuePtr>::operator()(const mal::ValuePtr &o) const {
+  assert(o->isa<mal::StringBase>());
+  if (auto stringBase = o->dyncast<mal::StringBase>()) {
+    return std::hash<std::string>{}(stringBase->data_);
+  }
+  throw mal::EvalException{std::format("invalid key '{:r}'", o)};
+}
+
+} // namespace std
+
+
 namespace {
 
 using mal::EnvPtr;
@@ -91,7 +104,7 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
     return Constant::trueValue();
   }
   if (auto other = rhs->dyncast<StringBase>();
-      other && other->loId_ == this->loId_ && data == other->data) {
+      other && other->loId_ == this->loId_ && data_ == other->data_) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -101,7 +114,7 @@ ValuePtr Symbol::eval(const EnvPtr &env) const {
   assert(env);
   if (auto value = env->find(asKey()))
     return value;
-  throw EvalException{std::format("'{}' not found", data)};
+  throw EvalException{std::format("'{}' not found", data_)};
 }
 
 ValuePtr Symbol::isEqualTo(ValuePtr rhs) const {
@@ -124,6 +137,7 @@ ValuePtr Constant::isEqualTo(ValuePtr rhs) const {
 } // namespace mal
 
 namespace {
+// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-avoid-unchecked-container-access) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 
@@ -156,7 +170,8 @@ find_next_character_to_unescape(std::string_view view,
     // SIMD constants for characters requiring escape
     static const uint8x16_t v92 = vdupq_n_u8(92);  // '\\'
 
-    while (remaining >= 16) {
+    static constexpr std::size_t chunk_size{sizeof(uint8x16_t)};
+    while (remaining >= chunk_size) {
       const uint8x16_t word = vld1q_u8(ptr);
       const uint8x16_t needs_unescape = vceqq_u8(word, v92);
 
@@ -173,15 +188,16 @@ find_next_character_to_unescape(std::string_view view,
           return {pos, unescaped};
         }
       }
-      ptr += 16;
-      remaining -= 16;
+      ptr += chunk_size;
+      remaining -= chunk_size;
     }
   }
   {
     // SIMD constants for characters requiring escape
     static const uint8x8_t v92 = vdup_n_u8(92);  // '\\'
 
-    if (remaining >= 8) {
+    static constexpr std::size_t chunk_size{sizeof(uint8x8_t)};
+    if (remaining >= chunk_size) {
       const uint8x8_t word = vld1_u8(ptr);
       const uint8x8_t needs_unescape = vceq_u8(word, v92);
 
@@ -198,13 +214,13 @@ find_next_character_to_unescape(std::string_view view,
           return {pos, unescaped};
         }
       }
-      ptr += 8;
-      remaining -= 8;
+      ptr += chunk_size;
+      remaining -= chunk_size;
     }
   }
   {
     // scalar constants for characters requiring escape
-    static const std::uint8_t v92 = 92;  // '\\'
+    static constexpr std::uint8_t v92 = 92;  // '\\'
 
     while (remaining > 0) {
       const std::uint8_t word = *ptr;
@@ -233,7 +249,7 @@ namespace mal {
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 
-std::string String::unescape(const std::string &in) {
+std::string String::unescape(std::string_view in) {
   std::string_view view{in.begin() + 1, in.end() - 1};
   auto [location, unescaped] = find_next_character_to_unescape(view, 0);
   if (location == view.size()) [[likely]] {
@@ -260,7 +276,7 @@ std::string String::unescape(const std::string &in) {
 
 #else
 
-std::string String::unescape(const std::string& in) {
+std::string String::unescape(std::string_view in) {
   std::string out;
   out.reserve(in.size() - 2);
   for (auto i = in.begin() + 1, end = in.end() - 1; i != end; ++i) {
@@ -325,7 +341,8 @@ std::size_t find_next_character_to_escape(std::string_view view,
     static const uint8x16_t v34 = vdupq_n_u8(34);  // '"'
     static const uint8x16_t v92 = vdupq_n_u8(92);  // '\\'
 
-    while (remaining >= 16) {
+    static constexpr std::size_t chunk_size{sizeof(uint8x16_t)};
+    while (remaining >= chunk_size) {
       const uint8x16_t word = vld1q_u8(ptr);
 
       uint8x16_t needs_escape = vceqq_u8(word, v10);
@@ -341,8 +358,8 @@ std::size_t find_next_character_to_escape(std::string_view view,
             static_cast<std::size_t>(std::countr_zero(mask));
         return offset + (trailing_zeros >> 2);
       }
-      ptr += 16;
-      remaining -= 16;
+      ptr += chunk_size;
+      remaining -= chunk_size;
     }
   }
   {
@@ -351,7 +368,8 @@ std::size_t find_next_character_to_escape(std::string_view view,
     static const uint8x8_t v34 = vdup_n_u8(34);  // '"'
     static const uint8x8_t v92 = vdup_n_u8(92);  // '\\'
 
-    if (remaining >= 8) {
+    static constexpr std::size_t chunk_size{sizeof(uint8x8_t)};
+    if (remaining >= chunk_size) {
       const uint8x8_t word = vld1_u8(ptr);
 
       uint8x8_t needs_escape = vceq_u8(word, v10);
@@ -367,15 +385,15 @@ std::size_t find_next_character_to_escape(std::string_view view,
             static_cast<std::size_t>(std::countr_zero(mask));
         return offset + (trailing_zeros >> 3);
       }
-      ptr += 8;
-      remaining -= 8;
+      ptr += chunk_size;
+      remaining -= chunk_size;
     }
   }
   {
     // scalar constants for characters requiring escape
-    static const std::uint8_t v10 = 10;  // '\n'
-    static const std::uint8_t v34 = 34;  // '"'
-    static const std::uint8_t v92 = 92;  // '\\'
+    static constexpr std::uint8_t v10 = 10;  // '\n'
+    static constexpr std::uint8_t v34 = 34;  // '"'
+    static constexpr std::uint8_t v92 = 92;  // '\\'
 
     while (remaining > 0) {
       const std::uint8_t word = *ptr;
@@ -404,7 +422,7 @@ namespace mal {
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 
-std::string String::escape(const std::string &in) {
+std::string String::escape(std::string_view in) {
   std::string out{'"'};
   const auto size = in.size();
   auto location = find_next_character_to_escape(in, 0);
@@ -432,7 +450,7 @@ std::string String::escape(const std::string &in) {
 
 #else // defined(__aarch64__) || defined(_M_ARM64)
 
-std::string String::escape(const std::string& in) {
+std::string String::escape(std::string_view in) {
   std::string out{'"'};
   out.reserve(in.size() + 2);
   for (auto&& c : in) {
@@ -444,8 +462,10 @@ std::string String::escape(const std::string& in) {
 
 #endif // !(defined(__aarch64__) || defined(_M_ARM64))
 
+// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+
 std::string String::print(PrintType readably) const {
-  return readably ? escape(StringBase::data) : StringBase::data;
+  return readably ? escape(StringBase::data_) : StringBase::data_;
 }
 
 ValuePtr Atom::isEqualTo(ValuePtr rhs) const {
@@ -481,14 +501,14 @@ std::string List::print(PrintType readably) const {
   }
   if (auto fromMacro = [&]() -> std::optional<std::string> {
         if (data.size() == 2) {
-          if (auto symbol = data[0]->dyncast<Symbol>()) {
-            return symbol->fromMacro;
+          if (auto symbol = data.at(0)->dyncast<Symbol>()) {
+            return symbol->fromMacro_;
           }
         }
         return {};
       }()) {
-    return readably ? std::format("{}{:r}", *fromMacro, data[1])
-                    : std::format("{}{}", *fromMacro, data[1]);
+    return readably ? std::format("{}{:r}", *fromMacro, data.at(1))
+                    : std::format("{}{}", *fromMacro, data.at(1));
 
   }
   return readably ? std::format("({:r})", data) : std::format("({})", data);
@@ -511,6 +531,7 @@ ValuePtr List::eval(const EnvPtr &env) const {
   }
   auto &evalFn = EvalFnStack::top();
   auto [ast, evalEnv] = [&]() {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access) - data.empty() has been checked
     auto op = evalFn(data[0], env);
     if (auto invocable = op->dyncast<Invocable>()) {
       return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
@@ -553,8 +574,10 @@ Hash::Hash(const Hash &other, ValuesSpan values)
                                mal::views::Chunk(2)
 #endif // __cpp_lib_ranges_chunk
                                | std::views::transform([](auto &&chunk) {
+                                   // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                    assert(chunk[0]->template isa<StringBase>());
                                    return std::tie(chunk[0], chunk[1]);
+                                   // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                  })) {
     data.insert_or_assign(key, value);
   }
@@ -592,7 +615,7 @@ FunctionBase::FunctionBase(std::uint32_t loId, Params params, ValuePtr body,
                            EnvPtr env)
     : Invocable{loId}, bindSize{[&]() -> std::size_t {
         if (auto i = std::ranges::find_if(
-                params, [](auto &&elt) { return elt.name()[0] == '&'; });
+                params, [](auto &&elt) { return elt.name().at(0) == '&'; });
             i != params.end()) {
           if ((params.end() - i) != 2) {
             throw EvalException{
@@ -606,7 +629,7 @@ FunctionBase::FunctionBase(std::uint32_t loId, Params params, ValuePtr body,
       capturedEnv{std::move(env)} {}
 
 template <typename TYPE>
-ValuePtr FunctionBase::isEqualToFunctionBase(const ValuePtr &rhs) const {
+ValuePtr FunctionBase::isEqualImpl(const ValuePtr &rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
@@ -647,14 +670,14 @@ EnvPtr FunctionBase::makeApplyEnv(VALUES &&values, const EnvPtr &evalEnv) const 
 std::string Lambda::print(PrintType readable) const {
   if (readable) {
     return std::format("#<λ@{:p} {} {:r}>",
-                       reinterpret_cast<const void *>(this), params, body);
+                       static_cast<const void *>(this), params, body);
 
   }
-  return std::format("#<λ@{:p}>", reinterpret_cast<const void *>(this));
+  return std::format("#<λ@{:p}>", static_cast<const void *>(this));
 }
 
 ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
-  return FunctionBase::template isEqualToFunctionBase<Lambda>(rhs);
+  return FunctionBase::template isEqualImpl<Lambda>(rhs);
 }
 
 InvocableResult Lambda::apply(bool evaled, ValuesSpan values,
@@ -668,13 +691,13 @@ InvocableResult Lambda::apply(bool evaled, ValuesSpan values,
 std::string Macro::print(PrintType readable) const {
   if (readable) {
     return std::format("#<macro@{:p} {} {:r}>",
-                       reinterpret_cast<const void *>(this), params, body);
+                       static_cast<const void *>(this), params, body);
   }
-  return std::format("#<macro@{:p}>", reinterpret_cast<const void *>(this));
+  return std::format("#<macro@{:p}>", static_cast<const void *>(this));
 }
 
 ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
-  return FunctionBase::template isEqualToFunctionBase<Macro>(rhs);
+  return FunctionBase::template isEqualImpl<Macro>(rhs);
 }
 
 InvocableResult Macro::apply(bool /* evaled */, ValuesSpan values,
@@ -695,6 +718,7 @@ InvocableResult Eval::apply(bool evaled, ValuesSpan values,
                             const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
   checkArgsIs("eval", values, 1);
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
   return {evaled ? values[0] : EvalFnStack::top()(values[0], evalEnv), env};
 }
 

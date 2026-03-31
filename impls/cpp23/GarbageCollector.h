@@ -15,6 +15,7 @@
 
 namespace mal {
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-union-access) - union for uninitialised storage
 template <typename T, typename ALLOCATOR = std::allocator<T>>
   requires std::is_same_v<T, std::shared_ptr<typename T::element_type>>
 class SPSCList {
@@ -22,7 +23,6 @@ public:
   class Node {
   public:
     Node(Node *next): next_{next} {};
-    ~Node() {};
   private:
     friend class SPSCList;
     Node *next_;
@@ -106,6 +106,11 @@ public:
     delete_node(std::exchange(it.current_->next_, it.current_->next_->next_));
   }
 
+  SPSCList(const SPSCList &) = delete;
+  SPSCList& operator=(const SPSCList &) = delete;
+  SPSCList(SPSCList &&) = delete;
+  SPSCList& operator=(SPSCList &&) = delete;
+
   ~SPSCList() {
     Node *current = head_.get();
     while (current) {
@@ -164,8 +169,9 @@ private:
     std::atomic<Node *> sync_;
   } head_;
 };
+// NOLINTEND(cppcoreguidelines-pro-type-union-access)
 
-inline static std::size_t ChunkSize = 16;
+inline static constexpr std::size_t ChunkSize = 16;
 
 template <typename T>
   requires std::is_same_v<T, std::shared_ptr<typename T::element_type>>
@@ -179,7 +185,7 @@ private:
       if (it->use_count() == 1) {
         it->reset();
       }
-      if (yieldAndStopRequested(&counter)) {
+      if (std::forward<FUNC>(yieldAndStopRequested)(&counter)) {
         return true;
       }
     }
@@ -201,7 +207,7 @@ private:
       } else {
         ++it;
       }
-      if (yieldAndStopRequested(&counter)) {
+      if (std::forward<FUNC>(yieldAndStopRequested)(&counter)) {
         return true;
       }
     }
@@ -210,7 +216,7 @@ private:
 
 public:
   GarbageCollector()
-      : list_{}, thread_{[&](std::stop_token stoken) {
+      : thread_{[&](std::stop_token stoken) {
           auto yieldAndStopRequested = [&](std::size_t *counter = nullptr) {
             if ((++*counter % ChunkSize) == 0) {
               std::this_thread::yield();
@@ -233,6 +239,11 @@ public:
           }
         }} {}
 
+  GarbageCollector(const GarbageCollector &) = delete;
+  GarbageCollector& operator=(const GarbageCollector &) = delete;
+  GarbageCollector(GarbageCollector &&) = delete;
+  GarbageCollector& operator=(GarbageCollector &&) = delete;
+
   ~GarbageCollector() {
     thread_.request_stop();
     cv_.notify_all();
@@ -243,7 +254,7 @@ public:
   }
 
 private:
-  SPSCList<T> list_;
+  SPSCList<T> list_{};
   std::condition_variable_any cv_;
   std::mutex mtx_;
   std::jthread thread_;

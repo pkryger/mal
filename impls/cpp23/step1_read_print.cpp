@@ -13,7 +13,6 @@
 #include <utility>
 
 namespace mal {
-static ReadLine rl("~/.mal_history");
 
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
@@ -41,7 +40,8 @@ std::string rep(const std::string &str) {
 } // namespace mal
 
 int main() {
-  while (auto line = mal::rl.get("user> ")) {
+  static mal::ReadLine rl("~/.mal_history");
+  while (auto line = rl.get("user> ")) {
     std::string out;
     try {
       out = mal::rep(line.value());

@@ -21,8 +21,6 @@
 
 namespace mal {
 
-static ReadLine rl("~/.mal_history");
-
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
 using Special = const std::pair<std::string, SpecialForm>;
@@ -43,7 +41,7 @@ ValuePtr EVAL(ValuePtr ast, const EnvPtr &env) {
       return ast->eval(env);
     }
     if (auto special = [&]() -> Special * {
-          if (auto symbol = values[0]->dyncast<Symbol>()) {
+          if (auto symbol = values.front()->dyncast<Symbol>()) {
             auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
               return *symbol == elt.first;
             });
@@ -88,7 +86,8 @@ std::string rep(const std::string &str) {
 } // namespace mal
 
 int main() {
-  while (auto line = mal::rl.get("user> ")) {
+  static mal::ReadLine rl("~/.mal_history");
+  while (auto line = rl.get("user> ")) {
     std::string out;
     try {
       out = mal::rep(line.value());

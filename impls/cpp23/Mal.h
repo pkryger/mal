@@ -32,7 +32,9 @@ public:
     }
 
     Guard(const Guard &) = delete;
+    Guard(Guard &&) = delete;
     Guard &operator=(const Guard &) = delete;
+    Guard &operator=(Guard &&) = delete;
 
     ~Guard() {
       stack.pop();
@@ -47,6 +49,11 @@ private:
 
 class GarbageCollectible {
 public:
+  GarbageCollectible() noexcept = default;
+  GarbageCollectible(const GarbageCollectible &) = default;
+  GarbageCollectible(GarbageCollectible &&) = default;
+  GarbageCollectible& operator=(const GarbageCollectible &) = default;
+  GarbageCollectible& operator=(GarbageCollectible &&) = default;
   virtual ~GarbageCollectible() = default;
 };
 using GarbageCollectiblePtr = std::shared_ptr<GarbageCollectible>;

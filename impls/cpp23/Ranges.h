@@ -167,7 +167,7 @@ template <bool CONST>
 class ChunkView<VIEW>::iterator {
   friend ChunkView;
 
-  const ChunkView *parent_;
+  const ChunkView *parent_{nullptr};
 
   using View = std::conditional_t<CONST, const VIEW, VIEW>;
   using ViewIterator = std::ranges::iterator_t<View>;
@@ -177,7 +177,7 @@ class ChunkView<VIEW>::iterator {
   ViewIterator current_;
   ViewIterator next_;
   ViewSentinel end_;
-  ViewDifference reminder_;
+  ViewDifference reminder_{0};
 
   explicit constexpr iterator(const ChunkView *parent, ViewIterator current,
                               ViewIterator next, ViewSentinel end,

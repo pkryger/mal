@@ -29,9 +29,9 @@ struct DFS<DFSNode<T, CHILD, CHILDREN...>> {
 private:
   static constexpr auto foldChildren(std::uint32_t counter)
       -> std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> {
-    std::uint32_t _sink, hi, running = counter;
+    std::uint32_t _ = 0, hi = 0, running = counter;
     auto step = [&]<typename C>() {
-      std::tie(_sink, hi, running) = DFS<C>::compute(running);
+      std::tie(_, hi, running) = DFS<C>::compute(running);
     };
     (step.template operator()<CHILD>(), ...,
      step.template operator()<CHILDREN>());

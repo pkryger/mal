@@ -22,6 +22,7 @@
 #include <type_traits>
 // IWYU pragma: no_include <tuple>
 
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 namespace mal {
 InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
                                const EnvPtr &env) {
@@ -201,7 +202,7 @@ InvocableResult specialDefmacroBang(std::string_view name, ValuesSpan values,
     }
     auto res = evalFn(values[1], env);
     if (auto lambda = res->dyncast<Lambda>()) {
-      res = make<Macro>(std::move(const_cast<Lambda&>(*lambda)));
+      res = make<Macro>(*lambda);
       env->insert_or_assign(symbol->asKey(), res);
       return {res, {}};
     }
@@ -252,5 +253,6 @@ InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
       std::format("invalid '{}' argument {:r}", name, values[1])};
 }
 
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
 } // namespace mal

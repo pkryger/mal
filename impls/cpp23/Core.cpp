@@ -11,7 +11,6 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
-#include <cstring>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -30,11 +29,9 @@
 #include <tuple>
 #include <utility>
 // IWYU pragma: no_include <__vector/vector.h>
+// IWYU pragma: no_include <_stdlib.h>
 
 namespace mal {
-
-static ReadLine coreReadLine{};
-
 
 void checkArgsIs(std::string_view name, std::size_t actual,
                  std::size_t expected) {
@@ -87,11 +84,12 @@ void throwWrongArgument(std::string_view name, ValuePtr val) {
 
 } // namespace mal
 
+
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 namespace {
 using mal::Atom;
 using mal::Constant;
 using mal::CoreException;
-using mal::coreReadLine;
 using mal::EnvPtr;
 using mal::EvalFnStack;
 using mal::Hash;
@@ -104,6 +102,7 @@ using mal::Macro;
 using mal::make;
 using mal::MalException;
 using mal::MetaMixIn;
+using mal::ReadLine;
 using mal::readStr;
 using mal::Sequence;
 using mal::String;
@@ -306,10 +305,11 @@ InvocableResult println(std::string_view /* name */, ValuesSpan values,
 
 InvocableResult pr_str(std::string_view /* name */, ValuesSpan values,
                        const EnvPtr & /* env */) {
-  if (auto malImpl =
+  static constexpr std::string_view malImpl{"cpp23"};
+  if (auto envImpl =
           // NOLINTNEXTLINE(concurrency-mt-unsafe) - single threaded
       std::getenv("MAL_IMPL");
-      malImpl && std::strncmp(malImpl, "cpp23", 5) == 0) {
+      envImpl && envImpl == malImpl) {
     return {make<String>(std::format("{:l}", values)), {}};
   }
   return {make<String>(std::format("{:r}", values)), {}};
@@ -740,7 +740,8 @@ InvocableResult dissoc(std::string_view name, ValuesSpan values,
 }
 
 InvocableResult readline(std::string_view name, ValuesSpan values,
-                         const EnvPtr &/* env */) {
+                         const EnvPtr & /* env */) {
+  static ReadLine coreReadLine{};
   checkArgsIs(name, values, 1);
   if (auto prompt = values[0]->dyncast<String>()) {
     if (auto res = coreReadLine.get(prompt->data())) {
@@ -838,6 +839,8 @@ InvocableResult fnQuestion(std::string_view name, ValuesSpan values, const EnvPt
 }
 
 } // namespace
+
+// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
 namespace mal {
 void prepareEnv(Env &env) {

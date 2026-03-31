@@ -25,8 +25,15 @@
 #include <utility>
 #include <vector> // IWYU pragma: keep
 // IWYU pragma: no_include <__vector/vector.h>
+// IWYU pragma: no_include <__bit_reference>
 
 namespace mal {
+
+class EvalException : public std::runtime_error {
+public:
+  explicit EvalException(const std::string &str) : std::runtime_error{str} {}
+};
+
 
 using ValuesContainer = std::vector<ValuePtr>;
 using ValuesMap = std::unordered_map<ValuePtr, ValuePtr>;
@@ -54,6 +61,7 @@ public:
   constexpr PrintType &operator=(const PrintType &) noexcept = default;
   constexpr PrintType(PrintType &&) noexcept = default;
   constexpr PrintType &operator=(PrintType &&) noexcept = default;
+  constexpr ~PrintType() noexcept = default;
 
   constexpr auto operator<=>(const PrintType &) const noexcept = default;
   constexpr bool operator==(const PrintType &) const noexcept = default;
@@ -77,12 +85,11 @@ public:
 
   virtual ValuePtr isEqualTo(ValuePtr rhs) const = 0;
 
-  virtual ~Value() = default;
-
-  Value(const Value &) = delete;
-  Value(Value &&) = delete;
-  Value &operator=(const Value &) = delete;
-  Value &operator=(Value &&) = delete;
+  Value(const Value &) = default;
+  Value(Value &&) = default;
+  Value &operator=(const Value &) = default;
+  Value &operator=(Value &&) = default;
+  ~Value() override = default;
 
 protected:
   explicit Value(std::uint32_t loId) noexcept : RttiBase{loId} {}
@@ -118,22 +125,31 @@ class Symbol;
 
 class StringBase : public Value {
 public:
-  std::string print(PrintType /* readably */) const override { return data; }
+  std::string print(PrintType /* readably */) const override { return data_; }
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   friend bool operator==(const StringBase &lhs,
                          const StringBase &rhs) noexcept {
-    return lhs.data == rhs.data;
+    return lhs.data_ == rhs.data_;
+  }
+
+  friend void swap(StringBase &lhs, StringBase &rhs) noexcept {
+    using std::swap;
+    swap(lhs.data_, rhs.data_);
   }
 
   friend std::hash<ValuePtr>;
   friend detail::Intern<std::string, Symbol>;
 
+
 protected:
   explicit StringBase(std::uint32_t loId, std::string v) noexcept
-      : Value{loId}, data{std::move(v)} {}
+      : Value{loId}, data_{std::move(v)} {}
 
-  std::string data;
+  explicit StringBase(std::uint32_t loId, std::string_view v) noexcept
+      : Value{loId}, data_{v} {}
+
+  std::string data_;
 
 private:
   StringBase() noexcept : Value{typeInfo<StringBase>.lo} {}
@@ -147,11 +163,7 @@ private:
 namespace std {
 
 template <> struct hash<mal::ValuePtr> {
-  std::size_t operator()(const mal::ValuePtr &o) const noexcept {
-    assert(o->isa<mal::StringBase>());
-    return std::hash<std::string>{}(
-        static_cast<const mal::StringBase &>(*o).data);
-  }
+  std::size_t operator()(const mal::ValuePtr &o) const;
 };
 
 } // namespace std
@@ -159,6 +171,9 @@ template <> struct hash<mal::ValuePtr> {
 namespace mal {
 
 bool operator==(const ValuePtr &lhs, const ValuePtr &rhs);
+
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+// std::fromat_parse_context doesn't provide an iterator wrapper
 
 struct ParseValueMixin {
   constexpr auto parse(std::format_parse_context &ctx) {
@@ -201,6 +216,7 @@ constexpr auto RangeFormatterParse(RANGE_FORMATTER &rf,
   }
   return it;
 }
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 } // namespace mal
 
@@ -256,11 +272,15 @@ namespace detail {
 
 template <typename BASE> class Intern<std::string, BASE> {
 public:
-  explicit Intern(const std::string & /* name */) noexcept {};
+  explicit Intern(const std::string &) noexcept {};
 
-  explicit Intern(const Intern & /* other */) noexcept = default;
+  explicit Intern(const Intern &) noexcept = default;
+  Intern& operator=(const Intern &) noexcept = default;
+  Intern(Intern &&) noexcept = default;
+  Intern& operator=(Intern &&) noexcept = default;
+  ~Intern() noexcept = default;
 
-  Intern(Intern && /* other */) noexcept = default;
+  friend void swap(Intern &, Intern &) noexcept {}
 
 protected:
   template <typename KEY_VIEW> KEY_VIEW asKey() const {
@@ -284,9 +304,16 @@ public:
           return newIntern;
         }()} {}
 
-  explicit Intern(const Intern &other) noexcept = default;
+  explicit Intern(const Intern &) noexcept = default;
+  Intern& operator=(const Intern &) noexcept = default;
+  Intern(Intern &&) noexcept = default;
+  Intern& operator=(Intern &&) noexcept = default;
+  ~Intern() noexcept = default;
 
-  Intern(Intern &&other) noexcept = default;
+  friend void swap(Intern &lhs, Intern &rhs) noexcept {
+    using std::swap;
+    swap(lhs.intern_, rhs.intern_);
+  }
 
 protected:
   template <typename KEY_VIEW>
@@ -304,46 +331,68 @@ private:
 class Symbol final : public StringBase,
                      public detail::Intern<Env::Key, Symbol> {
 public:
-  explicit Symbol(std::string value, std::optional<std::string> fromMacro = {})
-      : StringBase{typeInfo<Symbol>.lo, std::move(value)}, Intern{data},
-        fromMacro{std::move(fromMacro)} {}
+  explicit Symbol(std::string_view value, std::optional<std::string> fromMacro = {})
+      : StringBase{typeInfo<Symbol>.lo, value}, Intern{data_},
+        fromMacro_{std::move(fromMacro)} {}
 
   explicit Symbol(const Symbol &other)
-      : StringBase{typeInfo<Symbol>.lo, other.data}, Intern{other},
-        fromMacro{other.fromMacro} {}
+      : StringBase{typeInfo<Symbol>.lo, other.data_}, Intern{other},
+        fromMacro_{other.fromMacro_} {}
+
+  Symbol &operator=(const Symbol &other) {
+    Symbol temp{other};
+    swap(*this, temp);
+    return *this;
+  }
 
   Symbol(Symbol &&other) noexcept
-      : StringBase{typeInfo<Symbol>.lo, std::move(other.data)},
-        Intern{std::move(other)}, fromMacro{std::move(other.fromMacro)} {}
+      : StringBase{typeInfo<Symbol>.lo, std::move(other.data_)},
+        Intern{std::move(other)}, fromMacro_{} {
+    swap(*this, other);
+  }
+
+  Symbol &operator=(Symbol &&other) noexcept {
+    StringBase::operator=(std::move(other));
+    Intern::operator=(std::move(other));
+    fromMacro_ = std::move(other.fromMacro_);
+    return *this;
+  }
+
+  ~Symbol() override = default;
 
   ValuePtr eval(const EnvPtr &env) const override;
 
   Env::KeyView asKey() const { return Intern::asKey<Env::KeyView>(); }
 
-  std::string_view name() const { return data; }
+  std::string_view name() const { return data_; }
 
   ValuePtr isEqualTo(ValuePtr) const override;
 
   friend bool operator==(const Symbol &lhs, const std::string &rhs) {
-    return lhs.data == rhs;
+    return lhs.data_ == rhs;
   }
 
   friend bool operator==(const std::string &lhs, const Symbol &rhs) {
-    return lhs == rhs.data;
+    return lhs == rhs.data_;
+  }
+
+  friend void swap(Symbol &lhs, Symbol &rhs) noexcept {
+    using std::swap;
+    swap(lhs.fromMacro_, rhs.fromMacro_);
   }
 
   friend class List;
 
 private:
-  std::optional<std::string> fromMacro;
+  std::optional<std::string> fromMacro_;
 };
 
-inline static Symbol debugEval{"DEBUG-EVAL"};
+inline static const Symbol debugEval{"DEBUG-EVAL"};
 
 class Keyword final : public StringBase {
 public:
-  explicit Keyword(std::string value) noexcept
-      : StringBase{typeInfo<Keyword>.lo, std::move(value)} {}
+  explicit Keyword(std::string_view value) noexcept
+      : StringBase{typeInfo<Keyword>.lo, value} {}
 };
 
 class Constant : public StringBase {
@@ -380,10 +429,10 @@ public:
 
   std::string print(PrintType readably) const override;
 
-  const std::string &data() const { return StringBase::data; }
+  const std::string &data() const { return StringBase::data_; }
 
-  static std::string unescape(const std::string& in);
-  static std::string escape(const std::string &in);
+  static std::string unescape(std::string_view in);
+  static std::string escape(std::string_view in);
 };
 
 class Atom final : public Value {
@@ -414,6 +463,10 @@ public:
   explicit MetaMixIn(ValuePtr meta = Constant::nilValue())
       : meta_{std::move(meta)} {}
 
+  explicit MetaMixIn(const MetaMixIn &) noexcept = default;
+  MetaMixIn &operator=(const MetaMixIn &) noexcept = default;
+  MetaMixIn(MetaMixIn &&) noexcept = default;
+  MetaMixIn& operator=(MetaMixIn &&) noexcept = default;
   virtual ~MetaMixIn() = default;
 
   virtual ValuePtr cloneWithMeta(ValuePtr meta) const = 0;
@@ -517,7 +570,7 @@ public:
   //
   // [1] as of March 2026 the C++ standard has not taken a stance on that, see
   //     https://cplusplus.github.io/LWG/issue2844
-  template <std::ranges::input_range RANGE>
+  template <std::ranges::random_access_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuePtr>
   explicit Hash(RANGE &&range)
@@ -530,8 +583,10 @@ public:
 #endif //__cpp_lib_ranges_chunk
                                   | std::views::reverse |
                                   std::views::transform([](auto &&chunk) {
+                                    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                     assert(chunk[0]->template isa<StringBase>());
                                     return std::tie(chunk[0], chunk[1]);
+                                    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                   })} {
   }
 
@@ -601,7 +656,7 @@ public:
 
   std::string print(PrintType /* readably */) const override {
     return std::format("#<built-in {}@{:p}>", name,
-                       reinterpret_cast<const void *>(this));
+                       static_cast<const void *>(this));
   }
 
   Env::Key asKey() const { return Symbol{name}.asKey(); }
@@ -612,6 +667,7 @@ public:
 
 private:
   std::string name;
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   HandlerFn &handler;
 };
 
@@ -629,13 +685,14 @@ protected:
       : Invocable{loId}, bindSize{other.bindSize}, params{other.params},
         body{other.body}, capturedEnv{other.capturedEnv} {}
 
+  // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
   explicit FunctionBase(std::uint32_t loId, FunctionBase &&other) noexcept
       : Invocable{loId}, bindSize{other.bindSize},
         params{std::move(other.params)}, body{std::move(other.body)},
         capturedEnv{std::move(other.capturedEnv)} {}
 
   template <typename TYPE>
-  ValuePtr isEqualToFunctionBase(const ValuePtr &rhs) const;
+  ValuePtr isEqualImpl(const ValuePtr &rhs) const;
 
   template <typename VALUES>
   EnvPtr makeApplyEnv(VALUES &&values, const EnvPtr &evalEnv) const;
@@ -644,9 +701,6 @@ protected:
   Params params;
   ValuePtr body;
   EnvPtr capturedEnv;
-
-private:
-  FunctionBase() : Invocable{typeInfo<FunctionBase>.lo} {}
 };
 
 } // namespace mal
@@ -725,7 +779,7 @@ public:
         env{other.env} {}
 
   std::string print(PrintType /* readably */) const override {
-    return std::format("#<eval@{:p}>", reinterpret_cast<const void *>(this));
+    return std::format("#<eval@{:p}>", static_cast<const void *>(this));
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
@@ -739,12 +793,6 @@ public:
 
 private:
   EnvPtr env;
-};
-
-
-class EvalException : public std::runtime_error {
-public:
-  explicit EvalException(const std::string &str) : std::runtime_error{str} {}
 };
 
 class MalException : public std::runtime_error {

@@ -24,8 +24,6 @@
 
 namespace mal {
 
-static ReadLine rl("~/.mal_history");
-
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
 using Special = const std::pair<std::string, SpecialForm>;
@@ -53,20 +51,22 @@ ValuePtr EVAL(ValuePtr ast, const EnvPtr &evalEnv) {
         return ast->eval(*env);
       }
       if (auto special = [&]() -> Special * {
-        if (auto symbol = values[0]->dyncast<Symbol>()) {
-          auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
-            return *symbol == elt.first;
-          });
-          return res != specials.end() ? res : nullptr;
-        }
-        return nullptr;
-      }()) {
+            if (auto symbol = values.front()->dyncast<Symbol>()) {
+              auto res =
+                  std::ranges::find_if(specials, [&](auto &&elt) noexcept {
+                    return *symbol == elt.first;
+                  });
+              return res != specials.end() ? res : nullptr;
+            }
+            return nullptr;
+          }()) {
         std::tie(ast, env) =
             special->second(special->first, values.subspan(1), *env);
       } else {
         std::tie(ast, env) = [&]() {
           auto data = list->values();
-          auto op = EVAL(data[0], *env);
+          assert(!data.empty());
+          auto op = EVAL(data.front(), *env);
           if (auto invocable = op->dyncast<Invocable>()) {
             return invocable->apply(false, data.subspan(1), *env);
           }
@@ -148,10 +148,11 @@ int main(int argc, const char *argv[]) {
   auto args = std::span{argv, static_cast<std::size_t>(argc)}.subspan(1);
   auto envPtr = mal::repEnv(args);
   if (!args.empty()) {
-    mal::rep(std::format("(load-file \"{}\")", args[0]), envPtr);
+    mal::rep(std::format("(load-file \"{}\")", args.front()), envPtr);
     return 0;
   }
-  while (auto line = mal::rl.get("user> ")) {
+  static mal::ReadLine rl("~/.mal_history");
+  while (auto line = rl.get("user> ")) {
     std::print("{}\n", rep(line.value(), envPtr));
   }
 }

@@ -32,6 +32,7 @@ public:
   constexpr FunctionRef(FunctionRef &&rhs) noexcept = default;
   constexpr FunctionRef &operator=(const FunctionRef &rhs) noexcept = default;
   constexpr FunctionRef &operator=(FunctionRef &&rhs) noexcept = default;
+  ~FunctionRef() = default;
 
   template <typename T>
     requires(!IsFunctionRef<T>) && (!std::is_pointer_v<T>)
@@ -59,7 +60,7 @@ public:
         !IsFunctionRef<std::remove_cv_t<FUNC>> &&
         !std::is_member_function_pointer_v<std::remove_reference_t<FUNC>> &&
         IsInvocableUsing<FUNC>)
-  constexpr FunctionRef(FUNC &&obj) noexcept
+  constexpr FunctionRef(const FUNC &obj) noexcept
       : storage_(std::addressof(obj)),
         callback_{
             [](Storage storage, ARGS &&...args) static noexcept(NOEX) -> RET {
@@ -76,6 +77,7 @@ public:
   }
 
 private:
+  // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access) - wrapper over a union
   union Storage {
     void *obj_;
     void const *const_obj_;
@@ -106,9 +108,11 @@ private:
         }
       } else {
         static_assert(std::is_function_v<T>);
-        return reinterpret_cast<T *>(storage.fn_);
+        return static_cast<T *>(storage.fn_);
       }
   }
+  // NOLINTEND(cppcoreguidelines-pro-type-union-access) - wrapper over a union
+
   RET (*callback_)(Storage, ARGS &&...) noexcept(NOEX);
 };
 

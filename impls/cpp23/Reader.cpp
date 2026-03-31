@@ -1,5 +1,6 @@
 #include "Reader.h" // IWYU pragma: associated
 #include "Mal.h"
+#include <charconv>
 #if !defined(__cpp_lib_ranges_stride)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_stride
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstdint>
 #include <format>
 #include <limits>
 #if defined(__cpp_lib_ranges_stride)
@@ -15,6 +17,8 @@
 #endif // __cpp_lib_ranges_stride
 #include <regex>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <utility>
 // IWYU pragma: no_include <ranges>
 // IWYU pragma: no_include <memory>
@@ -56,56 +60,60 @@ static const std::array macros = {
 
 class Tokeniser {
 public:
-  explicit Tokeniser(const std::string &s) : str{s}, pos{s.begin()} {
+  explicit Tokeniser(const std::string &s) : str_{s}, pos_{str_.begin()} {
     nextToken();
   }
 
-  bool eoi() const noexcept { return pos == str.end(); }
+  bool eoi() const noexcept { return pos_ == str_.end(); }
   void nextToken();
-  const std::string &peek() const noexcept {
+  std::string_view peek() const noexcept {
     assert(!eoi());
-    return token;
+    return token_;
   }
 
 private:
   bool match(const std::regex &regex);
 
   auto tokenSize() const {
-    auto size = token.size();
+    auto size = token_.size();
     if (size > static_cast<decltype(size)>(
                    std::numeric_limits<std::string::difference_type>::max())) {
       throw ReaderException(
-          std::format("token at pos {} too big {}", pos - str.begin(), size));
+          std::format("token at pos {} too big {}", pos_ - str_.begin(), size));
     }
     return static_cast<std::string::difference_type>(size);
   }
 
-  const std::string &str;
-  std::string::const_iterator pos;
-  std::string token;
+  std::string_view str_;
+  std::string_view::const_iterator pos_;
+  std::string_view token_;
 };
 
 bool Tokeniser::match(const std::regex &regex) {
   if (eoi())
     return false;
 
-  std::smatch match;
-  if (!std::regex_search(pos, str.end(), match, regex,
+  std::cmatch match;
+  if (!std::regex_search(pos_, str_.end(), match, regex,
                          std::regex_constants::match_continuous))
     return false;
 
   assert(match.size() == 1);
   assert(match.position(0) == 0);
   assert(match.length(0) > 0);
-  token = match.str(0);
+  token_ =
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access) - already checked
+    {match[0].first, match[0].second};
   return true;
 }
 
 void Tokeniser::nextToken() {
-  pos += tokenSize();
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - this is iterator
+  pos_ += tokenSize();
   // Skip white spaces and comments
   while (match(std::regex{"[\\s,]+|;.*"})) {
-    pos += tokenSize();
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - this is iterator
+    pos_ += tokenSize();
   }
 
   if (eoi()) {
@@ -118,11 +126,11 @@ void Tokeniser::nextToken() {
     }
   }
 
-  std::string mismatch{pos, str.end()};
-  if (mismatch[0] == '"') {
+  if (*pos_ == '"') {
     throw ReaderException{"unbalanced \""};
   }
-  throw ReaderException{std::format("mismatch from: {}", std::move(mismatch))};
+  throw ReaderException{
+      std::format("mismatch from: {}", std::string{pos_, str_.end()})};
 }
 
 ValuePtr readForm(Tokeniser & /* tokeniser */);
@@ -147,11 +155,11 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   auto token = tokeniser.peek();
   tokeniser.nextToken();
 
-  if (token[0] == '"') {
+  if (token.front() == '"') {
     return make<String>(String::unescape(token));
   }
 
-  if (token[0] == ':') {
+  if (token.front() == ':') {
     return make<Keyword>(token);
   }
 
@@ -161,8 +169,18 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
                       std::move(meta));
   }
 
-  if (std::regex_match(token, std::regex{"^[-+]?\\d+$"})) {
-    return make<Integer>(std::stol(token));
+  if (std::regex_match(token.begin(), token.end(), std::regex{"^[-+]?\\d+$"})) {
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables) - use as an output
+    std::int64_t value;
+    auto [_, ec] = std::from_chars(
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - this is iterator
+        token.begin() + (token.front() == '+' ? 1 : 0),
+        token.end(), value);
+
+    if (ec != std::errc{}) [[unlikely]] {
+      throw ReaderException{std::format("cannot read number '{}'", token)};
+    }
+    return make<Integer>(value);
   }
 
   auto first = [](auto &&elt) noexcept { return elt.first; };
@@ -178,12 +196,12 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
                       readForm(tokeniser));
   }
 
-  return make<Symbol>(std::move(token));
+  return make<Symbol>(token);
 }
 
 ValuePtr readForm(Tokeniser &tokeniser) {
   assert(!tokeniser.eoi());
-  auto &&token = tokeniser.peek();
+  auto token = tokeniser.peek();
   if (token == "(") {
     tokeniser.nextToken();
     return make<List>(readSequence(tokeniser, ")"));
