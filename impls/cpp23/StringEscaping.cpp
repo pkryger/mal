@@ -14,7 +14,7 @@
 #include <utility>
 #endif // MAL_HAVE_NEON
 
-// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
+// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
 
 namespace {
 
@@ -44,8 +44,8 @@ find_next_character_to_unescape(std::string_view view,
                                 std::size_t location) noexcept {
 
   const std::size_t len = view.size();
-  const std::uint8_t *ptr =
-      reinterpret_cast<const std::uint8_t *>(view.data()) + location;
+  const auto *data = std::bit_cast<const std::uint8_t *>(view.data());
+  const std::uint8_t *ptr = data + location;
   std::size_t remaining = len - location;
   auto unescaped_after_pos = [&](std::size_t pos) -> std::optional<char> {
     if (++pos < view.size()) {
@@ -73,8 +73,7 @@ find_next_character_to_unescape(std::string_view view,
       const uint8x8_t res = vshrn_n_u16(vreinterpretq_u16_u8(needs_unescape), 4);
       const std::uint64_t mask = vget_lane_u64(vreinterpret_u64_u8(res), 0);
       if (mask != 0) {
-        const auto offset = static_cast<std::size_t>(
-            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto offset = static_cast<std::size_t>(ptr - data);
         const auto trailing_zeros =
             static_cast<std::size_t>(std::countr_zero(mask));
         const auto pos = offset + (trailing_zeros >> 2);
@@ -99,8 +98,7 @@ find_next_character_to_unescape(std::string_view view,
       const std::uint64_t mask =
           vget_lane_u64(vreinterpret_u64_u8(needs_unescape), 0);
       if (mask != 0) {
-        const auto offset = static_cast<std::size_t>(
-            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto offset = static_cast<std::size_t>(ptr - data);
         const auto trailing_zeros =
             static_cast<std::size_t>(std::countr_zero(mask));
         const auto pos = offset + (trailing_zeros >> 3);
@@ -122,8 +120,7 @@ find_next_character_to_unescape(std::string_view view,
       const bool needs_unescape = word == v92;
 
       if (needs_unescape) {
-        const auto offset = static_cast<std::size_t>(
-            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto offset = static_cast<std::size_t>(ptr - data);
         auto unescaped = unescaped_after_pos(offset);
         if (unescaped) {
           return {offset, unescaped};
@@ -139,8 +136,8 @@ find_next_character_to_unescape(std::string_view view,
 std::size_t find_next_character_to_escape(std::string_view view,
                                           std::size_t location) noexcept {
   const std::size_t len = view.size();
-  const std::uint8_t *ptr =
-      reinterpret_cast<const std::uint8_t *>(view.data()) + location;
+  const auto *data = std::bit_cast<const std::uint8_t *>(view.data());
+  const std::uint8_t *ptr = data + location;
   std::size_t remaining = len - location;
   {
     // SIMD constants for characters requiring escape
@@ -159,8 +156,7 @@ std::size_t find_next_character_to_escape(std::string_view view,
       const uint8x8_t res = vshrn_n_u16(vreinterpretq_u16_u8(needs_escape), 4);
       const std::uint64_t mask = vget_lane_u64(vreinterpret_u64_u8(res), 0);
       if (mask != 0) {
-        const auto offset = static_cast<std::size_t>(
-            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto offset = static_cast<std::size_t>(ptr - data);
         const auto trailing_zeros =
             static_cast<std::size_t>(std::countr_zero(mask));
         return offset + (trailing_zeros >> 2);
@@ -186,8 +182,7 @@ std::size_t find_next_character_to_escape(std::string_view view,
       const std::uint64_t mask =
           vget_lane_u64(vreinterpret_u64_u8(needs_escape), 0);
       if (mask != 0) {
-        const auto offset = static_cast<std::size_t>(
-            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto offset = static_cast<std::size_t>(ptr - data);
         const auto trailing_zeros =
             static_cast<std::size_t>(std::countr_zero(mask));
         return offset + (trailing_zeros >> 3);
@@ -210,8 +205,7 @@ std::size_t find_next_character_to_escape(std::string_view view,
       needs_escape |= word == v92;
 
       if (needs_escape) {
-        const auto offset = static_cast<std::size_t>(
-            ptr - reinterpret_cast<const std::uint8_t *>(view.data()));
+        const auto offset = static_cast<std::size_t>(ptr - data);
         return offset;
       }
       ++ptr;
@@ -330,4 +324,4 @@ std::string escapeString(std::string_view input) {
 
 } // namespace mal
 
-// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
+// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
