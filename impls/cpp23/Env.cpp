@@ -18,7 +18,7 @@ ValuePtr EnvBase::find(KeyView key) const {
   }
   auto findKey = [&]() {
     if constexpr (detail::IsHashContainer<Map>) {
-      return PreHashedKey{key, Hash{}(key)};
+      return PreHashedKey{.key=key, .hash=Hash{}(key)};
     } else {
       return key;
     }

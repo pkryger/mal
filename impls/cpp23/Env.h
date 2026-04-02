@@ -145,21 +145,21 @@ public:
       : debugEval_{outer ? outer->debugEval_ : nullptr},
         outer_{std::move(outer)}, size_{outer_ ? outer_->size() + 1 : 1} {}
 
-  ValuePtr find(KeyView key) const;
+  [[nodiscard]] ValuePtr find(KeyView key) const;
 
-  ValuePtr find(const PreHashedKey& key) const;
+  [[nodiscard]] ValuePtr find(const PreHashedKey& key) const;
 
-  virtual ValuePtr findLocal(FindLocalKey phk) const = 0;
+  [[nodiscard]] virtual ValuePtr findLocal(FindLocalKey phk) const = 0;
 
   virtual void insert_or_assign(Key key, ValuePtr value) = 0;
 
-  virtual std::size_t mapsSize() const = 0;
+  [[nodiscard]] virtual std::size_t mapsSize() const = 0;
 
   auto begin() noexcept {
     return Iterator<false>{this};
   }
 
-  auto begin() const noexcept {
+  [[nodiscard]] auto begin() const noexcept {
     return Iterator<true>{this};
   }
 
@@ -167,11 +167,11 @@ public:
     return std::default_sentinel;
   }
 
-  auto end() const noexcept {
+  [[nodiscard]] auto end() const noexcept {
     return std::default_sentinel;
   }
 
-  std::size_t size() const noexcept {
+  [[nodiscard]] std::size_t size() const noexcept {
     return size_;
   }
 
@@ -190,9 +190,9 @@ public:
 
   void insert_or_assign(Key key, ValuePtr value) override;
 
-  ValuePtr findLocal(FindLocalKey phk) const override;
+  [[nodiscard]] ValuePtr findLocal(FindLocalKey phk) const override;
 
-  std::size_t mapsSize() const override { return map_.size(); }
+  [[nodiscard]] std::size_t mapsSize() const override { return map_.size(); }
 
 private:
   Map map_;
@@ -201,16 +201,18 @@ private:
 class ApplyEnv : public EnvBase {
 public:
   template <std::ranges::input_range RANGE>
-  explicit ApplyEnv(const EnvPtr &evalEnv, const EnvPtr &capturedEnv,
+  explicit ApplyEnv(const EnvPtr &evalEnv,
+                    // NOLINTNEXTLINE(modernize-pass-by-value) - conflicts with performance-unnecessary-value-param
+                    const EnvPtr &capturedEnv,
                     RANGE &&range)
       : EnvBase{evalEnv}, map_{std::from_range, std::forward<RANGE>(range)},
         capturedEnv_{capturedEnv} {}
 
   void insert_or_assign(Key key, ValuePtr value) override;
 
-  ValuePtr findLocal(FindLocalKey phk) const override;
+  [[nodiscard]] ValuePtr findLocal(FindLocalKey phk) const override;
 
-  std::size_t mapsSize() const override;
+  [[nodiscard]] std::size_t mapsSize() const override;
 
 private:
   Map map_;

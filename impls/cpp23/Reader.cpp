@@ -40,9 +40,9 @@ using mal::Vector;
 
 static const std::array tokenRegexes = {
   std::regex("~@"),
-  std::regex("[\\[\\]{}()'`~^@]"),
-  std::regex("\"(?:\\\\.|[^\\\\\"])*\""),
-  std::regex("[^\\s\\[\\]{}('\"`,;)]+"),
+  std::regex(R"([\[\]{}()'`~^@])"),
+  std::regex(R"("(?:\\.|[^\\"])*")"),
+  std::regex(R"([^\s\[\]{}('"`,;)]+)"),
 };
 
 static const std::array constants = {
@@ -65,9 +65,11 @@ public:
     nextToken();
   }
 
-  bool eoi() const noexcept { return pos_ == str_.end(); }
+  [[nodiscard]] bool eoi() const noexcept { return pos_ == str_.end(); }
+
   void nextToken();
-  std::string_view peek() const noexcept {
+
+  [[nodiscard]] std::string_view peek() const noexcept {
     assert(!eoi());
     return token_;
   }
@@ -75,7 +77,7 @@ public:
 private:
   bool match(const std::regex &regex);
 
-  auto tokenSize() const {
+  [[nodiscard]] auto tokenSize() const {
     auto size = token_.size();
     if (size > static_cast<decltype(size)>(
                    std::numeric_limits<std::string::difference_type>::max()))

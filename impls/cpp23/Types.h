@@ -53,7 +53,7 @@ public:
     return type_ != Type::Simply;
   }
 
-  constexpr Type type() const noexcept {
+  [[nodiscard]] constexpr Type type() const noexcept {
     return type_;
   }
 
@@ -314,7 +314,7 @@ public:
 
 protected:
   template <typename KEY_VIEW>
-  KEY_VIEW asKey() const { return intern_; }
+  [[nodiscard]] KEY_VIEW asKey() const { return intern_; }
 
 private:
   UINT intern_{0};
@@ -466,9 +466,9 @@ public:
   MetaMixIn& operator=(MetaMixIn &&) noexcept = default;
   virtual ~MetaMixIn() = default;
 
-  virtual ValuePtr cloneWithMeta(ValuePtr meta) const = 0;
+  [[nodiscard]] virtual ValuePtr cloneWithMeta(ValuePtr meta) const = 0;
 
-  ValuePtr meta() const { return meta_; }
+  [[nodiscard]] ValuePtr meta() const { return meta_; }
 
 private:
   ValuePtr meta_;

@@ -4,10 +4,12 @@ Checks:          '-*,
   clang-diagnostic-*,
   concurrency-*,
   cppcoreguidelines-*,
+  modernize-*,
   performance-*,
   portability-*,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
-  -cppcoreguidelines-non-private-member-variables-in-classes'
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -modernize-use-trailing-return-type'
 WarningsAsErrors: ''
 HeaderFileExtensions:
   - ''
@@ -79,6 +81,90 @@ CheckOptions:
   cppcoreguidelines-use-default-member-init.IgnoreMacros: 'true'
   cppcoreguidelines-use-default-member-init.UseAssignment: 'false'
   cppcoreguidelines-use-enum-class.IgnoreUnscopedEnumsInClasses: 'false'
+  modernize-avoid-bind.PermissiveParameterList: 'false'
+  modernize-avoid-c-arrays.AllowStringArrays: 'false'
+  modernize-deprecated-headers.CheckHeaderFile: 'false'
+  modernize-loop-convert.IncludeStyle: llvm
+  modernize-loop-convert.MakeReverseRangeFunction: ''
+  modernize-loop-convert.MakeReverseRangeHeader: ''
+  modernize-loop-convert.MaxCopySize: '16'
+  modernize-loop-convert.MinConfidence: reasonable
+  modernize-loop-convert.NamingStyle: CamelCase
+  modernize-loop-convert.UseCxx20ReverseRanges: 'true'
+  modernize-make-shared.IgnoreDefaultInitialization: 'true'
+  modernize-make-shared.IgnoreMacros: 'true'
+  modernize-make-shared.IncludeStyle: llvm
+  modernize-make-shared.MakeSmartPtrFunction: 'std::make_shared'
+  modernize-make-shared.MakeSmartPtrFunctionHeader: '<memory>'
+  modernize-make-unique.IgnoreDefaultInitialization: 'true'
+  modernize-make-unique.IgnoreMacros: 'true'
+  modernize-make-unique.IncludeStyle: llvm
+  modernize-make-unique.MakeSmartPtrFunction: 'std::make_unique'
+  modernize-make-unique.MakeSmartPtrFunctionHeader: '<memory>'
+  modernize-min-max-use-initializer-list.IgnoreNonTrivialTypes: 'true'
+  modernize-min-max-use-initializer-list.IgnoreTrivialTypesOfSizeAbove: '32'
+  modernize-min-max-use-initializer-list.IncludeStyle: llvm
+  modernize-pass-by-value.IncludeStyle: llvm
+  modernize-pass-by-value.ValuesOnly: 'false'
+  modernize-raw-string-literal.DelimiterStem: lit
+  modernize-raw-string-literal.ReplaceShorterLiterals: 'false'
+  modernize-replace-auto-ptr.IncludeStyle: llvm
+  modernize-replace-disallow-copy-and-assign-macro.MacroName: DISALLOW_COPY_AND_ASSIGN
+  modernize-replace-random-shuffle.IncludeStyle: llvm
+  modernize-type-traits.IgnoreMacros: 'false'
+  modernize-use-auto.MinTypeNameLength: '5'
+  modernize-use-auto.RemoveStars: 'false'
+  modernize-use-bool-literals.IgnoreMacros: 'true'
+  modernize-use-default-member-init.IgnoreMacros: 'true'
+  modernize-use-default-member-init.UseAssignment: 'false'
+  modernize-use-designated-initializers.IgnoreMacros: 'true'
+  modernize-use-designated-initializers.IgnoreSingleElementAggregates: 'true'
+  modernize-use-designated-initializers.RestrictToPODTypes: 'false'
+  modernize-use-designated-initializers.StrictCStandardCompliance: 'true'
+  modernize-use-designated-initializers.StrictCppStandardCompliance: 'true'
+  modernize-use-emplace.ContainersWithPush: '::std::stack;::std::queue;::std::priority_queue'
+  modernize-use-emplace.ContainersWithPushBack: '::std::vector;::std::list;::std::deque'
+  modernize-use-emplace.ContainersWithPushFront: '::std::forward_list;::std::list;::std::deque'
+  modernize-use-emplace.EmplacyFunctions: 'vector::emplace_back;vector::emplace;deque::emplace;deque::emplace_front;deque::emplace_back;forward_list::emplace_after;forward_list::emplace_front;list::emplace;list::emplace_back;list::emplace_front;set::emplace;set::emplace_hint;map::emplace;map::emplace_hint;multiset::emplace;multiset::emplace_hint;multimap::emplace;multimap::emplace_hint;unordered_set::emplace;unordered_set::emplace_hint;unordered_map::emplace;unordered_map::emplace_hint;unordered_multiset::emplace;unordered_multiset::emplace_hint;unordered_multimap::emplace;unordered_multimap::emplace_hint;stack::emplace;queue::emplace;priority_queue::emplace'
+  modernize-use-emplace.IgnoreImplicitConstructors: 'false'
+  modernize-use-emplace.SmartPointers: '::std::shared_ptr;::std::unique_ptr;::std::auto_ptr;::std::weak_ptr'
+  modernize-use-emplace.TupleMakeFunctions: '::std::make_pair;::std::make_tuple'
+  modernize-use-emplace.TupleTypes: '::std::pair;::std::tuple'
+  modernize-use-equals-default.IgnoreMacros: 'true'
+  modernize-use-equals-delete.IgnoreMacros: 'true'
+  modernize-use-integer-sign-comparison.EnableQtSupport: 'false'
+  modernize-use-integer-sign-comparison.IncludeStyle: llvm
+  modernize-use-nodiscard.ReplacementString: '[[nodiscard]]'
+  modernize-use-noexcept.ReplacementString: ''
+  modernize-use-noexcept.UseNoexceptFalse: 'true'
+  modernize-use-nullptr.IgnoredTypes: '_CmpUnspecifiedParam;^std::__cmp_cat::__unspec'
+  modernize-use-nullptr.NullMacros: 'NULL'
+  modernize-use-override.AllowOverrideAndFinal: 'false'
+  modernize-use-override.FinalSpelling: final
+  modernize-use-override.IgnoreDestructors: 'false'
+  modernize-use-override.IgnoreTemplateInstantiations: 'false'
+  modernize-use-override.OverrideSpelling: override
+  modernize-use-ranges.IncludeStyle: llvm
+  modernize-use-ranges.UseReversePipe: 'false'
+  modernize-use-scoped-lock.WarnOnSingleLocks: 'true'
+  modernize-use-scoped-lock.WarnOnUsingAndTypedef: 'true'
+  modernize-use-std-format.FormatHeader: '<format>'
+  modernize-use-std-format.IncludeStyle: llvm
+  modernize-use-std-format.ReplacementFormatFunction: 'std::format'
+  modernize-use-std-format.StrFormatLikeFunctions: 'absl::StrFormat'
+  modernize-use-std-format.StrictMode: 'false'
+  modernize-use-std-numbers.DiffThreshold: '0.001'
+  modernize-use-std-numbers.IncludeStyle: llvm
+  modernize-use-std-print.FprintfLikeFunctions: '::fprintf;absl::FPrintF'
+  modernize-use-std-print.IncludeStyle: llvm
+  modernize-use-std-print.PrintHeader: '<print>'
+  modernize-use-std-print.PrintfLikeFunctions: '::printf;absl::PrintF'
+  modernize-use-std-print.ReplacementPrintFunction: 'std::print'
+  modernize-use-std-print.ReplacementPrintlnFunction: 'std::println'
+  modernize-use-std-print.StrictMode: 'false'
+  modernize-use-transparent-functors.SafeMode: 'false'
+  modernize-use-using.IgnoreExternC: 'false'
+  modernize-use-using.IgnoreMacros: 'true'
   performance-enum-size.EnumIgnoreList: ''
   performance-faster-string-find.StringLikeClasses: '::std::basic_string;::std::basic_string_view'
   performance-for-range-copy.AllowedTypes: ''

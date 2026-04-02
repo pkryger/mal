@@ -238,7 +238,7 @@ find_next_character_to_unescape(std::string_view view,
       --remaining;
     }
   }
-  return {std::size_t(view.size()), {}};
+  return {static_cast<std::size_t>(view.size()), {}};
 }
 
 #endif // defined(__aarch64__) || defined(_M_ARM64)
@@ -412,7 +412,7 @@ std::size_t find_next_character_to_escape(std::string_view view,
     }
   }
 
-  return std::size_t(view.size());
+  return static_cast<std::size_t>(view.size());
 }
 #endif // defined(__aarch64__) || defined(_M_ARM64)
 

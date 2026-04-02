@@ -166,7 +166,7 @@ int main(int argc, const char *argv[]) {
     mal::rep(std::format("(load-file \"{}\")", args.front()), envPtr);
     return 0;
   }
-  mal::rep("(println (str \"Mal [\" *host-language* \"]\"))", envPtr);
+  mal::rep(R"((println (str "Mal [" *host-language* "]")))", envPtr);
   static mal::ReadLine rl("~/.mal_history");
   while (auto line = rl.get("user> ")) {
     std::print("{}\n", mal::rep(line.value(), envPtr));

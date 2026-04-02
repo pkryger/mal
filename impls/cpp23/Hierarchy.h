@@ -50,7 +50,7 @@ public:
 
 struct TypeInfo {
   uint32_t lo, hi;
-  constexpr bool contains(uint32_t id) const {
+  [[nodiscard]] constexpr bool contains(uint32_t id) const {
     return lo <= id && id <= hi;
   }
 };

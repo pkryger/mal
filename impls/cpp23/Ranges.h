@@ -28,8 +28,7 @@ template <std::ranges::viewable_range R> auto malChunkView(R &&r, std::size_t n)
 }
 */
 
-namespace mal {
-namespace views {
+namespace mal::views {
 
 namespace detail {
 template <typename FN>
@@ -56,7 +55,8 @@ class ChunkView : public std::ranges::view_interface<ChunkView<VIEW>> {
   template<bool>
   class iterator;
 
-  template <typename VIEW_ITERATOR> auto findNext(VIEW_ITERATOR it) const {
+  template <typename VIEW_ITERATOR>
+  [[nodiscard]] auto findNext(VIEW_ITERATOR it) const {
     auto reminder = [&]() {
       if constexpr (std::ranges::sized_range<VIEW> &&
                     std::is_same_v<std::ranges::iterator_t<VIEW>,
@@ -71,8 +71,9 @@ class ChunkView : public std::ranges::view_interface<ChunkView<VIEW>> {
   }
 
   template <typename VIEW_ITERATOR>
-  auto findPrev(VIEW_ITERATOR it,
-                std::ranges::range_difference_t<VIEW> reminder) const {
+  [[nodiscard]] auto
+  findPrev(VIEW_ITERATOR it,
+           std::ranges::range_difference_t<VIEW> reminder) const {
     std::ranges::advance(it, -(count_ - reminder), std::ranges::begin(base_));
     return it;
   }
@@ -88,22 +89,22 @@ public:
     assert(count > 0);
   }
 
-  constexpr VIEW base() const &
+  [[nodiscard]] constexpr VIEW base() const &
     requires std::copy_constructible<VIEW>
   {
     return base_;
   }
 
-  constexpr VIEW base() && { return std::move(base_); }
+  [[nodiscard]] constexpr VIEW base() && { return std::move(base_); }
 
-  constexpr auto begin() {
+  [[nodiscard]] constexpr auto begin() {
     auto current = std::ranges::begin(base_);
     auto [next, reminder] = findNext(std::ranges::begin(base_));
     return iterator<false>{this, current, next, std::ranges::end(base_),
                            reminder};
   }
 
-  constexpr auto begin() const
+  [[nodiscard]] constexpr auto begin() const
     requires std::ranges::range<const VIEW>
   {
     auto current = std::ranges::begin(base_);
@@ -112,7 +113,7 @@ public:
                           reminder};
   }
 
-  constexpr auto end() {
+  [[nodiscard]] constexpr auto end() {
     using ReminderType = iterator<false>::difference_type;
     if constexpr (std::ranges::sized_range<VIEW>) {
       auto end = std::ranges::end(base_);
@@ -125,7 +126,7 @@ public:
     }
   }
 
-  constexpr auto end() const
+  [[nodiscard]] constexpr auto end() const
     requires std::ranges::range<const VIEW>
   {
     using ReminderType = iterator<true>::difference_type;
@@ -140,17 +141,18 @@ public:
     }
   }
 
-  constexpr std::ranges::range_difference_t<VIEW> count() const & {
+  [[nodiscard]] constexpr std::ranges::range_difference_t<VIEW>
+  count() const & {
     return count_;
   }
 
-  std::size_t size()
+  [[nodiscard]] std::size_t size()
     requires std::ranges::sized_range<VIEW>
   {
     return detail::divCeil(std::ranges::size(base_), count_);
   }
 
-  std::size_t size() const
+  [[nodiscard]] std::size_t size() const
     requires std::ranges::sized_range<const VIEW>
   {
     return detail::divCeil(std::ranges::size(base_), count_);
@@ -309,25 +311,25 @@ public:
     assert(count > 0);
   }
 
-  constexpr VIEW base() const &
+  [[nodiscard]] constexpr VIEW base() const &
     requires std::copy_constructible<VIEW>
   {
     return base_;
   }
 
-  constexpr VIEW base() && { return std::move(base_); }
+  [[nodiscard]] constexpr VIEW base() && { return std::move(base_); }
 
-  constexpr auto begin() {
+  [[nodiscard]] constexpr auto begin() {
     return iterator<false>{this, std::ranges::begin(base_)};
   }
 
-  constexpr auto begin() const
+  [[nodiscard]] constexpr auto begin() const
     requires std::ranges::range<const VIEW>
   {
     return iterator<true>{this, std::ranges::begin(base_)};
   }
 
-  constexpr auto end() {
+  [[nodiscard]] constexpr auto end() {
     if constexpr (std::ranges::sized_range<VIEW>) {
       return iterator<false>{this, std::ranges::end(base_)};
     } else {
@@ -335,7 +337,7 @@ public:
     }
   }
 
-  constexpr auto end() const
+  [[nodiscard]] constexpr auto end() const
     requires std::ranges::range<const VIEW>
   {
     if constexpr (std::ranges::sized_range<VIEW>) {
@@ -345,17 +347,18 @@ public:
     }
   }
 
-  constexpr std::ranges::range_difference_t<VIEW> count() const & {
+  [[nodiscard]] constexpr std::ranges::range_difference_t<VIEW>
+  count() const & {
     return count_;
   }
 
-  std::size_t size()
+  [[nodiscard]] std::size_t size()
     requires std::ranges::sized_range<VIEW>
   {
     return detail::divCeil(std::ranges::size(base_), count_);
   }
 
-  std::size_t size() const
+  [[nodiscard]] std::size_t size() const
     requires std::ranges::sized_range<const VIEW>
   {
     return detail::divCeil(std::ranges::size(base_), count_);
@@ -481,7 +484,7 @@ struct StrideFn : std::ranges::range_adaptor_closure<StrideFn> {
 
 inline constexpr auto Stride = stride_fn::StrideFn{};
 
-} // namespace views
-} // namespace mal
+} // namespace mal::views
+
 
 #endif // INCLUDE_RANGES_H

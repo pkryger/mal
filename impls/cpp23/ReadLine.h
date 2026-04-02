@@ -92,11 +92,15 @@ public:
     std::size_t end_;
   };
 
-  auto begin() noexcept { return Iterator<false>{this, tail_}; }
-  auto begin() const noexcept { return Iterator<true>{this, tail_}; }
+  [[nodiscard]] auto begin() noexcept { return Iterator<false>{this, tail_}; }
+  [[nodiscard]] auto begin() const noexcept {
+    return Iterator<true>{this, tail_};
+  }
 
-  auto end() noexcept { return Iterator<false>{this, head_}; }
-  auto end() const noexcept { return Iterator<true>{this, head_}; }
+  [[nodiscard]] auto end() noexcept { return Iterator<false>{this, head_}; }
+  [[nodiscard]] auto end() const noexcept {
+    return Iterator<true>{this, head_};
+  }
 
   explicit CyclicBuffer(std::size_t capacity)
       : data_(capacity), capacity_{capacity} {}
@@ -113,9 +117,11 @@ public:
     full_ = head_ == tail_;
   }
 
-  bool empty() const noexcept { return !full_ && (head_ == tail_); }
+  [[nodiscard]] bool empty() const noexcept {
+    return !full_ && (head_ == tail_);
+  }
 
-  size_t size() const noexcept {
+  [[nodiscard]] size_t size() const noexcept {
     if (full_) {
       return capacity_;
     }
