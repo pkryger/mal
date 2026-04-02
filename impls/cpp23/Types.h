@@ -161,13 +161,9 @@ private:
 // This block need to appear when the StringBase is already defined, but
 // before the first instantiation of ValuesMap, such that hash<ValuePtr>
 // can be defined
-namespace std {
-
-template <> struct hash<mal::ValuePtr> {
+template <> struct std::hash<mal::ValuePtr> {
   std::size_t operator()(const mal::ValuePtr &o) const;
 };
-
-} // namespace std
 
 namespace mal {
 

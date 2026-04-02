@@ -138,6 +138,7 @@ void Tokeniser::nextToken() {
 
 ValuePtr readForm(Tokeniser & /* tokeniser */);
 
+// NOLINTNEXTLINE(misc-no-recursion)
 ValuesContainer readSequence(Tokeniser &tokeniser, const std::string &end) {
   assert(!tokeniser.eoi());
   ValuesContainer items;
@@ -153,6 +154,7 @@ ValuesContainer readSequence(Tokeniser &tokeniser, const std::string &end) {
   return items;
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 ValuePtr readAtom(Tokeniser &tokeniser) {
   assert(!tokeniser.eoi());
   auto token = tokeniser.peek();
@@ -206,6 +208,7 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   return make<Symbol>(token);
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 ValuePtr readForm(Tokeniser &tokeniser) {
   assert(!tokeniser.eoi());
   auto token = tokeniser.peek();

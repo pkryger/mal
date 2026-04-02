@@ -12,7 +12,8 @@
 #include <string>
 #include <utility>
 
-namespace mal {
+namespace {
+using namespace mal;
 
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
@@ -31,21 +32,21 @@ std::string rep(const std::string &str) {
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
     gc.registerValue(std::move(value));
   };
-  static GarbageCollectStack::Guard gcGuard{gcRegister};
-  static EvalFnStack::Guard evalGuard{EVAL};
+  static const GarbageCollectStack::Guard gcGuard{gcRegister};
+  static const EvalFnStack::Guard evalGuard{EVAL};
 
   return PRINT(EVAL(READ(str), nullptr));
 }
 
-} // namespace mal
+} // namespace
 
 int main() {
   static mal::ReadLine rl("~/.mal_history");
   while (auto line = rl.get("user> ")) {
     std::string out;
     try {
-      out = mal::rep(line.value());
-    } catch (mal::ReaderException ex) {
+      out = rep(line.value());
+    } catch (const mal::ReaderException &ex) {
       out = std::string{"ReaderException: "} + ex.what();
     }
     std::print("{}\n", out);

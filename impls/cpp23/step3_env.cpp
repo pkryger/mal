@@ -19,7 +19,8 @@
 // IWYU pragma: no_include <string_view>
 // IWYU pragma: no_include <tuple>
 
-namespace mal {
+namespace {
+using namespace mal;
 
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
@@ -29,6 +30,7 @@ static const std::array specials{
   Special{"let*", specialLetStar},
 };
 
+// NOLINTNEXTLINE(misc-no-recursion)
 ValuePtr EVAL(ValuePtr ast, const EnvPtr &env) {
   assert(ast);
   assert(env);
@@ -70,32 +72,32 @@ std::string rep(const std::string &str) {
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
     gc.registerValue(std::move(value));
   };
-  static GarbageCollectStack::Guard gcGuard{gcRegister};
-  static EvalFnStack::Guard evalGuard{EVAL};
+  static const GarbageCollectStack::Guard gcGuard{gcRegister};
+  static const EvalFnStack::Guard evalGuard{EVAL};
 
   static Env env = []() {
     Env env{nullptr};
     prepareEnv(env);
     return env;
   }();
-  static EnvPtr envPtr =
+  static const EnvPtr envPtr =
     std::shared_ptr<Env>(std::addressof(env), [](auto &&) noexcept {});
   return PRINT(EVAL(READ(str), envPtr));
 }
 
-} // namespace mal
+} // namespace
 
 int main() {
   static mal::ReadLine rl("~/.mal_history");
   while (auto line = rl.get("user> ")) {
     std::string out;
     try {
-      out = mal::rep(line.value());
-    } catch (mal::ReaderException ex) {
+      out = rep(line.value());
+    } catch (const mal::ReaderException &ex) {
       out = std::string{"[reader] "} + ex.what();
-    } catch (mal::CoreException ex) {
+    } catch (const mal::CoreException &ex) {
       out = std::string{"[core] "} + ex.what();
-    } catch (mal::EvalException ex) {
+    } catch (const mal::EvalException &ex) {
       out = std::string{"[eval] "} + ex.what();
     }
     std::print("{}\n", out);

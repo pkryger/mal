@@ -18,7 +18,6 @@
 #include <string_view>
 #include <utility>
 #include <span>
-#include <string>
 #include <type_traits>
 // IWYU pragma: no_include <tuple>
 
@@ -124,6 +123,7 @@ InvocableResult specialQuote(std::string_view name, ValuesSpan values,
   return {values[0], {}};
 }
 
+// NOLINTNEXTLINE(misc-no-recursion)
 InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
                                   const EnvPtr &env) {
   checkArgsIs(name, values, 1);
@@ -153,6 +153,7 @@ InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
     }
     auto res = std::ranges::fold_left(
         values | std::views::reverse, make<List>(),
+        // NOLINTNEXTLINE(misc-no-recursion)
         [&](auto &&acc, auto &&elt) -> ValuePtr {
           if (auto spliceUnquote = [&]() -> ValuePtr {
                 if (auto eltValues =
@@ -231,13 +232,13 @@ InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
         };
         try {
           return {EvalFnStack::top()(values[0], env), {}};
-        } catch (CoreException ex) {
+        } catch (const CoreException &ex) {
           return exceptionHandler(make<String>(ex.what()));
-        } catch (EvalException ex) {
+        } catch (const EvalException &ex) {
           return exceptionHandler(make<String>(ex.what()));
-        } catch (ReaderException ex) {
+        } catch (const ReaderException &ex) {
           return exceptionHandler(make<String>(ex.what()));
-        } catch (MalException ex) {
+        } catch (const MalException &ex) {
           return exceptionHandler(ex.value);
         }
         assert(false);

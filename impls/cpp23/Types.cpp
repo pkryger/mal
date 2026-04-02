@@ -1,6 +1,8 @@
 #include "Types.h" // IWYU pragma: associated
 #include "Core.h"
+#include "Env.h"
 #include "FunctionRef.h"
+#include "Hierarchy.h"
 #include "InPlaceAllocator.h"
 #include "Mal.h"
 #if !defined(__cpp_lib_ranges_chunk)
@@ -13,25 +15,27 @@
 #include <bit>
 #endif // defined(__aarch64__) || defined(_M_ARM64)
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
 #include <format>
 #include <optional>
 #include <ranges>
 #include <span>
+#include <string>
+#include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
-namespace std {
-
-std::size_t hash<mal::ValuePtr>::operator()(const mal::ValuePtr &o) const {
+// NOLINTBEGIN(misc-include-cleaner) - looks like namespace std freaks clang-tidy out
+std::size_t std::hash<mal::ValuePtr>::operator()(const mal::ValuePtr &o) const {
   assert(o->isa<mal::StringBase>());
   if (auto stringBase = o->dyncast<mal::StringBase>()) {
     return std::hash<std::string>{}(stringBase->data_);
   }
   throw mal::EvalException{std::format("invalid key '{:r}'", o)};
 }
-
-} // namespace std
-
+// NOLINTEND(misc-include-cleaner)
 
 namespace {
 
@@ -149,8 +153,8 @@ find_next_character_to_unescape(std::string_view view,
                                 std::size_t location) noexcept {
 
   const std::size_t len = view.size();
-  const uint8_t *ptr =
-      reinterpret_cast<const uint8_t *>(view.data()) + location;
+  const std::uint8_t *ptr =
+      reinterpret_cast<const std::uint8_t *>(view.data()) + location;
   std::size_t remaining = len - location;
   auto unescaped_after_pos = [&](std::size_t pos) -> std::optional<char> {
     if (++pos < view.size()) {
@@ -250,7 +254,7 @@ namespace mal {
 #if defined(__aarch64__) || defined(_M_ARM64)
 
 std::string String::unescape(std::string_view in) {
-  std::string_view view{in.begin() + 1, in.end() - 1};
+  const std::string_view view{in.begin() + 1, in.end() - 1};
   auto [location, unescaped] = find_next_character_to_unescape(view, 0);
   if (location == view.size()) [[likely]] {
     assert(!unescaped);
@@ -332,8 +336,8 @@ void maybe_escape_and_append_character(char c, std::string &out) {
 std::size_t find_next_character_to_escape(std::string_view view,
                                           std::size_t location) noexcept {
   const std::size_t len = view.size();
-  const uint8_t *ptr =
-      reinterpret_cast<const uint8_t *>(view.data()) + location;
+  const std::uint8_t *ptr =
+      reinterpret_cast<const std::uint8_t *>(view.data()) + location;
   std::size_t remaining = len - location;
   {
     // SIMD constants for characters requiring escape

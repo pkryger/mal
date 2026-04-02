@@ -4,12 +4,15 @@ Checks:          '-*,
   clang-diagnostic-*,
   concurrency-*,
   cppcoreguidelines-*,
+  misc-*,
   modernize-*,
   performance-*,
   portability-*,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
   -cppcoreguidelines-non-private-member-variables-in-classes,
-  -modernize-use-trailing-return-type'
+  -modernize-use-trailing-return-type,
+  -misc-multiple-inheritance,
+  -misc-non-private-member-variables-in-classes'
 WarningsAsErrors: ''
 HeaderFileExtensions:
   - ''
@@ -81,6 +84,38 @@ CheckOptions:
   cppcoreguidelines-use-default-member-init.IgnoreMacros: 'true'
   cppcoreguidelines-use-default-member-init.UseAssignment: 'false'
   cppcoreguidelines-use-enum-class.IgnoreUnscopedEnumsInClasses: 'false'
+  misc-const-correctness.AllowedTypes: ''
+  misc-const-correctness.AnalyzePointers: 'true'
+  misc-const-correctness.AnalyzeReferences: 'true'
+  misc-const-correctness.AnalyzeValues: 'true'
+  misc-const-correctness.TransformPointersAsPointers: 'true'
+  misc-const-correctness.TransformPointersAsValues: 'false'
+  misc-const-correctness.TransformReferences: 'true'
+  misc-const-correctness.TransformValues: 'true'
+  misc-const-correctness.WarnPointersAsPointers: 'true'
+  misc-const-correctness.WarnPointersAsValues: 'false'
+  misc-coroutine-hostile-raii.AllowedAwaitablesList: ''
+  misc-coroutine-hostile-raii.AllowedCallees: ''
+  misc-coroutine-hostile-raii.RAIITypesList: 'std::lock_guard;std::scoped_lock'
+  misc-header-include-cycle.IgnoredFilesList: ''
+  misc-include-cleaner.DeduplicateFindings: 'true'
+  misc-include-cleaner.IgnoreHeaders: ''
+  misc-include-cleaner.MissingIncludes: 'true'
+  misc-include-cleaner.UnusedIncludes: 'true'
+  misc-override-with-different-visibility.CheckDestructors: 'false'
+  misc-override-with-different-visibility.CheckOperators: 'false'
+  misc-override-with-different-visibility.DisallowedVisibilityChange: any
+  misc-override-with-different-visibility.IgnoredFunctions: ''
+  misc-throw-by-value-catch-by-reference.CheckThrowTemporaries: 'true'
+  misc-throw-by-value-catch-by-reference.MaxSize: '18446744073709551615'
+  misc-throw-by-value-catch-by-reference.WarnOnLargeObjects: 'false'
+  misc-uniqueptr-reset-release.IncludeStyle: llvm
+  misc-unused-parameters.IgnoreVirtual: 'false'
+  misc-unused-parameters.StrictMode: 'false'
+  misc-use-internal-linkage.AnalyzeFunctions: 'true'
+  misc-use-internal-linkage.AnalyzeTypes: 'true'
+  misc-use-internal-linkage.AnalyzeVariables: 'true'
+  misc-use-internal-linkage.FixMode: UseStatic
   modernize-avoid-bind.PermissiveParameterList: 'false'
   modernize-avoid-c-arrays.AllowStringArrays: 'false'
   modernize-deprecated-headers.CheckHeaderFile: 'false'
