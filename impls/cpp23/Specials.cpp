@@ -241,7 +241,7 @@ InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
         } catch (const ReaderException &ex) {
           return exceptionHandler(make<String>(ex.what()));
         } catch (const MalException &ex) {
-          return exceptionHandler(ex.value);
+          return exceptionHandler(ex.value_);
         }
         assert(false);
       }

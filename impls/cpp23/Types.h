@@ -105,17 +105,17 @@ private:
 class Integer final : public Value {
 public:
   explicit Integer(std::int64_t value) noexcept
-      : Value{typeInfo<Integer>.low_}, data{value} {}
+      : Value{typeInfo<Integer>.low_}, data_{value} {}
 
   std::string print(PrintType /*readably*/) const override {
-    return std::to_string(data);
+    return std::to_string(data_);
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  std::int64_t value() const noexcept { return data; }
+  std::int64_t value() const noexcept { return data_; }
 private:
-  std::int64_t data;
+  std::int64_t data_;
 };
 
 namespace detail {
@@ -177,18 +177,18 @@ struct ParseValueMixin {
     if (iter != ctx.end()) {
       switch (*iter) {
       case 'r':
-        printType = Readably;
+        printType_ = Readably;
         ++iter;
         break;
       case 'l':
-        printType = MalReadably;
+        printType_ = MalReadably;
         ++iter;
         break;
       }
     }
     return iter;
   }
-  PrintType printType{Simply};
+  PrintType printType_{Simply};
 };
 
 template <typename RANGE_FORMATTER>
@@ -201,11 +201,11 @@ constexpr auto RangeFormatterParse(RANGE_FORMATTER &formatter,
   if (iter != ctx.end()) {
     switch (*iter) {
     case 'r':
-      formatter.underlying().printType = Readably;
+      formatter.underlying().printType_ = Readably;
       ++iter;
       break;
     case 'l':
-      formatter.underlying().printType = MalReadably;
+      formatter.underlying().printType_ = MalReadably;
       ++iter;
       break;
     }
@@ -220,7 +220,7 @@ namespace std {
 template <> struct formatter<mal::ValuePtr> : mal::ParseValueMixin {
   template<typename FORMAT_CONTEXT>
   auto format(const mal::ValuePtr &val, FORMAT_CONTEXT &ctx) const {
-    return format_to(ctx.out(), "{}", val->print(printType));
+    return format_to(ctx.out(), "{}", val->print(printType_));
   }
 };
 
@@ -229,7 +229,7 @@ struct formatter<mal::ValuesMap::value_type> : mal::ParseValueMixin {
   template <typename FORMAT_CONTEXT>
   auto format(const mal::ValuesMap::value_type &val,
               FORMAT_CONTEXT &ctx) const {
-    switch (printType.type()) {
+    switch (printType_.type()) {
     using enum mal::PrintType::Type;
     case Simply:
       return format_to(ctx.out(), "{} {}", val.first, val.second);
@@ -430,24 +430,24 @@ public:
 class Atom final : public Value {
 public:
   explicit Atom(ValuePtr value) noexcept
-      : Value{typeInfo<Atom>.low_}, data{std::move(value)} {}
+      : Value{typeInfo<Atom>.low_}, data_{std::move(value)} {}
 
   std::string print(PrintType readably) const override {
-    return readably ? std::format("(atom {:r})", data)
-                    : std::format("(atom {})", data);
+    return readably ? std::format("(atom {:r})", data_)
+                    : std::format("(atom {})", data_);
   }
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  ValuePtr value() const { return data; }
+  ValuePtr value() const { return data_; }
 
   ValuePtr reset(ValuePtr value) const {
-    data = value;
+    data_ = value;
     return value;
   }
 
 private:
-  mutable ValuePtr data;
+  mutable ValuePtr data_;
 };
 
 class MetaMixIn {
@@ -567,7 +567,7 @@ public:
                                  ValuePtr>
   explicit Hash(RANGE &&range)
       : Value{typeInfo<Hash>.low_},
-        data{std::from_range, std::forward<RANGE>(range) |
+        data_{std::from_range, std::forward<RANGE>(range) |
 #ifdef __cpp_lib_ranges_chunk
                                   std::views::chunk(2)
 #else
@@ -585,12 +585,12 @@ public:
                                  ValuesMap::value_type>
   explicit Hash(RANGE &&range)
       : Value{typeInfo<Hash>.low_},
-        data{std::from_range, std::forward<RANGE>(range)} {}
+        data_{std::from_range, std::forward<RANGE>(range)} {}
 
   explicit Hash(const Hash &other, ValuesSpan values);
 
   explicit Hash(const Hash &other, ValuePtr meta)
-      : Value{typeInfo<Hash>.low_}, MetaMixIn{std::move(meta)}, data{other.data} {
+      : Value{typeInfo<Hash>.low_}, MetaMixIn{std::move(meta)}, data_{other.data_} {
   }
 
   std::string print(PrintType readably) const override;
@@ -601,16 +601,16 @@ public:
 
   ValuePtr find(const ValuePtr &key) const;
 
-  auto begin() const { return data.begin(); }
+  auto begin() const { return data_.begin(); }
 
-  auto end() const { return data.end(); }
+  auto end() const { return data_.end(); }
 
   ValuePtr cloneWithMeta(ValuePtr meta) const override {
     return make<Hash>(*this, std::move(meta));
   }
 
 private:
-  ValuesMap data;
+  ValuesMap data_;
 };
 
 class Invocable : public Value {
@@ -671,14 +671,14 @@ public:
 
 protected:
   explicit FunctionBase(std::uint32_t lowId, const FunctionBase &other)
-      : Invocable{lowId}, bindSize{other.bindSize}, params{other.params},
-        body{other.body}, capturedEnv{other.capturedEnv} {}
+      : Invocable{lowId}, bindSize_{other.bindSize_}, params_{other.params_},
+        body_{other.body_}, capturedEnv_{other.capturedEnv_} {}
 
   // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
   explicit FunctionBase(std::uint32_t lowId, FunctionBase &&other) noexcept
-      : Invocable{lowId}, bindSize{other.bindSize},
-        params{std::move(other.params)}, body{std::move(other.body)},
-        capturedEnv{std::move(other.capturedEnv)} {}
+      : Invocable{lowId}, bindSize_{other.bindSize_},
+        params_{std::move(other.params_)}, body_{std::move(other.body_)},
+        capturedEnv_{std::move(other.capturedEnv_)} {}
 
   template <typename TYPE>
   ValuePtr isEqualImpl(const ValuePtr &rhs) const;
@@ -686,10 +686,10 @@ protected:
   template <typename VALUES>
   EnvPtr makeApplyEnv(VALUES &&values, const EnvPtr &evalEnv) const;
 
-  std::size_t bindSize;
-  Params params;
-  ValuePtr body;
-  EnvPtr capturedEnv;
+  std::size_t bindSize_;
+  Params params_;
+  ValuePtr body_;
+  EnvPtr capturedEnv_;
 };
 
 } // namespace mal
@@ -761,11 +761,11 @@ public:
 class Eval final : public Invocable, public MetaMixIn {
 public:
   explicit Eval(EnvPtr env)
-      : Invocable{typeInfo<Eval>.low_}, env{std::move(env)} {}
+      : Invocable{typeInfo<Eval>.low_}, env_{std::move(env)} {}
 
   explicit Eval(const Eval &other, ValuePtr meta)
       : Invocable{typeInfo<Eval>.low_}, MetaMixIn{std::move(meta)},
-        env{other.env} {}
+        env_{other.env_} {}
 
   std::string print(PrintType /*readably*/) const override {
     return std::format("#<eval@{:p}>", static_cast<const void *>(this));
@@ -781,15 +781,15 @@ public:
   }
 
 private:
-  EnvPtr env;
+  EnvPtr env_;
 };
 
 class MalException : public std::runtime_error {
 public:
   MalException(const std::string &str, ValuePtr value)
-      : std::runtime_error{str}, value{std::move(value)} {}
+      : std::runtime_error{str}, value_{std::move(value)} {}
 
-  ValuePtr value;
+  ValuePtr value_;
 };
 
 } // namespace mal

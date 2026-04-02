@@ -18,7 +18,7 @@ ValuePtr EnvBase::find(KeyView key) const {
   }
   auto findKey = [&]() {
     if constexpr (detail::IsHashContainer<Map>) {
-      return PreHashedKey{.key=key, .hash=Hash{}(key)};
+      return PreHashedKey{.key_=key, .hash_=Hash{}(key)};
     } else {
       return key;
     }
@@ -32,14 +32,14 @@ ValuePtr EnvBase::find(KeyView key) const {
 }
 
 ValuePtr EnvBase::find(const PreHashedKey &phk) const {
-  if (phk.key == debugEval.asKey()) {
+  if (phk.key_ == debugEval.asKey()) {
     return debugEval_;
   }
   const auto &findKey = [&]() {
     if constexpr (detail::IsHashContainer<Map>) {
       return phk;
     } else {
-      return phk.key;
+      return phk.key_;
     }}();
   for (auto &&env : *this) {
     if (auto value = env.findLocal(findKey)) {

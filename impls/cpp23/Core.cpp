@@ -230,8 +230,8 @@ InvocableResult compareIntegers(std::string_view name, ValuesSpan values,
   checkArgsAtLeast(name, values, 2);
   auto notMatching = std::ranges::adjacent_find(
       values,
-      [binary_op = std::forward<BINARY_OP>(binary_op)](auto &&lhs, auto &&rhs) {
-        return !binary_op(lhs, rhs);
+      [binaryOp = std::forward<BINARY_OP>(binary_op)](auto &&lhs, auto &&rhs) {
+        return !binaryOp(lhs, rhs);
       },
       [name = name](auto &&elt) {
         if (auto integer = elt->template dyncast<Integer>()) {

@@ -98,7 +98,7 @@ ValuePtr Integer::isEqualTo(ValuePtr rhs) const {
     return Constant::trueValue();
   }
   if (const auto *other = rhs->dyncast<Integer>();
-      (other != nullptr) && data == other->data) {
+      (other != nullptr) && data_ == other->data_) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -151,7 +151,7 @@ ValuePtr Atom::isEqualTo(ValuePtr rhs) const {
     return Constant::trueValue();
   }
   if (const auto *atom = rhs->dyncast<Atom>()) {
-    return data->isEqualTo(atom->data);
+    return data_->isEqualTo(atom->data_);
   }
   return Constant::falseValue();
 }
@@ -220,14 +220,14 @@ ValuePtr List::eval(const EnvPtr &env) const {
 }
 
 std::string Hash::print(PrintType readably) const {
-  return readably ? std::format("{{{:r}}}", data) : std::format("{{{}}}", data);
+  return readably ? std::format("{{{:r}}}", data_) : std::format("{{{}}}", data_);
 }
 
 ValuePtr Hash::eval(const EnvPtr &env) const {
   assert(env);
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
-  return make<Hash>(data | std::views::transform([&](auto &&elt) {
+  return make<Hash>(data_ | std::views::transform([&](auto &&elt) {
                       return std::pair{elt.first, evalFn(elt.second, env)};
                     }));
 }
@@ -237,13 +237,13 @@ ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
     return Constant::trueValue();
   }
   if (const auto *other = rhs->dyncast<Hash>()) {
-    return data == other->data ? Constant::trueValue() : Constant::falseValue();
+    return data_ == other->data_ ? Constant::trueValue() : Constant::falseValue();
   }
   return Constant::falseValue();
 }
 
 Hash::Hash(const Hash &other, ValuesSpan values)
-    : Value{typeInfo<Hash>.low_}, data{other.data} {
+    : Value{typeInfo<Hash>.low_}, data_{other.data_} {
   for (auto [key, value] : values |
 #ifdef __cpp_lib_ranges_chunk
                                std::views::chunk(2)
@@ -254,12 +254,12 @@ Hash::Hash(const Hash &other, ValuesSpan values)
                                    assert(chunk[0]->template isa<StringBase>());
                                    return std::tie(chunk[0], chunk[1]);
                                  })) {
-    data.insert_or_assign(key, value);
+    data_.insert_or_assign(key, value);
   }
 }
 
 ValuePtr Hash::find(const ValuePtr &key) const {
-  if (auto res = data.find(key); res != data.end()) {
+  if (auto res = data_.find(key); res != data_.end()) {
     return res->second;
   }
   return nullptr;
@@ -288,7 +288,7 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
 
 FunctionBase::FunctionBase(std::uint32_t lowId, Params params, ValuePtr body,
                            EnvPtr env)
-    : Invocable{lowId}, bindSize{[&]() -> std::size_t {
+    : Invocable{lowId}, bindSize_{[&]() -> std::size_t {
         if (auto iter = std::ranges::find_if(
                 params, [](auto &&elt) { return elt.name().at(0) == '&'; });
             iter != params.end()) {
@@ -300,8 +300,8 @@ FunctionBase::FunctionBase(std::uint32_t lowId, Params params, ValuePtr body,
         }
         return params.size();
       }()},
-      params{std::move(params)}, body{std::move(body)},
-      capturedEnv{std::move(env)} {}
+      params_{std::move(params)}, body_{std::move(body)},
+      capturedEnv_{std::move(env)} {}
 
 template <typename TYPE>
 ValuePtr FunctionBase::isEqualImpl(const ValuePtr &rhs) const {
@@ -309,16 +309,16 @@ ValuePtr FunctionBase::isEqualImpl(const ValuePtr &rhs) const {
     return Constant::trueValue();
   }
   if (auto other = rhs->dyncast<TYPE>();
-      other && bindSize == other->bindSize &&
-      params.size() == other->params.size()) {
-    auto res = std::ranges::mismatch(params, other->params,
+      other && bindSize_ == other->bindSize_ &&
+      params_.size() == other->params_.size()) {
+    auto res = std::ranges::mismatch(params_, other->params_,
                                      [](auto &&lhs, auto &&rhs) noexcept {
                                        return lhs == rhs;
                                      });
-    if (res.in1 != params.end() || res.in2 != other->params.end()) {
+    if (res.in1 != params_.end() || res.in2 != other->params_.end()) {
       return Constant::falseValue();
     }
-    return body->isEqualTo(other->body);
+    return body_->isEqualTo(other->body_);
   }
   return Constant::falseValue();
 }
@@ -326,18 +326,18 @@ ValuePtr FunctionBase::isEqualImpl(const ValuePtr &rhs) const {
 template <typename VALUES>
 EnvPtr FunctionBase::makeApplyEnv(VALUES &&values, const EnvPtr &evalEnv) const {
   auto applyEnv = make<ApplyEnv>(
-      evalEnv, capturedEnv,
+      evalEnv, capturedEnv_,
       std::views::zip(
-          params | std::views::take(bindSize) |
+          params_ | std::views::take(bindSize_) |
               std::views::transform([](auto &&param) { return param.asKey(); }),
           std::forward<VALUES>(values)));
-  if (bindSize == params.size()) {
-    checkArgsIs(print(Simply), values.size(), bindSize);
+  if (bindSize_ == params_.size()) {
+    checkArgsIs(print(Simply), values.size(), bindSize_);
   } else {
-    checkArgsAtLeast(print(Simply), values.size(), bindSize);
+    checkArgsAtLeast(print(Simply), values.size(), bindSize_);
     applyEnv->insert_or_assign(
-        params.back().asKey(),
-        make<List>(std::forward<VALUES>(values) | std::views::drop(bindSize)));
+        params_.back().asKey(),
+        make<List>(std::forward<VALUES>(values) | std::views::drop(bindSize_)));
   }
   return applyEnv;
 }
@@ -345,7 +345,7 @@ EnvPtr FunctionBase::makeApplyEnv(VALUES &&values, const EnvPtr &evalEnv) const 
 std::string Lambda::print(PrintType readable) const {
   if (readable) {
     return std::format("#<λ@{:p} {} {:r}>",
-                       static_cast<const void *>(this), params, body);
+                       static_cast<const void *>(this), params_, body_);
 
   }
   return std::format("#<λ@{:p}>", static_cast<const void *>(this));
@@ -358,15 +358,15 @@ ValuePtr Lambda::isEqualTo(ValuePtr rhs) const {
 InvocableResult Lambda::apply(bool evaled, ValuesSpan values,
                               const EnvPtr &evalEnv) const {
   if (evaled) {
-    return {body, makeApplyEnv(values, evalEnv)};
+    return {body_, makeApplyEnv(values, evalEnv)};
   }
-  return {body, makeApplyEnv(evalValues(values, evalEnv), evalEnv)};
+  return {body_, makeApplyEnv(evalValues(values, evalEnv), evalEnv)};
 }
 
 std::string Macro::print(PrintType readable) const {
   if (readable) {
     return std::format("#<macro@{:p} {} {:r}>",
-                       static_cast<const void *>(this), params, body);
+                       static_cast<const void *>(this), params_, body_);
   }
   return std::format("#<macro@{:p}>", static_cast<const void *>(this));
 }
@@ -378,7 +378,7 @@ ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
 InvocableResult Macro::apply(bool /*evaled*/, ValuesSpan values,
                              const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
-  return {EvalFnStack::top()(body, FunctionBase::makeApplyEnv(values, evalEnv)),
+  return {EvalFnStack::top()(body_, FunctionBase::makeApplyEnv(values, evalEnv)),
           evalEnv};
 }
 
@@ -393,7 +393,7 @@ InvocableResult Eval::apply(bool evaled, ValuesSpan values,
                             const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
   checkArgsIs("eval", values, 1);
-  return {evaled ? values[0] : EvalFnStack::top()(values[0], evalEnv), env};
+  return {evaled ? values[0] : EvalFnStack::top()(values[0], evalEnv), env_};
 }
 
 } // namespace mal

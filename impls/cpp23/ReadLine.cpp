@@ -49,12 +49,12 @@ ReadLine::ReadLine(const std::string &file)
 }
 
 std::optional<std::string> ReadLine::get(const std::string &prompt) {
-  if (last_ != id) {
+  if (last_ != id_) {
     clear_history();
     for (auto &&line : lines_) {
       add_history(line.c_str());
     }
-    last_ = id;
+    last_ = id_;
   }
 
   auto &&line = guardedString(readline(prompt.c_str()));

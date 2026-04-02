@@ -99,7 +99,7 @@ public:
   }
 
   explicit SPSCList(const ALLOCATOR &allocator = ALLOCATOR())
-      : node_allocator_(allocator), head_{new_node(nullptr, nullptr)} {}
+      : nodeAllocator_(allocator), head_{new_node(nullptr, nullptr)} {}
 
   void erase_next(Iterator<false> iter) {
     assert(iter.current_);
@@ -125,15 +125,15 @@ private:
   [[nodiscard]]
   Node *new_node(Node *head, ARGS &&...args) {
     Node *node =
-        std::allocator_traits<NodeAllocator>::allocate(node_allocator_, 1);
+        std::allocator_traits<NodeAllocator>::allocate(nodeAllocator_, 1);
     try {
       std::construct_at(node, head);
       std::uninitialized_construct_using_allocator(std::addressof(node->value_),
-                                                   node_allocator_,
+                                                   nodeAllocator_,
                                                    std::forward<ARGS>(args)...);
       return node;
     } catch (...) {
-      std::allocator_traits<NodeAllocator>::deallocate(node_allocator_, node,
+      std::allocator_traits<NodeAllocator>::deallocate(nodeAllocator_, node,
                                                        1);
       throw;
     }
@@ -141,13 +141,13 @@ private:
 
   void delete_node(Node *node) {
     assert(node);
-    std::allocator_traits<NodeAllocator>::destroy(node_allocator_,
+    std::allocator_traits<NodeAllocator>::destroy(nodeAllocator_,
                                                   std::addressof(node->value_));
-    std::allocator_traits<NodeAllocator>::deallocate(node_allocator_, node, 1);
+    std::allocator_traits<NodeAllocator>::deallocate(nodeAllocator_, node, 1);
   }
 
   [[no_unique_address]]
-  NodeAllocator node_allocator_;
+  NodeAllocator nodeAllocator_;
 
   class Head {
   public:

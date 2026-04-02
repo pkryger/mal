@@ -44,8 +44,8 @@ public:
                                          std::string_view, Key>;
 
   struct PreHashedKey {
-    HashKeyView key;
-    std::size_t hash;
+    HashKeyView key_;
+    std::size_t hash_;
   };
 
   struct Hash {
@@ -66,7 +66,7 @@ public:
     }
 
     std::size_t operator()(const PreHashedKey &phk) const {
-      return phk.hash;
+      return phk.hash_;
     }
   };
 
@@ -87,7 +87,7 @@ public:
     }
 
     bool operator()(KeyView lhs, const PreHashedKey &rhs) const {
-      return lhs == rhs.key;
+      return lhs == rhs.key_;
     }
   };
   using Map = std::unordered_map<Key, ValuePtr, Hash, Equal>;
@@ -109,17 +109,17 @@ public:
     Iterator(Iterator &&) = default;
     Iterator& operator=(Iterator &&) = default;
     ~Iterator() = default;
-    explicit Iterator(value_type *current) noexcept : current{current} {}
+    explicit Iterator(value_type *current) noexcept : current_{current} {}
 
 
-    value_type &operator*() noexcept { return *current; }
-    value_type &operator*() const noexcept { return *current; }
+    value_type &operator*() noexcept { return *current_; }
+    value_type &operator*() const noexcept { return *current_; }
 
-    value_type *operator->() noexcept { return current; }
-    value_type *operator->() const noexcept { return current; }
+    value_type *operator->() noexcept { return current_; }
+    value_type *operator->() const noexcept { return current_; }
 
     Iterator &operator++() noexcept {
-      current = current->outer_.get();
+      current_ = current_->outer_.get();
       return *this;
     }
 
@@ -129,17 +129,17 @@ public:
 
     friend constexpr bool operator==(const Iterator &lhs,
                                      const Iterator &rhs) noexcept {
-      return lhs.current == rhs.current;
+      return lhs.current_ == rhs.current_;
     }
 
     friend constexpr bool
     operator==(const Iterator &lhs,
                std::default_sentinel_t /*rhs*/) noexcept {
-      return lhs.current == nullptr;
+      return lhs.current_ == nullptr;
     }
 
   private:
-    value_type *current{nullptr};
+    value_type *current_{nullptr};
   };
 
   explicit EnvBase(EnvPtr outer) noexcept

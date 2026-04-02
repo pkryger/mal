@@ -153,7 +153,7 @@ private:
   inline static std::size_t last_{};
   detail::CyclicBuffer<std::string> lines_;
   std::shared_ptr<const char> historyFile_;
-  std::size_t id{++counter_};
+  std::size_t id_{++counter_};
 };
 
 } // namespace mal

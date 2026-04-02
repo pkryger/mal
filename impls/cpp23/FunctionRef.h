@@ -82,7 +82,7 @@ private:
   // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access) - wrapper over a union
   union Storage {
     void *obj_;
-    void const *const_obj_;
+    void const *constObj_;
     RET (*fn_)(ARGS...) noexcept(NOEX);
 
     constexpr explicit Storage() noexcept : obj_{nullptr} {}
@@ -90,7 +90,7 @@ private:
     template <typename T> constexpr explicit Storage(T *ptr) noexcept {
       if constexpr (std::is_object_v<T>) {
         if constexpr (std::is_const_v<T>) {
-          const_obj_ = ptr;
+          constObj_ = ptr;
         } else {
           obj_ = ptr;
         }
@@ -104,7 +104,7 @@ private:
   template <typename T> static constexpr auto get(Storage storage) noexcept {
       if constexpr (std::is_object_v<T>) {
         if constexpr (std::is_const_v<T>) {
-          return static_cast<T *>(storage.const_obj_);
+          return static_cast<T *>(storage.constObj_);
         } else {
           return static_cast<T *>(storage.obj_);
         }
