@@ -18,7 +18,7 @@ namespace detail {
 
 template <typename FN> class FnStack {
 public:
-  using StackType = std::stack<std::function_ref<FN>>;
+  using StackType = std::stack<FunctionRef<FN>>;
 
   static StackType::value_type &top() { return stack.top(); }
 

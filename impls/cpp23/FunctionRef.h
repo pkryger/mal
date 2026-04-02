@@ -118,12 +118,4 @@ private:
 
 } // namespace mal
 
-#ifndef __cpp_lib_function_ref
-namespace std {
-
-template <typename... Ts> using function_ref = ::mal::FunctionRef<Ts...>;
-
-} // namespace std
-#endif
-
 #endif // INCLUDE_FUNCTIONREF
