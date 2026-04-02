@@ -119,7 +119,7 @@ InvocableResult specialDo(std::string_view name, ValuesSpan values,
 }
 
 InvocableResult specialQuote(std::string_view name, ValuesSpan values,
-                             const EnvPtr &/* env */) {
+                             const EnvPtr &/*env*/) {
   checkArgsIs(name, values, 1);
   return {values[0], {}};
 }

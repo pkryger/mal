@@ -707,7 +707,7 @@ ValuePtr Macro::isEqualTo(ValuePtr rhs) const {
   return FunctionBase::template isEqualImpl<Macro>(rhs);
 }
 
-InvocableResult Macro::apply(bool /* evaled */, ValuesSpan values,
+InvocableResult Macro::apply(bool /*evaled*/, ValuesSpan values,
                              const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
   return {EvalFnStack::top()(body, FunctionBase::makeApplyEnv(values, evalEnv)),

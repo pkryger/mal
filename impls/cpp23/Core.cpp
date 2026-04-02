@@ -225,7 +225,7 @@ InvocableResult count(std::string_view name, ValuesSpan values,
 
 template <typename BINARY_OP>
 InvocableResult compareIntegers(std::string_view name, ValuesSpan values,
-                                const EnvPtr & /*env*/,
+                                const EnvPtr &/*env*/,
                                 BINARY_OP &&binary_op) {
   checkArgsAtLeast(name, values, 2);
   auto notMatching = std::ranges::adjacent_find(
@@ -306,7 +306,7 @@ InvocableResult println(std::string_view /*name*/, ValuesSpan values,
 }
 
 InvocableResult pr_str(std::string_view /*name*/, ValuesSpan values,
-                       const EnvPtr & /*env*/) {
+                       const EnvPtr &/*env*/) {
   static constexpr std::string_view malImpl{"cpp23"};
   if (auto *envImpl =
       // NOLINTNEXTLINE(concurrency-mt-unsafe) - single threaded
@@ -740,7 +740,7 @@ InvocableResult dissoc(std::string_view name, ValuesSpan values,
 }
 
 InvocableResult readline(std::string_view name, ValuesSpan values,
-                         const EnvPtr & /*env*/) {
+                         const EnvPtr &/*env*/) {
   static ReadLine coreReadLine{};
   checkArgsIs(name, values, 1);
   if (const auto *prompt = values[0]->dyncast<String>()) {
@@ -830,7 +830,7 @@ InvocableResult with_meta(std::string_view name, ValuesSpan values,
   throwWrongArgument(name, values[0]);
 }
 
-InvocableResult fnQuestion(std::string_view name, ValuesSpan values, const EnvPtr & /*env*/) {
+InvocableResult fnQuestion(std::string_view name, ValuesSpan values, const EnvPtr &/*env*/) {
   checkArgsIs(name, values, 1);
   return {values[0]->isa<Invocable>() && !values[0]->isa<Macro>()
               ? Constant::trueValue()

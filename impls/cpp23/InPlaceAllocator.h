@@ -58,7 +58,7 @@ public:
     return static_cast<T *>(storage_->allocate(sizeof(T) * n));
   }
 
-  void deallocate(T * /*object*/, std::size_t /* n */) noexcept {}
+  void deallocate(T */*object*/, std::size_t /*n*/) noexcept {}
 
   friend bool operator==(const InPlaceAllocator &lhs,
                          const InPlaceAllocator &rhs) {

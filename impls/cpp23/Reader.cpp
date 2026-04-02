@@ -140,7 +140,7 @@ void Tokeniser::nextToken() {
       std::format("mismatch from: {}", std::string{pos_, str_.end()})};
 }
 
-ValuePtr readForm(Tokeniser & /* tokeniser */);
+ValuePtr readForm(Tokeniser &/*tokeniser*/);
 
 // NOLINTNEXTLINE(misc-no-recursion)
 ValuesContainer readSequence(Tokeniser &tokeniser, const std::string &end) {

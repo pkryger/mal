@@ -81,7 +81,7 @@ class Value : public RttiBase, public GarbageCollectible, public std::enable_sha
 public:
   virtual std::string print(PrintType readably) const = 0;
 
-  virtual ValuePtr eval(const EnvPtr & /* env */) const
+  virtual ValuePtr eval(const EnvPtr &/*env*/) const
   { return shared_from_this(); }
 
   bool isTrue() const noexcept;
@@ -107,7 +107,7 @@ public:
   explicit Integer(std::int64_t value) noexcept
       : Value{typeInfo<Integer>.low_}, data{value} {}
 
-  std::string print(PrintType /* readably */) const override {
+  std::string print(PrintType /*readably*/) const override {
     return std::to_string(data);
   }
 
@@ -128,7 +128,7 @@ class Symbol;
 
 class StringBase : public Value {
 public:
-  std::string print(PrintType /* readably */) const override { return data_; }
+  std::string print(PrintType /*readably*/) const override { return data_; }
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   friend bool operator==(const StringBase &lhs,
@@ -267,7 +267,7 @@ namespace detail {
 
 template <typename BASE> class Intern<std::string, BASE> {
 public:
-  explicit Intern(const std::string & /*unused*/) noexcept {};
+  explicit Intern(const std::string &/*unused*/) noexcept {};
 
   Intern(const Intern &) noexcept = default;
   Intern& operator=(const Intern &) noexcept = default;
@@ -275,7 +275,7 @@ public:
   Intern& operator=(Intern &&) noexcept = default;
   ~Intern() noexcept = default;
 
-  friend void swap(Intern & /*lhs*/, Intern & /*rhs*/) noexcept {}
+  friend void swap(Intern &/*lhs*/, Intern &/*rhs*/) noexcept {}
 
 protected:
   template <typename KEY_VIEW> KEY_VIEW asKey() const {
@@ -647,7 +647,7 @@ public:
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  std::string print(PrintType /* readably */) const override {
+  std::string print(PrintType /*readably*/) const override {
     return std::format("#<built-in {}@{:p}>", name_,
                        static_cast<const void *>(this));
   }
@@ -756,7 +756,7 @@ public:
 
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  InvocableResult apply(bool /* evaled */, ValuesSpan values,
+  InvocableResult apply(bool /*evaled*/, ValuesSpan values,
                         const EnvPtr &evalEnv) const override;
 
 };
@@ -770,7 +770,7 @@ public:
       : Invocable{typeInfo<Eval>.low_}, MetaMixIn{std::move(meta)},
         env{other.env} {}
 
-  std::string print(PrintType /* readably */) const override {
+  std::string print(PrintType /*readably*/) const override {
     return std::format("#<eval@{:p}>", static_cast<const void *>(this));
   }
 

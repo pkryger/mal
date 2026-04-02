@@ -18,7 +18,7 @@ using namespace mal;
 
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
-ValuePtr EVAL(ValuePtr val, const EnvPtr &/* envPtr */) {
+ValuePtr EVAL(ValuePtr val, const EnvPtr &/*envPtr*/) {
   assert(val);
   return val;
 }
