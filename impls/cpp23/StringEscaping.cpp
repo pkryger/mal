@@ -14,14 +14,12 @@
 #include <utility>
 #endif // MAL_HAVE_NEON
 
-
-
 // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
 
 namespace {
 
-void maybe_escape_and_append_character(char c, std::string &out) {
-  switch (c) {
+void maybe_escape_and_append_character(char chr, std::string &out) {
+  switch (chr) {
   case '\\':
     out += "\\\\";
     break;
@@ -32,7 +30,7 @@ void maybe_escape_and_append_character(char c, std::string &out) {
     out += "\\\"";
     break;
   default:
-    out += c;
+    out += chr;
   }
 }
 

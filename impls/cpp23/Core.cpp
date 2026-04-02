@@ -783,8 +783,8 @@ InvocableResult seq(std::string_view name, ValuesSpan values,
     if (string->data().empty()) {
       return {Constant::nilValue(), {}};
     }
-    return {make<List>(string->data() | std::views::transform([](auto &&c) {
-                         return make<String>(std::string{c});
+    return {make<List>(string->data() | std::views::transform([](auto &&chr) {
+                         return make<String>(std::string{chr});
                        })),
             {}};
   }
