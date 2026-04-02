@@ -1,5 +1,7 @@
 #include "Reader.h" // IWYU pragma: associated
 #include "Mal.h"
+#include "StringEscaping.h"
+
 #include <charconv>
 #include <iterator>
 // NOLINTNEXTLINE(readability-use-concise-preprocessor-directives) - consistent checks
@@ -165,7 +167,7 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
   tokeniser.nextToken();
 
   if (token.front() == '"') {
-    return make<String>(String::unescape(token));
+    return make<String>(mal::unescapeString(token));
   }
 
   if (token.front() == ':') {

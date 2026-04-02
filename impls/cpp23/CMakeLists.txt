@@ -72,6 +72,7 @@ target_sources(mal
       Reader.h
       ReadLine.h
       Specials.h
+      StringEscaping.h
       Types.h
   PRIVATE
     Core.cpp
@@ -79,6 +80,7 @@ target_sources(mal
     ReadLine.cpp
     Reader.cpp
     Specials.cpp
+    StringEscaping.cpp
     Types.cpp
 )
 target_include_directories(mal PUBLIC ${READLINE_INCLUDE_DIRS})

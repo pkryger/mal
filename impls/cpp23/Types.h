@@ -425,9 +425,6 @@ public:
   std::string print(PrintType readably) const override;
 
   const std::string &data() const { return StringBase::data_; }
-
-  static std::string unescape(std::string_view input);
-  static std::string escape(std::string_view input);
 };
 
 class Atom final : public Value {
