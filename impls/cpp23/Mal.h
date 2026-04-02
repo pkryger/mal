@@ -36,7 +36,7 @@ public:
     Guard &operator=(const Guard &) = delete;
     Guard &operator=(Guard &&) = delete;
 
-    ~Guard() {
+    ~Guard() noexcept {
       stack.pop();
     }
   };

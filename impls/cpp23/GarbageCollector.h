@@ -113,7 +113,7 @@ public:
   SPSCList(SPSCList &&) = delete;
   SPSCList& operator=(SPSCList &&) = delete;
 
-  ~SPSCList() {
+  ~SPSCList() noexcept {
     Node *current = head_.get();
     while (current) {
       delete_node(std::exchange(current, current->next_));
@@ -139,7 +139,7 @@ private:
     }
   }
 
-  void delete_node(Node *node) {
+  void delete_node(Node *node) noexcept {
     assert(node);
     std::allocator_traits<NodeAllocator>::destroy(nodeAllocator_,
                                                   std::addressof(node->value_));
@@ -246,7 +246,7 @@ public:
   GarbageCollector(GarbageCollector &&) = delete;
   GarbageCollector& operator=(GarbageCollector &&) = delete;
 
-  ~GarbageCollector() {
+  ~GarbageCollector() noexcept {
     thread_.request_stop();
     cv_.notify_all();
   }
