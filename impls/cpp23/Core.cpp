@@ -85,7 +85,6 @@ void throwWrongArgument(std::string_view name, ValuePtr val) {
 } // namespace mal
 
 
-// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 namespace {
 using mal::Atom;
 using mal::Constant;
@@ -307,7 +306,7 @@ InvocableResult pr_str(std::string_view /* name */, ValuesSpan values,
                        const EnvPtr & /* env */) {
   static constexpr std::string_view malImpl{"cpp23"};
   if (auto envImpl =
-          // NOLINTNEXTLINE(concurrency-mt-unsafe) - single threaded
+      // NOLINTNEXTLINE(concurrency-mt-unsafe) - single threaded
       std::getenv("MAL_IMPL");
       envImpl && envImpl == malImpl) {
     return {make<String>(std::format("{:l}", values)), {}};
@@ -839,8 +838,6 @@ InvocableResult fnQuestion(std::string_view name, ValuesSpan values, const EnvPt
 }
 
 } // namespace
-
-// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
 namespace mal {
 void prepareEnv(Env &env) {

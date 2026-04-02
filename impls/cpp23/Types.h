@@ -1,6 +1,7 @@
 #ifndef INCLUDE_TYPES_H
 #define INCLUDE_TYPES_H
 
+#include "FunctionRef.h"
 #if !defined(__cpp_lib_ranges_chunk)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_chunk
@@ -172,9 +173,6 @@ namespace mal {
 
 bool operator==(const ValuePtr &lhs, const ValuePtr &rhs);
 
-// NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-// std::fromat_parse_context doesn't provide an iterator wrapper
-
 struct ParseValueMixin {
   constexpr auto parse(std::format_parse_context &ctx) {
     auto it = ctx.begin();
@@ -216,7 +214,6 @@ constexpr auto RangeFormatterParse(RANGE_FORMATTER &rf,
   }
   return it;
 }
-// NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 } // namespace mal
 
@@ -583,10 +580,8 @@ public:
 #endif //__cpp_lib_ranges_chunk
                                   | std::views::reverse |
                                   std::views::transform([](auto &&chunk) {
-                                    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                     assert(chunk[0]->template isa<StringBase>());
                                     return std::tie(chunk[0], chunk[1]);
-                                    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                   })} {
   }
 
@@ -642,12 +637,12 @@ public:
                                     const EnvPtr &Env);
 
   explicit BuiltIn(std::string name, HandlerFn &handler) noexcept
-      : Invocable{typeInfo<BuiltIn>.lo}, name{std::move(name)},
-        handler{handler} {}
+      : Invocable{typeInfo<BuiltIn>.lo}, name_{std::move(name)},
+        handler_{handler} {}
 
   explicit BuiltIn(const BuiltIn &other, ValuePtr meta)
       : Invocable{typeInfo<BuiltIn>.lo}, MetaMixIn{std::move(meta)},
-        name{other.name}, handler{other.handler} {}
+        name_{other.name_}, handler_{other.handler_} {}
 
   InvocableResult apply(bool evaled, ValuesSpan values,
                         const EnvPtr &evalEnv) const override;
@@ -655,20 +650,19 @@ public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
   std::string print(PrintType /* readably */) const override {
-    return std::format("#<built-in {}@{:p}>", name,
+    return std::format("#<built-in {}@{:p}>", name_,
                        static_cast<const void *>(this));
   }
 
-  Env::Key asKey() const { return Symbol{name}.asKey(); }
+  Env::Key asKey() const { return Symbol{name_}.asKey(); }
 
   ValuePtr cloneWithMeta(ValuePtr meta) const override {
     return make<BuiltIn>(*this, std::move(meta));
   }
 
 private:
-  std::string name;
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
-  HandlerFn &handler;
+  std::string name_;
+  FunctionRef<HandlerFn> handler_;
 };
 
 class FunctionBase : public Invocable {

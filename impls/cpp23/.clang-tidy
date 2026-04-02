@@ -1,0 +1,102 @@
+---
+Checks:          '-*,
+  clang-analyzer-*,
+  clang-diagnostic-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  performance-*,
+  portability-*,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-non-private-member-variables-in-classes'
+WarningsAsErrors: ''
+HeaderFileExtensions:
+  - ''
+  - h
+  - hh
+  - hpp
+  - hxx
+ImplementationFileExtensions:
+  - c
+  - cc
+  - cpp
+  - cxx
+HeaderFilterRegex: '.*/impls/cpp23/.*'
+ExcludeHeaderFilterRegex: ''
+FormatStyle:     none
+CheckOptions:
+  concurrency-mt-unsafe.FunctionSet: any
+  cppcoreguidelines-avoid-c-arrays.AllowStringArrays: 'false'
+  cppcoreguidelines-avoid-do-while.IgnoreMacros: 'false'
+  cppcoreguidelines-avoid-goto.IgnoreMacros: 'false'
+  cppcoreguidelines-avoid-magic-numbers.IgnoreAllFloatingPointValues: 'false'
+  cppcoreguidelines-avoid-magic-numbers.IgnoreBitFieldsWidths: 'true'
+  cppcoreguidelines-avoid-magic-numbers.IgnorePowersOf2IntegerValues: 'false'
+  cppcoreguidelines-avoid-magic-numbers.IgnoreTypeAliases: 'false'
+  cppcoreguidelines-avoid-magic-numbers.IgnoreUserDefinedLiterals: 'false'
+  cppcoreguidelines-avoid-magic-numbers.IgnoredFloatingPointValues: '1.0;100.0;'
+  cppcoreguidelines-avoid-magic-numbers.IgnoredIntegerValues: '1;2;3;4;'
+  cppcoreguidelines-avoid-non-const-global-variables.AllowInternalLinkage: 'false'
+  cppcoreguidelines-explicit-virtual-functions.AllowOverrideAndFinal: 'false'
+  cppcoreguidelines-explicit-virtual-functions.FinalSpelling: final
+  cppcoreguidelines-explicit-virtual-functions.IgnoreDestructors: 'false'
+  cppcoreguidelines-explicit-virtual-functions.IgnoreTemplateInstantiations: 'false'
+  cppcoreguidelines-explicit-virtual-functions.OverrideSpelling: override
+  cppcoreguidelines-init-variables.IncludeStyle: llvm
+  cppcoreguidelines-init-variables.MathHeader: '<math.h>'
+  cppcoreguidelines-macro-usage.AllowedRegexp: '^DEBUG_*'
+  cppcoreguidelines-macro-usage.CheckCapsOnly: 'false'
+  cppcoreguidelines-macro-usage.IgnoreCommandLineMacros: 'true'
+  cppcoreguidelines-missing-std-forward.ForwardFunction: '::std::forward'
+  cppcoreguidelines-narrowing-conversions.IgnoreConversionFromTypes: ''
+  cppcoreguidelines-narrowing-conversions.PedanticMode: 'false'
+  cppcoreguidelines-narrowing-conversions.WarnOnEquivalentBitWidth: 'true'
+  cppcoreguidelines-narrowing-conversions.WarnOnFloatingPointNarrowingConversion: 'true'
+  cppcoreguidelines-narrowing-conversions.WarnOnIntegerNarrowingConversion: 'true'
+  cppcoreguidelines-narrowing-conversions.WarnOnIntegerToFloatingPointNarrowingConversion: 'true'
+  cppcoreguidelines-narrowing-conversions.WarnWithinTemplateInstantiation: 'false'
+  cppcoreguidelines-no-malloc.Allocations: '::malloc;::calloc'
+  cppcoreguidelines-no-malloc.Deallocations: '::free'
+  cppcoreguidelines-no-malloc.Reallocations: '::realloc'
+  cppcoreguidelines-no-suspend-with-lock.LockGuards: '::std::unique_lock;::std::scoped_lock;::std::shared_lock;::std::lock_guard'
+  cppcoreguidelines-owning-memory.LegacyResourceConsumers: '::free;::realloc;::freopen;::fclose'
+  cppcoreguidelines-owning-memory.LegacyResourceProducers: '::malloc;::aligned_alloc;::realloc;::calloc;::fopen;::freopen;::tmpfile'
+  cppcoreguidelines-pro-bounds-constant-array-index.GslHeader: ''
+  cppcoreguidelines-pro-bounds-constant-array-index.IncludeStyle: llvm
+  cppcoreguidelines-pro-bounds-pointer-arithmetic.AllowIncrementDecrementOperators: 'true'
+  cppcoreguidelines-pro-type-const-cast.StrictMode: 'false'
+  cppcoreguidelines-pro-type-member-init.IgnoreArrays: 'false'
+  cppcoreguidelines-pro-type-member-init.UseAssignment: 'false'
+  cppcoreguidelines-pro-type-static-cast-downcast.StrictMode: 'true'
+  cppcoreguidelines-rvalue-reference-param-not-moved.AllowPartialMove: 'false'
+  cppcoreguidelines-rvalue-reference-param-not-moved.IgnoreNonDeducedTemplateTypes: 'false'
+  cppcoreguidelines-rvalue-reference-param-not-moved.IgnoreUnnamedParams: 'false'
+  cppcoreguidelines-rvalue-reference-param-not-moved.MoveFunction: '::std::move'
+  cppcoreguidelines-special-member-functions.AllowImplicitlyDeletedCopyOrMove: 'false'
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions: 'false'
+  cppcoreguidelines-special-member-functions.AllowMissingMoveFunctionsWhenCopyIsDeleted: 'false'
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: 'false'
+  cppcoreguidelines-special-member-functions.IgnoreMacros: 'true'
+  cppcoreguidelines-use-default-member-init.IgnoreMacros: 'true'
+  cppcoreguidelines-use-default-member-init.UseAssignment: 'false'
+  cppcoreguidelines-use-enum-class.IgnoreUnscopedEnumsInClasses: 'false'
+  performance-enum-size.EnumIgnoreList: ''
+  performance-faster-string-find.StringLikeClasses: '::std::basic_string;::std::basic_string_view'
+  performance-for-range-copy.AllowedTypes: ''
+  performance-for-range-copy.WarnOnAllAutoCopies: 'false'
+  performance-inefficient-string-concatenation.StrictMode: 'false'
+  performance-inefficient-vector-operation.EnableProto: 'false'
+  performance-inefficient-vector-operation.VectorLikeClasses: '::std::vector'
+  performance-move-const-arg.CheckMoveToConstRef: 'true'
+  performance-move-const-arg.CheckTriviallyCopyableMove: 'true'
+  performance-no-automatic-move.AllowedTypes: ''
+  performance-type-promotion-in-math-fn.IncludeStyle: llvm
+  performance-unnecessary-copy-initialization.AllowedTypes: ''
+  performance-unnecessary-copy-initialization.ExcludedContainerTypes: ''
+  performance-unnecessary-value-param.AllowedTypes: ''
+  performance-unnecessary-value-param.IgnoreCoroutines: 'true'
+  performance-unnecessary-value-param.IncludeStyle: llvm
+  portability-restrict-system-includes.Includes: '*'
+  portability-simd-intrinsics.Std: ''
+  portability-simd-intrinsics.Suggest: 'false'
+SystemHeaders:   false
+...

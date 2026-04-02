@@ -1,6 +1,7 @@
 #include "Reader.h" // IWYU pragma: associated
 #include "Mal.h"
 #include <charconv>
+#include <iterator>
 #if !defined(__cpp_lib_ranges_stride)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_stride
@@ -77,7 +78,8 @@ private:
   auto tokenSize() const {
     auto size = token_.size();
     if (size > static_cast<decltype(size)>(
-                   std::numeric_limits<std::string::difference_type>::max())) {
+                   std::numeric_limits<std::string::difference_type>::max()))
+        [[unlikely]] {
       throw ReaderException(
           std::format("token at pos {} too big {}", pos_ - str_.begin(), size));
     }
@@ -102,7 +104,6 @@ bool Tokeniser::match(const std::regex &regex) {
   assert(match.position(0) == 0);
   assert(match.length(0) > 0);
   token_ =
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access) - already checked
     {match[0].first, match[0].second};
   return true;
 }
@@ -173,8 +174,12 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
     // NOLINTNEXTLINE(cppcoreguidelines-init-variables) - use as an output
     std::int64_t value;
     auto [_, ec] = std::from_chars(
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - this is iterator
-        token.begin() + (token.front() == '+' ? 1 : 0),
+        [&]() {
+          if (token.front() == '+') {
+            return std::next(token.begin());
+          }
+          return token.begin();
+        }(),
         token.end(), value);
 
     if (ec != std::errc{}) [[unlikely]] {

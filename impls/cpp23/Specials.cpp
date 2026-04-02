@@ -22,7 +22,6 @@
 #include <type_traits>
 // IWYU pragma: no_include <tuple>
 
-// NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 namespace mal {
 InvocableResult specialDefBang(std::string_view name, ValuesSpan values,
                                const EnvPtr &env) {
@@ -252,7 +251,5 @@ InvocableResult specialTryStar(std::string_view name, ValuesSpan values,
   throw EvalException{
       std::format("invalid '{}' argument {:r}", name, values[1])};
 }
-
-// NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
 } // namespace mal

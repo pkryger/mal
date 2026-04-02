@@ -38,8 +38,6 @@ public:
       assert(current_ < buffer_->data_.size());
     }
 
-    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-    // access buffer is UB when not checked against END
     value_type &operator*() noexcept
       requires(!CONST)
     {
@@ -63,7 +61,6 @@ public:
       assert(current_ < buffer_->data_.size());
       return std::addressof(buffer_->data_[current_]);
     }
-    // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
 
     Iterator &operator++() {
       if (buffer_->empty()) {

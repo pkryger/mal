@@ -137,7 +137,7 @@ ValuePtr Constant::isEqualTo(ValuePtr rhs) const {
 } // namespace mal
 
 namespace {
-// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-avoid-unchecked-container-access) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
+// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic) - escape and unescape is about pointer arithmetic and ARM NEON intrinsics
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 
@@ -462,7 +462,7 @@ std::string String::escape(std::string_view in) {
 
 #endif // !(defined(__aarch64__) || defined(_M_ARM64))
 
-// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic, cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast, cppcoreguidelines-pro-bounds-pointer-arithmetic)
 
 std::string String::print(PrintType readably) const {
   return readably ? escape(StringBase::data_) : StringBase::data_;
@@ -531,7 +531,6 @@ ValuePtr List::eval(const EnvPtr &env) const {
   }
   auto &evalFn = EvalFnStack::top();
   auto [ast, evalEnv] = [&]() {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access) - data.empty() has been checked
     auto op = evalFn(data[0], env);
     if (auto invocable = op->dyncast<Invocable>()) {
       return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
@@ -574,10 +573,8 @@ Hash::Hash(const Hash &other, ValuesSpan values)
                                mal::views::Chunk(2)
 #endif // __cpp_lib_ranges_chunk
                                | std::views::transform([](auto &&chunk) {
-                                   // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                    assert(chunk[0]->template isa<StringBase>());
                                    return std::tie(chunk[0], chunk[1]);
-                                   // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
                                  })) {
     data.insert_or_assign(key, value);
   }
@@ -593,10 +590,10 @@ ValuePtr Hash::find(const ValuePtr &key) const {
 InvocableResult BuiltIn::apply(bool evaled, ValuesSpan values,
                                const EnvPtr &evalEnv) const {
   if (evaled) {
-    return handler(name, values, evalEnv);
+    return handler_(name_, values, evalEnv);
   }
   return WithEvaledValues{values, evalEnv}([&](auto &&values) {
-    return handler(name, std::forward<decltype(values)>(values), evalEnv);
+    return handler_(name_, std::forward<decltype(values)>(values), evalEnv);
   });
 }
 
@@ -605,7 +602,7 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
     return Constant::trueValue();
   }
   if (auto other = rhs->dyncast<BuiltIn>();
-      other && handler == other->handler) {
+      other && name_ == other->name_) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -718,7 +715,6 @@ InvocableResult Eval::apply(bool evaled, ValuesSpan values,
                             const EnvPtr &evalEnv) const {
   assert(!EvalFnStack::empty());
   checkArgsIs("eval", values, 1);
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
   return {evaled ? values[0] : EvalFnStack::top()(values[0], evalEnv), env};
 }
 

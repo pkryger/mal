@@ -25,11 +25,10 @@ public:
   void *allocate(std::size_t n) {
     assert(current_ <= buffer_.size());
     assert(n <= buffer_.size() - current_);
-    if (n > buffer_.size() - current_)
-        [[unlikely]] {
+    if (n > buffer_.size() - current_) [[unlikely]] {
       throw std::bad_alloc();
     }
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - raw memory
     return buffer_.data() + std::exchange(current_, current_ + n);
   }
 

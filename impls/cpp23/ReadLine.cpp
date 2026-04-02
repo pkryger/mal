@@ -42,9 +42,7 @@ ReadLine::ReadLine(const std::string &file)
       lines_{ReadLineHistorySize}, historyFile_{std::shared_ptr<const char>{
                                       tilde_expand(file.c_str()), std::free}} {
   read_history(historyFile_.get());
-  for (auto line = history_list(); line && *line;
-       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) - C style API
-       ++line) {
+  for (auto line = history_list(); line && *line; ++line) {
     lines_.push((*line)->line);
   }
 }
