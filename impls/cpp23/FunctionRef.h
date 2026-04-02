@@ -46,6 +46,7 @@ public:
 
   template <typename FUNC>
     requires std::is_function_v<FUNC> && IsInvocableUsing<FUNC>
+  // NOLINTNEXTLINE(google-explicit-constructor) - API
   constexpr FunctionRef(FUNC *func_ptr) noexcept
       : storage_{func_ptr},
         callback_{
@@ -60,6 +61,7 @@ public:
         !IsFunctionRef<std::remove_cv_t<FUNC>> &&
         !std::is_member_function_pointer_v<std::remove_reference_t<FUNC>> &&
         IsInvocableUsing<FUNC>)
+  // NOLINTNEXTLINE(google-explicit-constructor) - API
   constexpr FunctionRef(const FUNC &obj) noexcept
       : storage_(std::addressof(obj)),
         callback_{

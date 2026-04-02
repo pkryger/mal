@@ -13,6 +13,7 @@
 #include <utility>
 
 namespace {
+// NOLINTNEXTLINE(google-build-using-namespace)
 using namespace mal;
 
 ValuePtr READ(const std::string &str) { return readStr(str); }

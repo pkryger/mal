@@ -22,7 +22,7 @@ class SPSCList {
 public:
   class Node {
   public:
-    Node(Node *next): next_{next} {};
+    explicit Node(Node *next): next_{next} {};
   private:
     friend class SPSCList;
     Node *next_;
@@ -77,7 +77,7 @@ public:
 
   private:
     friend class SPSCList;
-    Iterator(Node *current) : current_{current} {}
+    explicit Iterator(Node *current) : current_{current} {}
     Node *current_;
   };
 

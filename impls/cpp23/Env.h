@@ -104,7 +104,7 @@ public:
     using iterator_concept = std::forward_iterator_tag;
 
     Iterator() = default;
-    explicit Iterator(const Iterator&) = default;
+    Iterator(const Iterator&) = default;
     Iterator& operator=(const Iterator&) = default;
     Iterator(Iterator &&) = default;
     Iterator& operator=(Iterator &&) = default;
@@ -189,7 +189,7 @@ private:
 
 class Env : public EnvBase {
 public:
-  Env(EnvPtr outer) : EnvBase{std::move(outer)} {}
+  explicit Env(EnvPtr outer) : EnvBase{std::move(outer)} {}
 
   void insert_or_assign(Key key, ValuePtr value) override;
 

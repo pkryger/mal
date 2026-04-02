@@ -51,7 +51,7 @@ public:
       : storage_{std::addressof(storage)} {}
 
   template <typename U>
-  InPlaceAllocator(InPlaceAllocator<U, SIZE> &other) noexcept
+  explicit InPlaceAllocator(InPlaceAllocator<U, SIZE> &other) noexcept
       : storage_{other.storage_} {}
 
   T *allocate(std::size_t n) {

@@ -5,6 +5,7 @@ Checks:          '-*,
   clang-diagnostic-*,
   concurrency-*,
   cppcoreguidelines-*,
+  google-*,
   misc-*,
   modernize-*,
   performance-*,
@@ -13,6 +14,7 @@ Checks:          '-*,
   -cert-err58-cpp,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
   -cppcoreguidelines-non-private-member-variables-in-classes,
+  -google-objc-*,
   -modernize-use-trailing-return-type,
   -misc-multiple-inheritance,
   -misc-non-private-member-variables-in-classes'
@@ -131,6 +133,21 @@ CheckOptions:
   cppcoreguidelines-use-default-member-init.IgnoreMacros: 'true'
   cppcoreguidelines-use-default-member-init.UseAssignment: 'false'
   cppcoreguidelines-use-enum-class.IgnoreUnscopedEnumsInClasses: 'false'
+  google-readability-braces-around-statements.ShortStatementLines: '1'
+  google-readability-function-size.BranchThreshold: none
+  google-readability-function-size.CountMemberInitAsStmt: 'true'
+  google-readability-function-size.LineThreshold: none
+  google-readability-function-size.NestingThreshold: none
+  google-readability-function-size.ParameterThreshold: none
+  google-readability-function-size.StatementThreshold: '800'
+  google-readability-function-size.VariableThreshold: none
+  google-readability-namespace-comments.AllowOmittingNamespaceComments: 'false'
+  google-readability-namespace-comments.ShortNamespaceLines: '10'
+  google-readability-namespace-comments.SpacesBeforeComments: '2'
+  google-readability-todo.Style: Hyphen
+  google-runtime-int.SignedTypePrefix: int
+  google-runtime-int.TypeSuffix: ''
+  google-runtime-int.UnsignedTypePrefix: uint
   misc-const-correctness.AllowedTypes: ''
   misc-const-correctness.AnalyzePointers: 'true'
   misc-const-correctness.AnalyzeReferences: 'true'

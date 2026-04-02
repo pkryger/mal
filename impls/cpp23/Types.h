@@ -48,6 +48,7 @@ public:
     Readably = 2
   };
 
+  // NOLINTNEXTLINE(google-explicit-constructor)
   constexpr PrintType(Type type) noexcept : type_(type) {}
 
   constexpr explicit operator bool() const noexcept {
@@ -268,7 +269,7 @@ template <typename BASE> class Intern<std::string, BASE> {
 public:
   explicit Intern(const std::string & /*unused*/) noexcept {};
 
-  explicit Intern(const Intern &) noexcept = default;
+  Intern(const Intern &) noexcept = default;
   Intern& operator=(const Intern &) noexcept = default;
   Intern(Intern &&) noexcept = default;
   Intern& operator=(Intern &&) noexcept = default;
@@ -298,7 +299,7 @@ public:
           return newIntern;
         }()} {}
 
-  explicit Intern(const Intern &) noexcept = default;
+  Intern(const Intern &) noexcept = default;
   Intern& operator=(const Intern &) noexcept = default;
   Intern(Intern &&) noexcept = default;
   Intern& operator=(Intern &&) noexcept = default;
@@ -329,7 +330,7 @@ public:
       : StringBase{typeInfo<Symbol>.low_, value}, Intern{data_},
         fromMacro_{std::move(fromMacro)} {}
 
-  explicit Symbol(const Symbol &other)
+  Symbol(const Symbol &other)
       : StringBase{typeInfo<Symbol>.low_, other.data_}, Intern{other},
         fromMacro_{other.fromMacro_} {}
 
@@ -457,7 +458,7 @@ public:
   explicit MetaMixIn(ValuePtr meta = Constant::nilValue())
       : meta_{std::move(meta)} {}
 
-  explicit MetaMixIn(const MetaMixIn &) noexcept = default;
+  MetaMixIn(const MetaMixIn &) noexcept = default;
   MetaMixIn &operator=(const MetaMixIn &) noexcept = default;
   MetaMixIn(MetaMixIn &&) noexcept = default;
   MetaMixIn& operator=(MetaMixIn &&) noexcept = default;
