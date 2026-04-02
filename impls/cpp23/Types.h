@@ -2,6 +2,7 @@
 #define INCLUDE_TYPES_H
 
 #include "FunctionRef.h"
+// NOLINTNEXTLINE(readability-use-concise-preprocessor-directives) - consistent checks
 #if !defined(__cpp_lib_ranges_chunk)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_chunk
@@ -93,17 +94,17 @@ public:
   ~Value() override = default;
 
 protected:
-  explicit Value(std::uint32_t loId) noexcept : RttiBase{loId} {}
+  explicit Value(std::uint32_t lowId) noexcept : RttiBase{lowId} {}
 
 private:
-  Value() noexcept : RttiBase{typeInfo<Value>.lo} {}
+  Value() noexcept : RttiBase{typeInfo<Value>.low_} {}
 };
 
 
 class Integer final : public Value {
 public:
   explicit Integer(std::int64_t value) noexcept
-      : Value{typeInfo<Integer>.lo}, data{value} {}
+      : Value{typeInfo<Integer>.low_}, data{value} {}
 
   std::string print(PrintType /* readably */) const override {
     return std::to_string(data);
@@ -144,16 +145,16 @@ public:
 
 
 protected:
-  explicit StringBase(std::uint32_t loId, std::string v) noexcept
-      : Value{loId}, data_{std::move(v)} {}
+  explicit StringBase(std::uint32_t lowId, std::string data) noexcept
+      : Value{lowId}, data_{std::move(data)} {}
 
-  explicit StringBase(std::uint32_t loId, std::string_view v) noexcept
-      : Value{loId}, data_{v} {}
+  explicit StringBase(std::uint32_t lowId, std::string_view data) noexcept
+      : Value{lowId}, data_{data} {}
 
   std::string data_;
 
 private:
-  StringBase() noexcept : Value{typeInfo<StringBase>.lo} {}
+  StringBase() noexcept : Value{typeInfo<StringBase>.low_} {}
 };
 
 } // namespace mal
@@ -162,7 +163,7 @@ private:
 // before the first instantiation of ValuesMap, such that hash<ValuePtr>
 // can be defined
 template <> struct std::hash<mal::ValuePtr> {
-  std::size_t operator()(const mal::ValuePtr &o) const;
+  std::size_t operator()(const mal::ValuePtr &value) const;
 };
 
 namespace mal {
@@ -171,44 +172,44 @@ bool operator==(const ValuePtr &lhs, const ValuePtr &rhs);
 
 struct ParseValueMixin {
   constexpr auto parse(std::format_parse_context &ctx) {
-    auto it = ctx.begin();
-    if (it != ctx.end()) {
-      switch (*it) {
+    const auto *iter = ctx.begin();
+    if (iter != ctx.end()) {
+      switch (*iter) {
       case 'r':
         printType = Readably;
-        ++it;
+        ++iter;
         break;
       case 'l':
         printType = MalReadably;
-        ++it;
+        ++iter;
         break;
       }
     }
-    return it;
+    return iter;
   }
   PrintType printType{Simply};
 };
 
 template <typename RANGE_FORMATTER>
-constexpr auto RangeFormatterParse(RANGE_FORMATTER &rf,
+constexpr auto RangeFormatterParse(RANGE_FORMATTER &formatter,
                                    std::format_parse_context &ctx) {
 
-  rf.set_brackets("", "");
-  rf.set_separator(" ");
-  auto it = ctx.begin();
-  if (it != ctx.end()) {
-    switch (*it) {
+  formatter.set_brackets("", "");
+  formatter.set_separator(" ");
+  const auto *iter = ctx.begin();
+  if (iter != ctx.end()) {
+    switch (*iter) {
     case 'r':
-      rf.underlying().printType = Readably;
-      ++it;
+      formatter.underlying().printType = Readably;
+      ++iter;
       break;
     case 'l':
-      rf.underlying().printType = MalReadably;
-      ++it;
+      formatter.underlying().printType = MalReadably;
+      ++iter;
       break;
     }
   }
-  return it;
+  return iter;
 }
 
 } // namespace mal
@@ -265,7 +266,7 @@ namespace detail {
 
 template <typename BASE> class Intern<std::string, BASE> {
 public:
-  explicit Intern(const std::string &) noexcept {};
+  explicit Intern(const std::string & /*unused*/) noexcept {};
 
   explicit Intern(const Intern &) noexcept = default;
   Intern& operator=(const Intern &) noexcept = default;
@@ -273,7 +274,7 @@ public:
   Intern& operator=(Intern &&) noexcept = default;
   ~Intern() noexcept = default;
 
-  friend void swap(Intern &, Intern &) noexcept {}
+  friend void swap(Intern & /*lhs*/, Intern & /*rhs*/) noexcept {}
 
 protected:
   template <typename KEY_VIEW> KEY_VIEW asKey() const {
@@ -289,10 +290,10 @@ public:
   explicit Intern(const std::string &name)
       : intern_{[&]() {
           auto newIntern = ++counter_;
-          auto it = interns_.emplace(name, newIntern);
-          if (!it.second) {
+          auto iter = interns_.emplace(name, newIntern);
+          if (!iter.second) {
             --counter_;
-            return it.first->second;
+            return iter.first->second;
           }
           return newIntern;
         }()} {}
@@ -325,11 +326,11 @@ class Symbol final : public StringBase,
                      public detail::Intern<Env::Key, Symbol> {
 public:
   explicit Symbol(std::string_view value, std::optional<std::string> fromMacro = {})
-      : StringBase{typeInfo<Symbol>.lo, value}, Intern{data_},
+      : StringBase{typeInfo<Symbol>.low_, value}, Intern{data_},
         fromMacro_{std::move(fromMacro)} {}
 
   explicit Symbol(const Symbol &other)
-      : StringBase{typeInfo<Symbol>.lo, other.data_}, Intern{other},
+      : StringBase{typeInfo<Symbol>.low_, other.data_}, Intern{other},
         fromMacro_{other.fromMacro_} {}
 
   Symbol &operator=(const Symbol &other) {
@@ -339,8 +340,8 @@ public:
   }
 
   Symbol(Symbol &&other) noexcept
-      : StringBase{typeInfo<Symbol>.lo, std::move(other.data_)},
-        Intern{std::move(other)}, fromMacro_{} {
+      : StringBase{typeInfo<Symbol>.low_, std::move(other.data_)},
+        Intern{std::move(other)} {
     swap(*this, other);
   }
 
@@ -359,7 +360,7 @@ public:
 
   std::string_view name() const { return data_; }
 
-  ValuePtr isEqualTo(ValuePtr) const override;
+  ValuePtr isEqualTo(ValuePtr /*rhs*/) const override;
 
   friend bool operator==(const Symbol &lhs, const std::string &rhs) {
     return lhs.data_ == rhs;
@@ -385,7 +386,7 @@ inline static const Symbol debugEval{"DEBUG-EVAL"};
 class Keyword final : public StringBase {
 public:
   explicit Keyword(std::string_view value) noexcept
-      : StringBase{typeInfo<Keyword>.lo, value} {}
+      : StringBase{typeInfo<Keyword>.low_, value} {}
 };
 
 class Constant : public StringBase {
@@ -412,26 +413,26 @@ public:
 
 private:
   explicit Constant(std::string value) noexcept
-      : StringBase{typeInfo<Constant>.lo, std::move(value)} {}
+      : StringBase{typeInfo<Constant>.low_, std::move(value)} {}
 };
 
 class String final : public StringBase {
 public:
-  explicit String(std::string v) noexcept
-      : StringBase{typeInfo<String>.lo, std::move(v)} {}
+  explicit String(std::string data) noexcept
+      : StringBase{typeInfo<String>.low_, std::move(data)} {}
 
   std::string print(PrintType readably) const override;
 
   const std::string &data() const { return StringBase::data_; }
 
-  static std::string unescape(std::string_view in);
-  static std::string escape(std::string_view in);
+  static std::string unescape(std::string_view input);
+  static std::string escape(std::string_view input);
 };
 
 class Atom final : public Value {
 public:
   explicit Atom(ValuePtr value) noexcept
-      : Value{typeInfo<Atom>.lo}, data{std::move(value)} {}
+      : Value{typeInfo<Atom>.low_}, data{std::move(value)} {}
 
   std::string print(PrintType readably) const override {
     return readably ? std::format("(atom {:r})", data)
@@ -479,42 +480,42 @@ public:
   std::size_t size() const { return data.size(); }
 
 protected:
-  explicit Sequence(std::uint32_t loId, ValuesContainer data) noexcept
-      : Value{loId}, data{std::move(data)} {}
+  explicit Sequence(std::uint32_t lowId, ValuesContainer data) noexcept
+      : Value{lowId}, data{std::move(data)} {}
 
-  explicit Sequence(std::uint32_t loId, ValuesSpan data) noexcept
-      : Value{loId}, data{std::from_range, data} {}
+  explicit Sequence(std::uint32_t lowId, ValuesSpan data) noexcept
+      : Value{lowId}, data{std::from_range, data} {}
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuePtr>
-  explicit Sequence(std::uint32_t loId, RANGE &&range)
-      : Value{loId}, data{std::from_range, std::forward<RANGE>(range)} {}
+  explicit Sequence(std::uint32_t lowId, RANGE &&range)
+      : Value{lowId}, data{std::from_range, std::forward<RANGE>(range)} {}
 
   ValuesContainer data;
 
 private:
-  Sequence() : Value{typeInfo<Sequence>.lo} {}
+  Sequence() : Value{typeInfo<Sequence>.low_} {}
 };
 
 class List final : public Sequence, public MetaMixIn {
 public:
   explicit List(ValuesContainer values) noexcept
-      : Sequence{typeInfo<List>.lo, std::move(values)} {}
+      : Sequence{typeInfo<List>.low_, std::move(values)} {}
 
   explicit List(ValuesSpan values, ValuePtr meta = {}) noexcept
-      : Sequence{typeInfo<List>.lo, values}, MetaMixIn{std::move(meta)} {}
+      : Sequence{typeInfo<List>.low_, values}, MetaMixIn{std::move(meta)} {}
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuePtr>
   explicit List(RANGE &&range)
-      : Sequence{typeInfo<List>.lo, std::forward<RANGE>(range)} {}
+      : Sequence{typeInfo<List>.low_, std::forward<RANGE>(range)} {}
 
   template <typename... ARGS>
     requires(std::convertible_to<ARGS, ValuePtr> && ...)
   explicit List(ARGS &&...args)
-      : Sequence{typeInfo<List>.lo,
+      : Sequence{typeInfo<List>.low_,
                  ValuesContainer{std::forward<ARGS>(args)...}} {}
 
   std::string print(PrintType readably) const override;
@@ -529,16 +530,16 @@ public:
 class Vector final : public Sequence, public MetaMixIn {
 public:
   explicit Vector(ValuesContainer values) noexcept
-      : Sequence{typeInfo<Vector>.lo, std::move(values)} {}
+      : Sequence{typeInfo<Vector>.low_, std::move(values)} {}
 
   explicit Vector(ValuesSpan values, ValuePtr meta = {}) noexcept
-      : Sequence{typeInfo<Vector>.lo, values}, MetaMixIn{std::move(meta)} {}
+      : Sequence{typeInfo<Vector>.low_, values}, MetaMixIn{std::move(meta)} {}
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuePtr>
   explicit Vector(RANGE &&range)
-      : Sequence{typeInfo<Vector>.lo, std::forward<RANGE>(range)} {}
+      : Sequence{typeInfo<Vector>.low_, std::forward<RANGE>(range)} {}
 
   std::string print(PrintType readably) const override {
     return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
@@ -567,7 +568,7 @@ public:
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuePtr>
   explicit Hash(RANGE &&range)
-      : Value{typeInfo<Hash>.lo},
+      : Value{typeInfo<Hash>.low_},
         data{std::from_range, std::forward<RANGE>(range) |
 #ifdef __cpp_lib_ranges_chunk
                                   std::views::chunk(2)
@@ -585,13 +586,13 @@ public:
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuesMap::value_type>
   explicit Hash(RANGE &&range)
-      : Value{typeInfo<Hash>.lo},
+      : Value{typeInfo<Hash>.low_},
         data{std::from_range, std::forward<RANGE>(range)} {}
 
   explicit Hash(const Hash &other, ValuesSpan values);
 
   explicit Hash(const Hash &other, ValuePtr meta)
-      : Value{typeInfo<Hash>.lo}, MetaMixIn{std::move(meta)}, data{other.data} {
+      : Value{typeInfo<Hash>.low_}, MetaMixIn{std::move(meta)}, data{other.data} {
   }
 
   std::string print(PrintType readably) const override;
@@ -620,10 +621,10 @@ public:
                                 const EnvPtr &evalEnv) const = 0;
 
 protected:
-  explicit Invocable(std::uint32_t loId) : Value{loId} {}
+  explicit Invocable(std::uint32_t lowId) : Value{lowId} {}
 
 private:
-  Invocable() : Value{typeInfo<Invocable>.lo} {}
+  Invocable() : Value{typeInfo<Invocable>.low_} {}
 
 };
 
@@ -633,11 +634,11 @@ public:
                                     const EnvPtr &Env);
 
   explicit BuiltIn(std::string name, HandlerFn &handler) noexcept
-      : Invocable{typeInfo<BuiltIn>.lo}, name_{std::move(name)},
+      : Invocable{typeInfo<BuiltIn>.low_}, name_{std::move(name)},
         handler_{handler} {}
 
   explicit BuiltIn(const BuiltIn &other, ValuePtr meta)
-      : Invocable{typeInfo<BuiltIn>.lo}, MetaMixIn{std::move(meta)},
+      : Invocable{typeInfo<BuiltIn>.low_}, MetaMixIn{std::move(meta)},
         name_{other.name_}, handler_{other.handler_} {}
 
   InvocableResult apply(bool evaled, ValuesSpan values,
@@ -667,17 +668,17 @@ public:
     using std::vector<Symbol>::vector;
   };
 
-  explicit FunctionBase(std::uint32_t loId, Params params, ValuePtr body,
+  explicit FunctionBase(std::uint32_t lowId, Params params, ValuePtr body,
                         EnvPtr env);
 
 protected:
-  explicit FunctionBase(std::uint32_t loId, const FunctionBase &other)
-      : Invocable{loId}, bindSize{other.bindSize}, params{other.params},
+  explicit FunctionBase(std::uint32_t lowId, const FunctionBase &other)
+      : Invocable{lowId}, bindSize{other.bindSize}, params{other.params},
         body{other.body}, capturedEnv{other.capturedEnv} {}
 
   // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-  explicit FunctionBase(std::uint32_t loId, FunctionBase &&other) noexcept
-      : Invocable{loId}, bindSize{other.bindSize},
+  explicit FunctionBase(std::uint32_t lowId, FunctionBase &&other) noexcept
+      : Invocable{lowId}, bindSize{other.bindSize},
         params{std::move(other.params)}, body{std::move(other.body)},
         capturedEnv{std::move(other.capturedEnv)} {}
 
@@ -722,13 +723,13 @@ public:
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>, Symbol>
   explicit Lambda(RANGE &&params, ValuePtr body, EnvPtr env)
-      : FunctionBase{typeInfo<Lambda>.lo,
+      : FunctionBase{typeInfo<Lambda>.low_,
                      {std::from_range, std::forward<RANGE>(params)},
                      std::move(body),
                      std::move(env)} {}
 
   explicit Lambda(const Lambda &other, ValuePtr meta)
-      : FunctionBase{typeInfo<Lambda>.lo, other}, MetaMixIn{std::move(meta)} {}
+      : FunctionBase{typeInfo<Lambda>.low_, other}, MetaMixIn{std::move(meta)} {}
 
   std::string print(PrintType readable) const override;
 
@@ -745,10 +746,10 @@ public:
 class Macro final : public FunctionBase {
 public:
   explicit Macro(const Lambda &other)
-      : FunctionBase{typeInfo<Macro>.lo, other} {}
+      : FunctionBase{typeInfo<Macro>.low_, other} {}
 
   explicit Macro(Lambda &&other) noexcept
-      : FunctionBase{typeInfo<Macro>.lo, std::move(other)} {}
+      : FunctionBase{typeInfo<Macro>.low_, std::move(other)} {}
 
   std::string print(PrintType readable) const override;
 
@@ -762,10 +763,10 @@ public:
 class Eval final : public Invocable, public MetaMixIn {
 public:
   explicit Eval(EnvPtr env)
-      : Invocable{typeInfo<Eval>.lo}, env{std::move(env)} {}
+      : Invocable{typeInfo<Eval>.low_}, env{std::move(env)} {}
 
   explicit Eval(const Eval &other, ValuePtr meta)
-      : Invocable{typeInfo<Eval>.lo}, MetaMixIn{std::move(meta)},
+      : Invocable{typeInfo<Eval>.low_}, MetaMixIn{std::move(meta)},
         env{other.env} {}
 
   std::string print(PrintType /* readably */) const override {

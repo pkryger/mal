@@ -22,7 +22,7 @@ namespace mal {
 namespace detail {
 
 template <typename T>
-concept IsHashContainer = requires(T t) {
+concept IsHashContainer = requires(T) {
   typename T::hasher;
   typename T::key_type;
   typename T::mapped_type;
@@ -132,8 +132,9 @@ public:
       return lhs.current == rhs.current;
     }
 
-    friend constexpr bool operator==(const Iterator &lhs,
-                                     std::default_sentinel_t) noexcept {
+    friend constexpr bool
+    operator==(const Iterator &lhs,
+               std::default_sentinel_t /*rhs*/) noexcept {
       return lhs.current == nullptr;
     }
 
@@ -147,7 +148,7 @@ public:
 
   [[nodiscard]] ValuePtr find(KeyView key) const;
 
-  [[nodiscard]] ValuePtr find(const PreHashedKey& key) const;
+  [[nodiscard]] ValuePtr find(const PreHashedKey& phk) const;
 
   [[nodiscard]] virtual ValuePtr findLocal(FindLocalKey phk) const = 0;
 
@@ -163,10 +164,12 @@ public:
     return Iterator<true>{this};
   }
 
+  // NOLINTNEXTLINE(readability-convert-member-functions-to-static) - interface
   auto end() noexcept {
     return std::default_sentinel;
   }
 
+  // NOLINTNEXTLINE(readability-convert-member-functions-to-static) - interface
   [[nodiscard]] auto end() const noexcept {
     return std::default_sentinel;
   }

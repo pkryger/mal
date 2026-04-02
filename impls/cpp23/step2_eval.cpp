@@ -32,9 +32,9 @@ std::string PRINT(ValuePtr ast) {
 }
 
 std::string rep(const std::string &str) {
-  static GarbageCollector<GarbageCollectiblePtr> gc;
+  static GarbageCollector<GarbageCollectiblePtr> garbageCollector;
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
-    gc.registerValue(std::move(value));
+    garbageCollector.registerValue(std::move(value));
   };
   static const GarbageCollectStack::Guard gcGuard{gcRegister};
   static const EvalFnStack::Guard evalGuard{EVAL};
@@ -52,8 +52,8 @@ std::string rep(const std::string &str) {
 } // namespace
 
 int main() {
-  static mal::ReadLine rl("~/.mal_history");
-  while (auto line = rl.get("user> ")) {
+  static mal::ReadLine readLine("~/.mal_history");
+  while (auto line = readLine.get("user> ")) {
     std::string out;
     try {
       out = rep(line.value());

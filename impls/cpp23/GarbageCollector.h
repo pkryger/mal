@@ -70,7 +70,8 @@ public:
       return lhs.current_ = rhs.current_;
     }
 
-    friend bool operator==(const Iterator &lhs, std::default_sentinel_t) {
+    friend bool operator==(const Iterator &lhs,
+                           std::default_sentinel_t /*rhs*/) {
       return lhs.current_ == nullptr;
     }
 
@@ -100,10 +101,11 @@ public:
   explicit SPSCList(const ALLOCATOR &allocator = ALLOCATOR())
       : node_allocator_(allocator), head_{new_node(nullptr, nullptr)} {}
 
-  void erase_next(Iterator<false> it) {
-    assert(it.current_);
-    assert(it.current_->next_);
-    delete_node(std::exchange(it.current_->next_, it.current_->next_->next_));
+  void erase_next(Iterator<false> iter) {
+    assert(iter.current_);
+    assert(iter.current_->next_);
+    delete_node(
+        std::exchange(iter.current_->next_, iter.current_->next_->next_));
   }
 
   SPSCList(const SPSCList &) = delete;
@@ -179,11 +181,11 @@ class GarbageCollector {
 private:
   template <typename ITERATOR, typename FUNC>
   [[nodiscard]]
-  bool resetUnusedPointers(ITERATOR it, FUNC &&yieldAndStopRequested) {
+  bool resetUnusedPointers(ITERATOR iter, FUNC &&yieldAndStopRequested) {
     std::size_t counter = 0;
-    for (; it != list_.end(); ++it) {
-      if (it->use_count() == 1) {
-        it->reset();
+    for (; iter != list_.end(); ++iter) {
+      if (iter->use_count() == 1) {
+        iter->reset();
       }
       if (std::forward<FUNC>(yieldAndStopRequested)(&counter)) {
         return true;
@@ -194,18 +196,18 @@ private:
 
   template <typename ITERATOR, typename FUNC>
   [[nodiscard]]
-  bool eraseEmptyNodes(ITERATOR it, FUNC &&yieldAndStopRequested) {
+  bool eraseEmptyNodes(ITERATOR iter, FUNC &&yieldAndStopRequested) {
     std::size_t counter = 0;
-    while (it != list_.end()) {
+    while (iter != list_.end()) {
       // skipping the head_ [sic!]
       auto next = [&]() {
-        auto res = it;
+        auto res = iter;
         return ++res;
       }();
       if (next != list_.end() && !*next) {
-        list_.erase_next(it);
+        list_.erase_next(iter);
       } else {
-        ++it;
+        ++iter;
       }
       if (std::forward<FUNC>(yieldAndStopRequested)(&counter)) {
         return true;
@@ -224,11 +226,11 @@ public:
             return stoken.stop_requested();
           };
           while (!stoken.stop_requested()) {
-            auto it = list_.begin();
-            if (resetUnusedPointers(it, yieldAndStopRequested)) {
+            auto iter = list_.begin();
+            if (resetUnusedPointers(iter, yieldAndStopRequested)) {
               return;
             }
-            if (eraseEmptyNodes(it, yieldAndStopRequested)) {
+            if (eraseEmptyNodes(iter, yieldAndStopRequested)) {
               return;
             }
             std::unique_lock guard{mtx_};

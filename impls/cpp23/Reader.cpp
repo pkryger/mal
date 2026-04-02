@@ -2,6 +2,7 @@
 #include "Mal.h"
 #include <charconv>
 #include <iterator>
+// NOLINTNEXTLINE(readability-use-concise-preprocessor-directives) - consistent checks
 #if !defined(__cpp_lib_ranges_stride)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_stride
@@ -13,6 +14,7 @@
 #include <cstdint>
 #include <format>
 #include <limits>
+// NOLINTNEXTLINE(readability-use-concise-preprocessor-directives) - consistent checks
 #if defined(__cpp_lib_ranges_stride)
 #include <ranges>
 #endif // __cpp_lib_ranges_stride
@@ -38,20 +40,20 @@ using mal::ValuePtr;
 using mal::ValuesContainer;
 using mal::Vector;
 
-static const std::array tokenRegexes = {
+const std::array tokenRegexes = {
   std::regex("~@"),
   std::regex(R"([\[\]{}()'`~^@])"),
   std::regex(R"("(?:\\.|[^\\"])*")"),
   std::regex(R"([^\s\[\]{}('"`,;)]+)"),
 };
 
-static const std::array constants = {
+const std::array constants = {
   std::pair{"nil", Constant::nilValue()},
   std::pair{"true", Constant::trueValue()},
   std::pair{"false", Constant::falseValue()},
 };
 
-static const std::array macros = {
+const std::array macros = {
   std::pair{"@", "deref"},
   std::pair{"`", "quasiquote"},
   std::pair{"'", "quote"},
@@ -61,7 +63,7 @@ static const std::array macros = {
 
 class Tokeniser {
 public:
-  explicit Tokeniser(const std::string &s) : str_{s}, pos_{str_.begin()} {
+  explicit Tokeniser(const std::string &str) : str_{str}, pos_{str_.begin()} {
     nextToken();
   }
 
@@ -94,13 +96,15 @@ private:
 };
 
 bool Tokeniser::match(const std::regex &regex) {
-  if (eoi())
+  if (eoi()) {
     return false;
+  }
 
   std::cmatch match;
   if (!std::regex_search(pos_, str_.end(), match, regex,
-                         std::regex_constants::match_continuous))
+                         std::regex_constants::match_continuous)) {
     return false;
+  }
 
   assert(match.size() == 1);
   assert(match.position(0) == 0);
@@ -194,12 +198,12 @@ ValuePtr readAtom(Tokeniser &tokeniser) {
 
   auto first = [](auto &&elt) noexcept { return elt.first; };
   auto isToken = [&](auto &&elt) noexcept { return elt == token; };
-  if (auto constant = std::ranges::find_if(constants, isToken, first);
+  if (const auto *constant = std::ranges::find_if(constants, isToken, first);
       constant != constants.end()) {
     return constant->second;
   }
 
-  if (auto macro = std::ranges::find_if(macros, isToken, first);
+  if (const auto *macro = std::ranges::find_if(macros, isToken, first);
       macro != macros.end()) {
     return make<List>(make<Symbol>(macro->second, macro->first),
                       readForm(tokeniser));

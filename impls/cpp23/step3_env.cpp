@@ -25,7 +25,7 @@ using namespace mal;
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
 using Special = const std::pair<std::string, SpecialForm>;
-static const std::array specials{
+const std::array specials{
   Special{"def!", specialDefBang},
   Special{"let*", specialLetStar},
 };
@@ -37,16 +37,17 @@ ValuePtr EVAL(ValuePtr ast, const EnvPtr &env) {
   if (auto dbg = env->find(debugEval.asKey()); dbg && dbg->isTrue()) {
     std::print("EVAL: {:l}\n", ast);
   }
-  if (auto list = ast->dyncast<List>()) {
+  if (const auto *list = ast->dyncast<List>()) {
     auto&& values = list->values();
     if (values.empty()) {
       return ast->eval(env);
     }
-    if (auto special = [&]() -> Special * {
-          if (auto symbol = values.front()->dyncast<Symbol>()) {
-            auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
-              return *symbol == elt.first;
-            });
+    if (const auto *special = [&]() -> Special * {
+          if (const auto *symbol = values.front()->dyncast<Symbol>()) {
+            const auto *res =
+                std::ranges::find_if(specials, [&](auto &&elt) noexcept {
+                  return *symbol == elt.first;
+                });
             return res != specials.end() ? res : nullptr;
           }
           return nullptr;
@@ -68,9 +69,9 @@ std::string PRINT(ValuePtr ast) {
 }
 
 std::string rep(const std::string &str) {
-  static GarbageCollector<GarbageCollectiblePtr> gc;
+  static GarbageCollector<GarbageCollectiblePtr> garbageCollector;
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
-    gc.registerValue(std::move(value));
+    garbageCollector.registerValue(std::move(value));
   };
   static const GarbageCollectStack::Guard gcGuard{gcRegister};
   static const EvalFnStack::Guard evalGuard{EVAL};
@@ -88,8 +89,8 @@ std::string rep(const std::string &str) {
 } // namespace
 
 int main() {
-  static mal::ReadLine rl("~/.mal_history");
-  while (auto line = rl.get("user> ")) {
+  static mal::ReadLine readLine("~/.mal_history");
+  while (auto line = readLine.get("user> ")) {
     std::string out;
     try {
       out = rep(line.value());

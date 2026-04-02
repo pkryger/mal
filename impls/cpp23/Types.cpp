@@ -5,6 +5,7 @@
 #include "Hierarchy.h"
 #include "InPlaceAllocator.h"
 #include "Mal.h"
+// NOLINTNEXTLINE(readability-use-concise-preprocessor-directives) - consistent checks
 #if !defined(__cpp_lib_ranges_chunk)
 #include "Ranges.h"
 #endif // __cpp_lib_ranges_chunk
@@ -28,12 +29,13 @@
 #include <vector>
 
 // NOLINTBEGIN(misc-include-cleaner) - looks like namespace std freaks clang-tidy out
-std::size_t std::hash<mal::ValuePtr>::operator()(const mal::ValuePtr &o) const {
-  assert(o->isa<mal::StringBase>());
-  if (auto stringBase = o->dyncast<mal::StringBase>()) {
+std::size_t
+std::hash<mal::ValuePtr>::operator()(const mal::ValuePtr &value) const {
+  assert(value->isa<mal::StringBase>());
+  if (const auto *stringBase = value->dyncast<mal::StringBase>()) {
     return std::hash<std::string>{}(stringBase->data_);
   }
-  throw mal::EvalException{std::format("invalid key '{:r}'", o)};
+  throw mal::EvalException{std::format("invalid key '{:r}'", value)};
 }
 // NOLINTEND(misc-include-cleaner)
 
@@ -51,12 +53,13 @@ auto evalValues(VALUES &&values, const EnvPtr &evalEnv)  {
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
   return std::forward<VALUES>(values) |
-         std::views::transform([&](auto &&v) { return evalFn(v, evalEnv); });
+         std::views::transform(
+             [&](auto &&value) { return evalFn(value, evalEnv); });
 }
 
 class WithEvaledValues {
 public:
-  inline static constexpr std::size_t InPlaceLimit = 32;
+  static constexpr std::size_t InPlaceLimit = 32;
   using Allocator = InPlaceAllocator<ValuePtr, InPlaceLimit>;
 
   explicit WithEvaledValues(ValuesSpan values, EnvPtr evalEnv)
@@ -84,8 +87,8 @@ private:
 namespace mal {
 
 bool Value::isTrue() const noexcept {
-  return !(this == Constant::nilValue().get() ||
-           this == Constant::falseValue().get());
+  return this != Constant::nilValue().get() &&
+         this != Constant::falseValue().get();
 }
 
 bool operator==(const ValuePtr &lhs, const ValuePtr &rhs) {
@@ -96,8 +99,8 @@ ValuePtr Integer::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = rhs->dyncast<Integer>();
-      other && data == other->data) {
+  if (const auto *other = rhs->dyncast<Integer>();
+      (other != nullptr) && data == other->data) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -107,8 +110,9 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = rhs->dyncast<StringBase>();
-      other && other->loId_ == this->loId_ && data_ == other->data_) {
+  if (const auto *other = rhs->dyncast<StringBase>();
+      (other != nullptr) && other->lowId_ == this->lowId_ &&
+      data_ == other->data_) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -116,8 +120,9 @@ ValuePtr StringBase::isEqualTo(ValuePtr rhs) const {
 
 ValuePtr Symbol::eval(const EnvPtr &env) const {
   assert(env);
-  if (auto value = env->find(asKey()))
+  if (auto value = env->find(asKey())) {
     return value;
+  }
   throw EvalException{std::format("'{}' not found", data_)};
 }
 
@@ -125,7 +130,8 @@ ValuePtr Symbol::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = rhs->dyncast<Symbol>(); other && asKey() == other->asKey()) {
+  if (const auto *other = rhs->dyncast<Symbol>();
+      (other != nullptr) && asKey() == other->asKey()) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
@@ -253,8 +259,8 @@ namespace mal {
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 
-std::string String::unescape(std::string_view in) {
-  const std::string_view view{in.begin() + 1, in.end() - 1};
+std::string String::unescape(std::string_view input) {
+  const std::string_view view{input.begin() + 1, input.end() - 1};
   auto [location, unescaped] = find_next_character_to_unescape(view, 0);
   if (location == view.size()) [[likely]] {
     assert(!unescaped);
@@ -280,10 +286,10 @@ std::string String::unescape(std::string_view in) {
 
 #else
 
-std::string String::unescape(std::string_view in) {
+std::string String::unescape(std::string_view input) {
   std::string out;
-  out.reserve(in.size() - 2);
-  for (auto i = in.begin() + 1, end = in.end() - 1; i != end; ++i) {
+  out.reserve(input.size() - 2);
+  for (auto i = input.begin() + 1, end = input.end() - 1; i != end; ++i) {
     char c = *i;
     if (c == '\\') {
       ++i;
@@ -426,26 +432,26 @@ namespace mal {
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 
-std::string String::escape(std::string_view in) {
+std::string String::escape(std::string_view input) {
   std::string out{'"'};
-  const auto size = in.size();
-  auto location = find_next_character_to_escape(in, 0);
+  const auto size = input.size();
+  auto location = find_next_character_to_escape(input, 0);
   if (location == size) [[likely]] {
     out.reserve(size + 2);
-    out.append(in.data(), size);
+    out.append(input.data(), size);
     out += '"';
     return out;
   }
 
-  out.reserve(size * 2 + 2);
+  out.reserve((size * 2) + 2);
   std::size_t pos = 0;
   while (location < size) {
-    out.append(in.data() + pos, location - pos);
-    maybe_escape_and_append_character(in[location], out);
+    out.append(input.data() + pos, location - pos);
+    maybe_escape_and_append_character(input[location], out);
     pos = location + 1;
-    location = find_next_character_to_escape(in, pos);
+    location = find_next_character_to_escape(input, pos);
   }
-  out.append(in.data() + pos, location - pos);
+  out.append(input.data() + pos, location - pos);
 
   out += '"';
   out.shrink_to_fit();
@@ -454,10 +460,10 @@ std::string String::escape(std::string_view in) {
 
 #else // defined(__aarch64__) || defined(_M_ARM64)
 
-std::string String::escape(std::string_view in) {
+std::string String::escape(std::string_view input) {
   std::string out{'"'};
-  out.reserve(in.size() + 2);
-  for (auto&& c : in) {
+  out.reserve(input.size() + 2);
+  for (auto&& c : input) {
     maybe_escape_and_append_character(c, out);
   }
   out += '"';
@@ -476,8 +482,8 @@ ValuePtr Atom::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto o = rhs->dyncast<Atom>()) {
-    return data->isEqualTo(o->data);
+  if (const auto *atom = rhs->dyncast<Atom>()) {
+    return data->isEqualTo(atom->data);
   }
   return Constant::falseValue();
 }
@@ -486,8 +492,8 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = rhs->dyncast<Sequence>();
-      other && data.size() == other->data.size()) {
+  if (const auto *other = rhs->dyncast<Sequence>();
+      (other != nullptr) && data.size() == other->data.size()) {
     auto res =
         std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
           return lhs->isEqualTo(rhs)->isTrue();
@@ -505,7 +511,7 @@ std::string List::print(PrintType readably) const {
   }
   if (auto fromMacro = [&]() -> std::optional<std::string> {
         if (data.size() == 2) {
-          if (auto symbol = data.at(0)->dyncast<Symbol>()) {
+          if (const auto *symbol = data.at(0)->dyncast<Symbol>()) {
             return symbol->fromMacro_;
           }
         }
@@ -522,8 +528,8 @@ ValuePtr Vector::eval(const EnvPtr &env) const {
   assert(env);
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
-  return make<Vector>(data | std::views::transform([&](auto &&v) {
-                        return evalFn(v, env);
+  return make<Vector>(data | std::views::transform([&](auto &&value) {
+                        return evalFn(value, env);
                       }));
 }
 
@@ -535,11 +541,11 @@ ValuePtr List::eval(const EnvPtr &env) const {
   }
   auto &evalFn = EvalFnStack::top();
   auto [ast, evalEnv] = [&]() {
-    auto op = evalFn(data[0], env);
-    if (auto invocable = op->dyncast<Invocable>()) {
+    auto value = evalFn(data[0], env);
+    if (const auto *invocable = value->dyncast<Invocable>()) {
       return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
     }
-    throw EvalException{std::format("invalid function '{:r}'", op)};
+    throw EvalException{std::format("invalid function '{:r}'", value)};
   }();
 
   return evalEnv ? EvalFnStack::top()(ast, *evalEnv) : ast;
@@ -562,14 +568,14 @@ ValuePtr Hash::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = rhs->dyncast<Hash>()) {
+  if (const auto *other = rhs->dyncast<Hash>()) {
     return data == other->data ? Constant::trueValue() : Constant::falseValue();
   }
   return Constant::falseValue();
 }
 
 Hash::Hash(const Hash &other, ValuesSpan values)
-    : Value{typeInfo<Hash>.lo}, data{other.data} {
+    : Value{typeInfo<Hash>.low_}, data{other.data} {
   for (auto [key, value] : values |
 #ifdef __cpp_lib_ranges_chunk
                                std::views::chunk(2)
@@ -605,24 +611,24 @@ ValuePtr BuiltIn::isEqualTo(ValuePtr rhs) const {
   if (this == rhs.get()) {
     return Constant::trueValue();
   }
-  if (auto other = rhs->dyncast<BuiltIn>();
-      other && name_ == other->name_) {
+  if (const auto *other = rhs->dyncast<BuiltIn>();
+      (other != nullptr) && name_ == other->name_) {
     return Constant::trueValue();
   }
   return Constant::falseValue();
 }
 
-FunctionBase::FunctionBase(std::uint32_t loId, Params params, ValuePtr body,
+FunctionBase::FunctionBase(std::uint32_t lowId, Params params, ValuePtr body,
                            EnvPtr env)
-    : Invocable{loId}, bindSize{[&]() -> std::size_t {
-        if (auto i = std::ranges::find_if(
+    : Invocable{lowId}, bindSize{[&]() -> std::size_t {
+        if (auto iter = std::ranges::find_if(
                 params, [](auto &&elt) { return elt.name().at(0) == '&'; });
-            i != params.end()) {
-          if ((params.end() - i) != 2) {
+            iter != params.end()) {
+          if ((params.end() - iter) != 2) {
             throw EvalException{
                 "there must be exactly one parameter after the &"};
           }
-          return static_cast<std::size_t>(i - params.begin());
+          return static_cast<std::size_t>(iter - params.begin());
         }
         return params.size();
       }()},

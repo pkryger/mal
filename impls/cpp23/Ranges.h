@@ -31,17 +31,17 @@ template <std::ranges::viewable_range R> auto malChunkView(R &&r, std::size_t n)
 namespace mal::views {
 
 namespace detail {
-template <typename FN>
+template <typename FUNC>
 struct Pipeable
-    : FN,
-      std::ranges::range_adaptor_closure<Pipeable<FN>> {
-  constexpr explicit Pipeable(FN &&fn) : FN{std::move(fn)} {}
+    : FUNC,
+      std::ranges::range_adaptor_closure<Pipeable<FUNC>> {
+  constexpr explicit Pipeable(FUNC &&func) : FUNC{std::move(func)} {}
 };
 
 template <typename FN> Pipeable(FN &&) -> Pipeable<FN>;
 
 constexpr std::size_t divCeil(std::size_t n, std::size_t denominator) {
-  return (n / denominator) + ((n % denominator) != 0u ? 1u : 0u);
+  return (n / denominator) + ((n % denominator) != 0U ? 1U : 0U);
 }
 
 } // namespace detail
@@ -56,26 +56,26 @@ class ChunkView : public std::ranges::view_interface<ChunkView<VIEW>> {
   class iterator;
 
   template <typename VIEW_ITERATOR>
-  [[nodiscard]] auto findNext(VIEW_ITERATOR it) const {
+  [[nodiscard]] auto findNext(VIEW_ITERATOR iter) const {
     auto reminder = [&]() {
       if constexpr (std::ranges::sized_range<VIEW> &&
                     std::is_same_v<std::ranges::iterator_t<VIEW>,
                                    std::ranges::sentinel_t<VIEW>>) {
-        return std::ranges::advance(it, count_, std::ranges::end(base_));
+        return std::ranges::advance(iter, count_, std::ranges::end(base_));
       } else {
-        std::ranges::advance(it, count_);
+        std::ranges::advance(iter, count_);
         return 0;
       }
     }();
-    return std::pair{it, reminder};
+    return std::pair{iter, reminder};
   }
 
   template <typename VIEW_ITERATOR>
   [[nodiscard]] auto
-  findPrev(VIEW_ITERATOR it,
+  findPrev(VIEW_ITERATOR iter,
            std::ranges::range_difference_t<VIEW> reminder) const {
-    std::ranges::advance(it, -(count_ - reminder), std::ranges::begin(base_));
-    return it;
+    std::ranges::advance(iter, -(count_ - reminder), std::ranges::begin(base_));
+    return iter;
   }
 
 public:
@@ -117,9 +117,10 @@ public:
     using ReminderType = iterator<false>::difference_type;
     if constexpr (std::ranges::sized_range<VIEW>) {
       auto end = std::ranges::end(base_);
-      auto n = std::ranges::size(base_);
-      auto count = static_cast<decltype(n)>(count_);
-      auto reminder = static_cast<ReminderType>(n - ((n / count) * count));
+      auto size = std::ranges::size(base_);
+      auto count = static_cast<decltype(size)>(count_);
+      auto reminder =
+          static_cast<ReminderType>(size - ((size / count) * count));
       return iterator<false>{this, end, end, end, reminder};
     } else {
       return std::default_sentinel;
@@ -132,9 +133,10 @@ public:
     using ReminderType = iterator<true>::difference_type;
     if constexpr (std::ranges::sized_range<const VIEW>) {
       auto end = std::ranges::end(base_);
-      auto n = std::ranges::size(base_);
-      auto count = static_cast<decltype(n)>(count_);
-      auto reminder = static_cast<ReminderType>(n - ((n / count) * count));
+      auto size = std::ranges::size(base_);
+      auto count = static_cast<decltype(size)>(count_);
+      auto reminder =
+          static_cast<ReminderType>(size - ((size / count) * count));
       return iterator<true>{this, end, end, end, reminder};
     } else {
       return std::default_sentinel;
@@ -200,7 +202,7 @@ public:
 
   iterator() = default;
 
-  constexpr const value_type operator*() const
+  constexpr value_type operator*() const
   {
     if constexpr (std::is_same_v<ViewIterator, ViewSentinel>) {
       assert(current_ != next_);
@@ -254,7 +256,7 @@ public:
   }
 
   friend constexpr bool operator==(const iterator &lhs,
-                                   std::default_sentinel_t) {
+                                   std::default_sentinel_t /*rhs*/) {
     if constexpr (std::is_same_v<ViewIterator, ViewSentinel>) {
       return lhs.current_ == lhs.next_;
     } else {
@@ -451,7 +453,7 @@ public:
   }
 
   friend constexpr bool operator==(const iterator &lhs,
-                                   std::default_sentinel_t) {
+                                   std::default_sentinel_t /*rhs*/) {
     return lhs.current_ == std::ranges::end(lhs.parent_->base());
   }
 

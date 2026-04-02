@@ -28,7 +28,7 @@ using namespace mal;
 ValuePtr READ(const std::string &str) { return readStr(str); }
 
 using Special = const std::pair<std::string, SpecialForm>;
-static const std::array specials{
+const std::array specials{
   Special{"def!", specialDefBang},
   Special{"let*", specialLetStar},
   Special{"if", specialIf},
@@ -50,16 +50,17 @@ ValuePtr EVAL(ValuePtr ast, const EnvPtr &evalEnv) {
       std::print("EVAL: {:l}\n", ast);
     }
 
-    if (auto list = ast->dyncast<List>()) {
+    if (const auto *list = ast->dyncast<List>()) {
       auto&& values = list->values();
       if (values.empty()) {
         return ast->eval(*env);
       }
-      if (auto special = [&]() -> Special * {
-        if (auto symbol = values.front()->dyncast<Symbol>()) {
-          auto res = std::ranges::find_if(specials, [&](auto &&elt) noexcept {
-            return *symbol == elt.first;
-          });
+      if (const auto *special = [&]() -> Special * {
+        if (const auto *symbol = values.front()->dyncast<Symbol>()) {
+          const auto *res =
+              std::ranges::find_if(specials, [&](auto &&elt) noexcept {
+                return *symbol == elt.first;
+              });
           return res != specials.end() ? res : nullptr;
         }
         return nullptr;
@@ -71,11 +72,11 @@ ValuePtr EVAL(ValuePtr ast, const EnvPtr &evalEnv) {
         std::tie(ast, env) = [&]() {
           auto data = list->values();
           assert(!data.empty());
-          auto op = EVAL(data.front(), *env);
-          if (auto invocable = op->dyncast<Invocable>()) {
+          auto value = EVAL(data.front(), *env);
+          if (const auto *invocable = value->dyncast<Invocable>()) {
             return invocable->apply(false, data.subspan(1), *env);
           }
-          throw EvalException{std::format("invalid function '{:r}'", op)};
+          throw EvalException{std::format("invalid function '{:r}'", value)};
         }();
       }
     } else {
@@ -91,9 +92,9 @@ std::string PRINT(ValuePtr ast) {
 }
 
 EnvPtr repEnv(std::span<const char*> args) {
-  static GarbageCollector<GarbageCollectiblePtr> gc;
+  static GarbageCollector<GarbageCollectiblePtr> garbageCollector;
   static auto gcRegister = [&](GarbageCollectiblePtr value) {
-    gc.registerValue(std::move(value));
+    garbageCollector.registerValue(std::move(value));
   };
   static const GarbageCollectStack::Guard gcGuard{gcRegister};
   static const EvalFnStack::Guard evalGuard{EVAL};
@@ -163,8 +164,8 @@ int main(int argc, const char *argv[]) {
     rep(std::format("(load-file \"{}\")", args.front()), envPtr);
     return 0;
   }
-  static mal::ReadLine rl("~/.mal_history");
-  while (auto line = rl.get("user> ")) {
+  static mal::ReadLine readLine("~/.mal_history");
+  while (auto line = readLine.get("user> ")) {
     std::print("{}\n", rep(line.value(), envPtr));
   }
 }

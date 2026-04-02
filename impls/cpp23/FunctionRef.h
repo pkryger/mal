@@ -39,7 +39,7 @@ public:
   FunctionRef &operator&(T) = delete;
 
   template <typename... TS>
-  inline static constexpr bool IsInvocableUsing =
+  static constexpr bool IsInvocableUsing =
       std::conditional_t<NOEX, std::is_nothrow_invocable_r<RET, TS..., ARGS...>,
         std::is_invocable_r<RET, TS..., ARGS...>>::value;
 

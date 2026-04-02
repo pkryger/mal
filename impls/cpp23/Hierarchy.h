@@ -29,29 +29,31 @@ struct DFS<DFSNode<T, CHILD, CHILDREN...>> {
 private:
   static constexpr auto foldChildren(std::uint32_t counter)
       -> std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> {
-    std::uint32_t _ = 0, hi = 0, running = counter;
+    std::uint32_t _ignore = 0;
+    std::uint32_t high = 0;
+    std::uint32_t running = counter;
     auto step = [&]<typename C>() {
-      std::tie(_, hi, running) = DFS<C>::compute(running);
+      std::tie(_ignore, high, running) = DFS<C>::compute(running);
     };
     (step.template operator()<CHILD>(), ...,
      step.template operator()<CHILDREN>());
-    return {counter, hi, running};
+    return {counter, high, running};
   }
 
 public:
   static constexpr auto compute(std::uint32_t counter)
       -> std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> {
-    auto [_, hi, next] = foldChildren(counter + 1);
-    return {counter, hi, next};
+    auto [_ignore, high, next] = foldChildren(counter + 1);
+    return {counter, high, next};
   }
 };
 
 } // namespace detail
 
 struct TypeInfo {
-  uint32_t lo, hi;
-  [[nodiscard]] constexpr bool contains(uint32_t id) const {
-    return lo <= id && id <= hi;
+  uint32_t low_, high_;
+  [[nodiscard]] constexpr bool contains(uint32_t actualId) const {
+    return low_ <= actualId && actualId <= high_;
   }
 };
 
@@ -79,10 +81,10 @@ private:
 
 public:
   static constexpr std::pair<bool, TypeInfo> find(std::uint32_t counter) {
-    auto [lo, hi, next] = DFS<DFSNode<T, CHILDREN...>>::compute(counter);
+    auto [low, high, next] = DFS<DFSNode<T, CHILDREN...>>::compute(counter);
 
     if constexpr (std::is_same_v<T, TARGET>) {
-      return {true, TypeInfo{lo, hi}};
+      return {true, TypeInfo{low, high}};
     } else if constexpr (sizeof...(CHILDREN) > 0) {
       return searchChildren<CHILDREN...>(counter + 1);
     } else {
@@ -135,15 +137,15 @@ using ValueHierarchy =
 template <typename T>
 inline constexpr TypeInfo typeInfo = [] {
   auto [found, info] = detail::FindInfo<ValueHierarchy, T>::find(0);
-  return found ? info : TypeInfo(~0u, 0u);
+  return found ? info : TypeInfo(~0U, 0U);
 }();
 
 class RttiBase {
 public:
-  explicit RttiBase(std::uint32_t loId) noexcept : loId_{loId} {}
+  explicit RttiBase(std::uint32_t lowId) noexcept : lowId_{lowId} {}
 
   template <typename T> [[nodiscard]] bool isa() const noexcept {
-    return typeInfo<T>.contains(loId_);
+    return typeInfo<T>.contains(lowId_);
   }
 
   template <typename T> [[nodiscard]] T *dyncast() noexcept {
@@ -155,7 +157,7 @@ public:
   }
 
 protected:
-  std::uint32_t loId_;
+  std::uint32_t lowId_;
 };
 
 } // namespace mal

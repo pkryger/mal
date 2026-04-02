@@ -76,9 +76,9 @@ public:
     }
 
     Iterator operator++(int) {
-      auto it = *this;
+      auto temp = *this;
       ++*this;
-      return it;
+      return temp;
     }
 
     friend bool operator==(const Iterator &lhs, const Iterator &rhs) {

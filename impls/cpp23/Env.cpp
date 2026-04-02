@@ -88,8 +88,8 @@ void ApplyEnv::insert_or_assign(Key key, ValuePtr value) {
 }
 
 ValuePtr ApplyEnv::findLocal(FindLocalKey phk) const {
-  if (auto it = map_.find(phk); it != map_.end()) {
-    return it->second;
+  if (auto iter = map_.find(phk); iter != map_.end()) {
+    return iter->second;
   }
   return capturedEnv_->find(phk);
 }
