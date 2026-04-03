@@ -161,12 +161,12 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
     return Constant::trueValue();
   }
   if (const auto *other = rhs->dyncast<Sequence>();
-      (other != nullptr) && data.size() == other->data.size()) {
+      (other != nullptr) && data_.size() == other->data_.size()) {
     auto res =
-        std::ranges::mismatch(data, other->data, [](auto &&lhs, auto &&rhs) {
-          return lhs->isEqualTo(rhs)->isTrue();
+        std::ranges::mismatch(data_, other->data_, [](auto &&eLhs, auto &&eRhs) {
+          return eLhs->isEqualTo(eRhs)->isTrue();
         });
-    return res.in1 == data.end() && res.in2 == other->data.end()
+    return res.in1 == data_.end() && res.in2 == other->data_.end()
                ? Constant::trueValue()
                : Constant::falseValue();
   }
@@ -175,28 +175,28 @@ ValuePtr Sequence::isEqualTo(ValuePtr rhs) const {
 
 std::string List::print(PrintType readably) const {
   if (readably == MalReadably) {
-    return std::format("({:l})", data);
+    return std::format("({:l})", data_);
   }
   if (auto fromMacro = [&]() -> std::optional<std::string> {
-        if (data.size() == 2) {
-          if (const auto *symbol = data.at(0)->dyncast<Symbol>()) {
+        if (data_.size() == 2) {
+          if (const auto *symbol = data_.at(0)->dyncast<Symbol>()) {
             return symbol->fromMacro_;
           }
         }
         return {};
       }()) {
-    return readably ? std::format("{}{:r}", *fromMacro, data.at(1))
-                    : std::format("{}{}", *fromMacro, data.at(1));
+    return readably ? std::format("{}{:r}", *fromMacro, data_.at(1))
+                    : std::format("{}{}", *fromMacro, data_.at(1));
 
   }
-  return readably ? std::format("({:r})", data) : std::format("({})", data);
+  return readably ? std::format("({:r})", data_) : std::format("({})", data_);
 }
 
 ValuePtr Vector::eval(const EnvPtr &env) const {
   assert(env);
   assert(!EvalFnStack::empty());
   auto &evalFn = EvalFnStack::top();
-  return make<Vector>(data | std::views::transform([&](auto &&value) {
+  return make<Vector>(data_ | std::views::transform([&](auto &&value) {
                         return evalFn(value, env);
                       }));
 }
@@ -204,14 +204,14 @@ ValuePtr Vector::eval(const EnvPtr &env) const {
 ValuePtr List::eval(const EnvPtr &env) const {
   assert(env);
   assert(!EvalFnStack::empty());
-  if (data.empty()) {
+  if (data_.empty()) {
     return shared_from_this();
   }
   auto &evalFn = EvalFnStack::top();
   auto [ast, evalEnv] = [&]() {
-    auto value = evalFn(data[0], env);
+    auto value = evalFn(data_[0], env);
     if (const auto *invocable = value->dyncast<Invocable>()) {
-      return invocable->apply(false, ValuesSpan{data}.subspan(1), env);
+      return invocable->apply(false, ValuesSpan{data_}.subspan(1), env);
     }
     throw EvalException{std::format("invalid function '{:r}'", value)};
   }();
@@ -270,8 +270,8 @@ InvocableResult BuiltIn::apply(bool evaled, ValuesSpan values,
   if (evaled) {
     return handler_(name_, values, evalEnv);
   }
-  return WithEvaledValues{values, evalEnv}([&](auto &&values) {
-    return handler_(name_, std::forward<decltype(values)>(values), evalEnv);
+  return WithEvaledValues{values, evalEnv}([&](auto &&vals) {
+    return handler_(name_, std::forward<decltype(vals)>(vals), evalEnv);
   });
 }
 
@@ -312,8 +312,8 @@ ValuePtr FunctionBase::isEqualImpl(const ValuePtr &rhs) const {
       other && bindSize_ == other->bindSize_ &&
       params_.size() == other->params_.size()) {
     auto res = std::ranges::mismatch(params_, other->params_,
-                                     [](auto &&lhs, auto &&rhs) noexcept {
-                                       return lhs == rhs;
+                                     [](auto &&eLhs, auto &&eRhs) noexcept {
+                                       return eLhs == eRhs;
                                      });
     if (res.in1 != params_.end() || res.in2 != other->params_.end()) {
       return Constant::falseValue();

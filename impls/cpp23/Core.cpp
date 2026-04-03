@@ -330,8 +330,8 @@ InvocableResult slurp(std::string_view name, ValuesSpan values,
   if (const auto *string = values[0]->dyncast<String>()) {
     auto path = string->data();
     auto file_size = std::filesystem::file_size(path);
-    if (file_size >
-        static_cast<uintmax_t>(std::numeric_limits<std::streamsize>::max())) {
+    if (file_size > static_cast<std::uintmax_t>(
+                        std::numeric_limits<std::streamsize>::max())) {
       throw CoreException(
           std::format("{}: file {} is too big", name, std::move(path)));
     }
@@ -450,13 +450,19 @@ InvocableResult nth(std::string_view name, ValuesSpan values,
   if (const auto *integer = values[1]->dyncast<Integer>()) {
     static_assert(sizeof(decltype(std::declval<Integer>().value())) >=
                   sizeof(ValuesSpan::size_type));
-    auto index = static_cast<ValuesSpan::size_type>(integer->value());
+    auto index = integer->value();
+    auto theIndex = static_cast<ValuesSpan::size_type>(index);
+    if (index < 0 ||
+        theIndex > std::numeric_limits<ValuesSpan::size_type>::max()) {
+      throw CoreException{std::format("index out of bounds {} for '{}'", index,
+                                      name)};
+    }
     if (const auto *sequence = values[0]->dyncast<Sequence>()) {
       values = sequence->values();
-      if (0 <= index && index < values.size()) {
-        return {values[index], {}};
+      if (0 <= index && theIndex < values.size()) {
+        return {values[theIndex], {}};
       }
-      throw CoreException{std::format("index out of bounds {} for '{}'", index,
+      throw CoreException{std::format("index out of bounds {} for '{}'", theIndex,
                                       name)};
     }
     if (const auto *constant = values[0]->dyncast<Constant>();

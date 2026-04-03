@@ -88,6 +88,10 @@ public:
     bool operator()(KeyView lhs, const PreHashedKey &rhs) const {
       return lhs == rhs.key_;
     }
+
+    bool operator()(const PreHashedKey &lhs, KeyView rhs) const {
+      return lhs.key_ == rhs;
+    }
   };
   using Map = std::unordered_map<Key, ValuePtr, Hash, Equal>;
 

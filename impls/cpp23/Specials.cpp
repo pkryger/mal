@@ -135,10 +135,10 @@ InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
     return {};
   };
   static auto argIfStartsWith = [](const Symbol &key,
-                                   ValuesSpan values) -> ValuePtr {
-    if (key.isEqualTo(values[0])->isTrue()) {
-      checkArgsIs(key.name(), values.subspan(1), 1);
-      return values[1];
+                                   ValuesSpan vals) -> ValuePtr {
+    if (key.isEqualTo(vals[0])->isTrue()) {
+      checkArgsIs(key.name(), vals.subspan(1), 1);
+      return vals[1];
     }
     return nullptr;
   };
@@ -159,9 +159,9 @@ InvocableResult specialQuasiquote(std::string_view name, ValuesSpan values,
                 if (auto eltValues =
                         valuesIfSequence.template operator()<List>(elt);
                         !eltValues.empty()) {
-                  if (auto spliceUnquote =
+                  if (auto theSpliceUnquote =
                           argIfStartsWith(splice_unquote, eltValues)) {
-                    return spliceUnquote;
+                    return theSpliceUnquote;
                   }
                 }
                 return nullptr;

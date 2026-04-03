@@ -239,6 +239,7 @@ struct formatter<mal::ValuesMap::value_type> : mal::ParseValueMixin {
       return format_to(ctx.out(), "{:l} {:l}", val.first, val.second);
       break;
     }
+    return ctx.out();
   }
 };
 
@@ -471,24 +472,24 @@ class Sequence : public Value {
 public:
   ValuePtr isEqualTo(ValuePtr rhs) const override;
 
-  ValuesSpan values() const noexcept { return {data.begin(), data.end()}; };
+  ValuesSpan values() const noexcept { return {data_.begin(), data_.end()}; };
 
-  std::size_t size() const { return data.size(); }
+  std::size_t size() const { return data_.size(); }
 
 protected:
   explicit Sequence(std::uint32_t lowId, ValuesContainer data) noexcept
-      : Value{lowId}, data{std::move(data)} {}
+      : Value{lowId}, data_{std::move(data)} {}
 
   explicit Sequence(std::uint32_t lowId, ValuesSpan data) noexcept
-      : Value{lowId}, data{std::from_range, data} {}
+      : Value{lowId}, data_{std::from_range, data} {}
 
   template <std::ranges::input_range RANGE>
     requires std::convertible_to<std::ranges::range_reference_t<RANGE>,
                                  ValuePtr>
   explicit Sequence(std::uint32_t lowId, RANGE &&range)
-      : Value{lowId}, data{std::from_range, std::forward<RANGE>(range)} {}
+      : Value{lowId}, data_{std::from_range, std::forward<RANGE>(range)} {}
 
-  ValuesContainer data;
+  ValuesContainer data_;
 
 private:
   Sequence() : Value{typeInfo<Sequence>.low_} {}
@@ -538,7 +539,7 @@ public:
       : Sequence{typeInfo<Vector>.low_, std::forward<RANGE>(range)} {}
 
   std::string print(PrintType readably) const override {
-    return readably ? std::format("[{:r}]", data) : std::format("[{}]", data);
+    return readably ? std::format("[{:r}]", data_) : std::format("[{}]", data_);
   }
 
   ValuePtr eval(const EnvPtr &env) const override;
@@ -702,8 +703,8 @@ template <> struct formatter<mal::Symbol> : mal::ParseValueMixin {
 };
 
 template <>
-struct std::formatter<mal::FunctionBase::Params>
-    : std::range_formatter<mal::Symbol> {
+struct formatter<mal::FunctionBase::Params>
+    : range_formatter<mal::Symbol> {
   constexpr formatter() {
     set_brackets("(", ")");
     set_separator(" ");

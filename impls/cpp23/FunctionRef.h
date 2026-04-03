@@ -66,8 +66,8 @@ public:
       : storage_(std::addressof(obj)),
         callback_{
             [](Storage storage, ARGS &&...args) static noexcept(NOEX) -> RET {
-              auto &obj = *get<std::remove_reference_t<FUNC>>(storage);
-              return obj(std::forward<ARGS>(args)...);
+              auto &theObj = *get<std::remove_reference_t<FUNC>>(storage);
+              return theObj(std::forward<ARGS>(args)...);
             }} {}
 
   // Following implementations:
