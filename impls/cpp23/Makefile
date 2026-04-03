@@ -1,4 +1,5 @@
-BUILD_DIR=build$(if $(CMAKE_BUILD_TYPE),/$(CMAKE_BUILD_TYPE))
+CMAKE_BUILD_TYPE?=Release
+BUILD_DIR=build/$(CMAKE_BUILD_TYPE)
 CMAKE=cmake
 
 NINJA=ninja
@@ -15,7 +16,7 @@ TARGETS=$(MAINS:%.cpp=$(BUILD_DIR)/%)
 .PHONY: all cmake $(TARGETS) clean
 
 $(GENERATED_FILE): CMakeLists.txt
-	$(CMAKE) -S . -B $(BUILD_DIR)
+	$(CMAKE) -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) -S . -B $(BUILD_DIR)
 
 all: $(GENERATED_FILE)
 	$(CMAKE) --build $(BUILD_DIR)
