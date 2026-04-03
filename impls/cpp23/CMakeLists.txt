@@ -1,16 +1,6 @@
 cmake_minimum_required(VERSION 4.2)
 project(mal LANGUAGES CXX)
 
-find_program(IWYU include-what-you-use)
-if(IWYU)
-  set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE
-    ${IWYU};
-    -Xiwyu;
-    --cxx17ns;
-    --quoted_includes_first
-  )
-endif()
-
 if(APPLE)
   execute_process(
     COMMAND brew --prefix readline

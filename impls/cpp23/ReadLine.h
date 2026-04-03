@@ -7,11 +7,10 @@
 #include <optional>
 #include <string>
 #include <type_traits>
-#include <vector> // IWYU pragma: keep
+#include <vector>
 #include <concepts>
 #include <iterator>
 #include <utility>
-// IWYU pragma: no_include <__vector/vector.h>
 
 namespace mal {
 

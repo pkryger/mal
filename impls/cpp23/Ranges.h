@@ -9,7 +9,7 @@
 #include <tuple>
 #include <type_traits>
 #include <utility>
-#include <version> // IWYU pragma: keep
+#include <version>
 
 /*
   Apple Clang 17 lacks implementation of

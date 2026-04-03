@@ -1,4 +1,4 @@
-#include "Types.h" // IWYU pragma: associated
+#include "Types.h"
 #include "Core.h"
 #include "Env.h"
 #include "FunctionRef.h"

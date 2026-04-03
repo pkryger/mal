@@ -2,7 +2,8 @@
 #include "GarbageCollector.h"
 #include "ReadLine.h"
 #include "Reader.h"
-#include "Types.h" // IWYU pragma: keep
+// NOLINTNEXTLINE(misc-include-cleaner) - needed for std::format
+#include "Types.h"
 
 #include <cassert>
 #include <memory>

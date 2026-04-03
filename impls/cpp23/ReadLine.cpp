@@ -1,4 +1,4 @@
-#include "ReadLine.h" // IWYU pragma: associated
+#include "ReadLine.h"
 
 #include <readline/readline.h>
 #include <readline/history.h>

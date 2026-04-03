@@ -1,4 +1,4 @@
-#include "Core.h" // IWYU pragma: associated
+#include "Core.h"
 #include "Env.h"
 #include "Mal.h"
 // NOLINTNEXTLINE(readability-use-concise-preprocessor-directives) - consistent checks
@@ -30,8 +30,6 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
-// IWYU pragma: no_include <__vector/vector.h>
-// IWYU pragma: no_include <_stdlib.h>
 
 namespace mal {
 

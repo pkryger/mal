@@ -15,7 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
-#include <functional> // IWYU pragma: keep
+#include <functional>
 #include <memory>
 #include <optional>
 #include <ranges>
@@ -25,9 +25,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <utility>
-#include <vector> // IWYU pragma: keep
-// IWYU pragma: no_include <__vector/vector.h>
-// IWYU pragma: no_include <__bit_reference>
+#include <vector>
 
 namespace mal {
 

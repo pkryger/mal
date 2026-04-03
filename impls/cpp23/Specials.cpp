@@ -1,4 +1,4 @@
-#include "Specials.h" // IWYU pragma: associated
+#include "Specials.h"
 #include "Core.h"
 #include "Env.h"
 #include "FunctionRef.h"
@@ -10,7 +10,7 @@
 #include "Reader.h"
 #include "Types.h"
 
-#include <algorithm> // IWYU pragma: keep
+#include <algorithm>
 #include <cassert>
 #include <format>
 #include <memory>
@@ -20,7 +20,6 @@
 #include <utility>
 #include <span>
 #include <type_traits>
-// IWYU pragma: no_include <tuple>
 
 namespace mal {
 InvocableResult specialDefBang(std::string_view name, ValuesSpan values,

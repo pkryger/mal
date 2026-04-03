@@ -16,8 +16,6 @@
 #include <print>
 #include <string>
 #include <utility>
-// IWYU pragma: no_include <string_view>
-// IWYU pragma: no_include <tuple>
 
 namespace {
 // NOLINTNEXTLINE(google-build-using-namespace)

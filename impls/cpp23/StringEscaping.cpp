@@ -1,4 +1,4 @@
-#include "StringEscaping.h" // IWYU pragma: associated
+#include "StringEscaping.h"
 
 #include <string>
 #include <string_view>

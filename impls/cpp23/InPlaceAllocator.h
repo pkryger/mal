@@ -4,11 +4,8 @@
 #include <array>
 #include <cstddef>
 #include <memory>
-#include <new> // IWYU pragma: keep
+#include <new>
 #include <utility>
-// IWYU pragma: no_include <__cstddef/max_align_t.h>
-// IWYU pragma: no_include <__new/exceptions.h>
-// IWYU pragma: no_include <__cstddef/byte.h>
 
 namespace mal {
 

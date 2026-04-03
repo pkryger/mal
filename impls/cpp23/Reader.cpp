@@ -1,4 +1,4 @@
-#include "Reader.h" // IWYU pragma: associated
+#include "Reader.h"
 #include "Mal.h"
 #include "StringEscaping.h"
 
@@ -25,8 +25,6 @@
 #include <string_view>
 #include <system_error>
 #include <utility>
-// IWYU pragma: no_include <ranges>
-// IWYU pragma: no_include <memory>
 
 namespace {
 using mal::Constant;

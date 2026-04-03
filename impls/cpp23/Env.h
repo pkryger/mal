@@ -5,8 +5,8 @@
 
 #include <concepts>
 #include <cstddef>
-#include <cstdint> // IWYU pragma: keep
-#include <functional> // IWYU pragma: keep
+#include <cstdint>
+#include <functional>
 #include <iterator>
 #include <ranges>
 #include <string>
@@ -14,8 +14,7 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
-#include <vector> // IWYU pragma: keep
-// IWYU pragma: no_include <__vector/vector.h>
+#include <vector>
 
 namespace mal {
 
