@@ -287,16 +287,7 @@ template <typename UINT, typename BASE>
            std::same_as<UINT, std::uint32_t>
 class Intern<UINT, BASE> {
 public:
-  explicit Intern(const std::string &name)
-      : intern_{[&]() {
-          auto newIntern = ++counter_;
-          auto iter = interns_.emplace(name, newIntern);
-          if (!iter.second) {
-            --counter_;
-            return iter.first->second;
-          }
-          return newIntern;
-        }()} {}
+  explicit Intern(const std::string &name) : intern_{internFor(name)} {}
 
   Intern(const Intern &) noexcept = default;
   Intern& operator=(const Intern &) noexcept = default;
@@ -314,9 +305,21 @@ protected:
   [[nodiscard]] KEY_VIEW asKey() const { return intern_; }
 
 private:
-  UINT intern_{0};
-  inline static UINT counter_{0};
-  inline static std::unordered_map<std::string, UINT> interns_;
+  UINT intern_;
+
+  static UINT internFor(const std::string &name) {
+    static UINT counter{0U};
+    static std::unordered_map<std::string, UINT> interns;
+
+    auto newIntern = ++counter;
+    auto iter = interns.emplace(name, newIntern);
+    if (!iter.second) {
+      --counter;
+      return iter.first->second;
+    }
+    return newIntern;
+  }
+
 };
 
 
