@@ -68,7 +68,6 @@ void Env::insert_or_assign(Key key, ValuePtr value) {
   if constexpr (std::is_trivially_copyable_v<Key>) {
     map_.insert_or_assign(key, std::move(value));
   } else {
-
     map_.insert_or_assign(
         std::move(key), // NOLINT(performance-move-const-arg) - false positive
         std::move(value));

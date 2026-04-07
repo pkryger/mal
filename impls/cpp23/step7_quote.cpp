@@ -55,15 +55,15 @@ ValuePtr EVAL(ValuePtr ast, const EnvPtr &evalEnv) {
         return ast->eval(*env);
       }
       if (const auto *special = [&]() -> Special * {
-        if (const auto *symbol = values.front()->dyncast<Symbol>()) {
-          const auto *res =
-              std::ranges::find_if(specials, [&](auto &&elt) noexcept {
-                return *symbol == elt.first;
-              });
-          return res != specials.end() ? res : nullptr;
-        }
-        return nullptr;
-      }()) {
+            if (const auto *symbol = values.front()->dyncast<Symbol>()) {
+              const auto *res =
+                  std::ranges::find_if(specials, [&](auto &&elt) noexcept {
+                    return *symbol == elt.first;
+                  });
+              return res != specials.end() ? res : nullptr;
+            }
+            return nullptr;
+          }()) {
         std::tie(ast, env) =
             special->second(special->first, values.subspan(1), *env);
       } else {
