@@ -9,7 +9,7 @@ IMPL:
   - {IMPL: c}
   - {IMPL: c.2}
   - {IMPL: cpp}
-  - {IMPL: cpp23}
+  - {IMPL: cpp23, NO_SELF_HOST: 1} # step8 macro capture
   - {IMPL: coffee}
   - {IMPL: cs}
   - {IMPL: chuck, NO_SELF_HOST_PERF: 1}  # perf OOM
